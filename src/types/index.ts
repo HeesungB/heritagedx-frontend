@@ -22,16 +22,20 @@ export interface ClubsResponse {
 }
 
 export interface ClubContact {
-  type: string;
-  value: string;
-  name?: string;
+  id: string;
+  phoneNumber?: string;
+  fax?: string;
+  email?: string;
+  contactPerson?: string;
   department?: string;
+  isPrimary: boolean;
 }
 
 export interface BankAccount {
-  bank: string;
-  account: string;
-  holder: string;
+  id: string;
+  bankName?: string;
+  accountNumber?: string;
+  accountHolder?: string;
 }
 
 export interface ClubDetail {
@@ -75,6 +79,7 @@ export interface AvailableFilters {
   hasProxyOptions: FilterOption[];
   isCertificateLostOptions: FilterOption[];
   transferStructures: FilterOption[];
+  requiresTaxInvoiceOptions: FilterOption[];
 }
 
 export interface Scenario {
@@ -82,11 +87,12 @@ export interface Scenario {
   scenarioCode: string;
   name: string;
   side: "Seller" | "Buyer";
-  ownerType: "Personal" | "Corporate";
+  ownerType: "Personal" | "Corporate" | "Family" | "Special" | "All";
   hasProxy: boolean;
   isCertificateLost: boolean;
   isFamily: boolean;
   transferStructure: string | null;
+  requiresTaxInvoice: boolean;
   requiredDocumentsCount: number | null;
   isActive: boolean;
 }

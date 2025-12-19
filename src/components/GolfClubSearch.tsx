@@ -10,9 +10,10 @@ import { fetchWithCache } from "@/utils/apiCache";
 
 interface GolfClubSearchProps {
   onClubConfirm: (club: Club, detail: ClubDetail) => void;
+  onReset: () => void;
 }
 
-export default function GolfClubSearch({ onClubConfirm }: GolfClubSearchProps) {
+export default function GolfClubSearch({ onClubConfirm, onReset }: GolfClubSearchProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [clubs, setClubs] = useState<Club[]>([]);
   const [loading, setLoading] = useState(true);
@@ -127,6 +128,7 @@ export default function GolfClubSearch({ onClubConfirm }: GolfClubSearchProps) {
               detail={clubDetail}
               loading={detailLoading}
               onConfirm={handleConfirm}
+              onReset={onReset}
             />
           )}
         </div>

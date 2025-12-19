@@ -6,9 +6,10 @@ interface GolfClubDetailProps {
   detail: ClubDetail;
   loading: boolean;
   onConfirm: () => void;
+  onReset: () => void;
 }
 
-export default function GolfClubDetail({ detail, loading, onConfirm }: GolfClubDetailProps) {
+export default function GolfClubDetail({ detail, loading, onConfirm, onReset }: GolfClubDetailProps) {
   if (loading) {
     return (
       <div className="mt-6 border border-gray-300 rounded p-6">
@@ -17,20 +18,21 @@ export default function GolfClubDetail({ detail, loading, onConfirm }: GolfClubD
     );
   }
 
-  const contactInfo = detail.contacts?.[0];
-  const contactName = contactInfo?.name || "-";
-  const contactDepartment = contactInfo?.department || "";
+  // 주 연락처 찾기 (isPrimary가 true인 것 또는 첫번째)
+  const primaryContact = detail.contacts?.find(c => c.isPrimary) || detail.contacts?.[0];
+  const contactPerson = primaryContact?.contactPerson || "-";
+  const contactDepartment = primaryContact?.department || "";
   const contactDisplay = contactDepartment
-    ? `${contactName} — ${contactDepartment}`
-    : contactName;
+    ? `${contactPerson} — ${contactDepartment}`
+    : contactPerson;
 
-  const phoneContact = detail.contacts?.find(c => c.type === "phone")?.value || "-";
-  const emailContact = detail.contacts?.find(c => c.type === "email")?.value || "-";
+  const phoneContact = primaryContact?.phoneNumber || "-";
+  const emailContact = primaryContact?.email || "-";
   const contactString = `${phoneContact} / ${emailContact}`;
 
   const bankAccount = detail.bankAccounts?.[0];
   const bankDisplay = bankAccount
-    ? `${bankAccount.bank} ${bankAccount.account} (${bankAccount.holder})`
+    ? `${bankAccount.bankName || ""} ${bankAccount.accountNumber || ""} (${bankAccount.accountHolder || ""})`
     : "-";
 
   const submissionMethods = detail.submissionMethods || ["VISIT", "MAIL", "EMAIL"];
@@ -49,8 +51,8 @@ export default function GolfClubDetail({ detail, loading, onConfirm }: GolfClubD
         <span className="text-gray-500 text-sm">L1 마스터 데이터 — 시스템 기록</span>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 p-4 mb-6">
-        <p>
+      <div className="bg-info-background border border-info-border p-4 mb-6">
+        <p className="text-info-text">
           <strong>데이터 갱신일 고지:</strong> 본 데이터는 최종 갱신일 기준 시스템 기록.
           운영자는 진행 전 골프장 행정실 직접 확인을 통해 현행 정확성 재검증 필요.
         </p>
@@ -160,7 +162,7 @@ export default function GolfClubDetail({ detail, loading, onConfirm }: GolfClubD
               href={detail.externalUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-600 underline"
+              className="text-link underline hover:text-link-hover"
             >
               {detail.externalUrl}
             </a>
@@ -172,12 +174,19 @@ export default function GolfClubDetail({ detail, loading, onConfirm }: GolfClubD
 
       {/* 하단 액션 */}
       <div className="flex justify-between items-center">
-        <span className="text-gray-500">운영자 정확성 검증 확인 후 골프장 선택 진행</span>
+        <div className="flex gap-4">
+          <button
+            onClick={onReset}
+            className="px-6 py-3 border border-gray-300 text-red-600 hover:bg-red-50 transition-colors"
+          >
+            초기화
+          </button>
+        </div>
         <button
           onClick={onConfirm}
           className="px-6 py-3 bg-gray-900 text-white hover:bg-gray-800 transition-colors"
         >
-          선택 확정 및 단계 2 진행
+          선택 확정 및 단계 2 진행 →
         </button>
       </div>
     </div>

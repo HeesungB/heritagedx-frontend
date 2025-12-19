@@ -1,3 +1,54 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/**
+ * Heritage OS 테마 CSS 변수
+ *
+ * 테마 색상을 변경하려면 src/config/theme.ts 파일을 수정하거나,
+ * 아래의 CSS 변수 값들을 직접 수정하세요.
+ */
+:root {
+  /* Primary 색상 - 주요 버튼, 강조 요소 */
+  --color-primary: #000000;
+  --color-primary-hover: #1f1f1f;
+  --color-primary-disabled: #9ca3af;
+  --color-primary-foreground: #ffffff;
+
+  /* Background 색상 - 배경 */
+  --color-background: #ffffff;
+  --color-background-secondary: #f9fafb;
+  --color-background-tertiary: #f3f4f6;
+  --color-background-muted: #e5e7eb;
+
+  /* Border 색상 - 테두리 */
+  --color-border: #e5e7eb;
+  --color-border-strong: #d1d5db;
+  --color-border-primary: #000000;
+
+  /* Text 색상 - 텍스트 */
+  --color-text: #111827;
+  --color-text-secondary: #4b5563;
+  --color-text-muted: #6b7280;
+  --color-text-disabled: #9ca3af;
+  --color-text-inverse: #ffffff;
+
+  /* Info 색상 - 정보 안내 */
+  --color-info-background: #f3f4f6;
+  --color-info-border: #d1d5db;
+  --color-info-text: #374151;
+
+  /* Success 색상 - 성공 상태 */
+  --color-success-background: #f0fdf4;
+  --color-success-border: #bbf7d0;
+  --color-success-text: #166534;
+
+  /* Error 색상 - 오류 상태 */
+  --color-error-background: #fef2f2;
+  --color-error-border: #fecaca;
+  --color-error-text: #dc2626;
+
+  /* Link 색상 */
+  --color-link: #000000;
+  --color-link-hover: #374151;
+}

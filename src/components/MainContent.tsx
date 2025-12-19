@@ -13,6 +13,8 @@ interface MainContentProps {
   onTransactionConfirm: (formData: TransactionFormData, scenario: Scenario) => void;
   onDocumentsConfirm: () => void;
   onSaveDraft: (formData: TransactionFormData) => void;
+  onPreviousStep: () => void;
+  onReset: () => void;
 }
 
 export default function MainContent({
@@ -21,21 +23,29 @@ export default function MainContent({
   onTransactionConfirm,
   onDocumentsConfirm,
   onSaveDraft,
+  onPreviousStep,
+  onReset,
 }: MainContentProps) {
   return (
     <main className="flex-1 p-8">
       <SystemNotice />
 
       {appState.currentStep === 1 && (
-        <GolfClubSearch onClubConfirm={onClubConfirm} />
+        <GolfClubSearch
+          onClubConfirm={onClubConfirm}
+          onReset={onReset}
+        />
       )}
 
       {appState.currentStep === 2 && appState.selectedClub && (
         <TransactionTypeForm
           clubCode={appState.selectedClub.code}
           clubName={appState.clubDetail?.name || appState.selectedClub.name}
+          initialFormData={appState.transactionForm}
           onConfirm={onTransactionConfirm}
           onSaveDraft={onSaveDraft}
+          onPreviousStep={onPreviousStep}
+          onReset={onReset}
         />
       )}
 
@@ -43,7 +53,10 @@ export default function MainContent({
         <RequiredDocuments
           clubCode={appState.selectedClub.code}
           scenarioCode={appState.selectedScenario.scenarioCode}
+          ownerType={appState.selectedScenario.ownerType}
           onConfirm={onDocumentsConfirm}
+          onPreviousStep={onPreviousStep}
+          onReset={onReset}
         />
       )}
 

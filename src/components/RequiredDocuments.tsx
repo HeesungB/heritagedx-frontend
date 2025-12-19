@@ -7,13 +7,19 @@ import { fetchWithCache } from "@/utils/apiCache";
 interface RequiredDocumentsProps {
   clubCode: string;
   scenarioCode: string;
+  ownerType: string;
   onConfirm: () => void;
+  onPreviousStep: () => void;
+  onReset: () => void;
 }
 
 export default function RequiredDocuments({
   clubCode,
   scenarioCode,
+  ownerType,
   onConfirm,
+  onPreviousStep,
+  onReset,
 }: RequiredDocumentsProps) {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [scenario, setScenario] = useState<DocumentsScenario | null>(null);
@@ -27,7 +33,7 @@ export default function RequiredDocuments({
       try {
         setLoading(true);
         const data = await fetchWithCache<DocumentsResponse>(
-          `https://api.heritage-dx.com/api/scenarios/${scenarioCode}/documents?clubCode=${clubCode}`
+          `https://api.heritage-dx.com/api/scenarios/${scenarioCode}/documents?clubCode=${clubCode}&ownerType=${ownerType}`
         );
         setDocuments(data.data.documents);
         setScenario(data.data.scenario);
@@ -40,10 +46,10 @@ export default function RequiredDocuments({
       }
     }
 
-    if (clubCode && scenarioCode) {
+    if (clubCode && scenarioCode && ownerType) {
       fetchDocuments();
     }
-  }, [clubCode, scenarioCode]);
+  }, [clubCode, scenarioCode, ownerType]);
 
   // 정렬된 서류 목록
   const sortedDocuments = [...documents].sort((a, b) => {
@@ -189,12 +195,25 @@ export default function RequiredDocuments({
 
       {/* 하단 액션 */}
       <div className="flex justify-between items-center">
-        <span className="text-gray-500">서류 목록 확인 후 단계 4 진행</span>
+        <div className="flex gap-4">
+          <button
+            onClick={onPreviousStep}
+            className="px-6 py-3 border border-gray-300 hover:bg-gray-50 transition-colors"
+          >
+            ← 이전 단계
+          </button>
+          <button
+            onClick={onReset}
+            className="px-6 py-3 border border-gray-300 text-red-600 hover:bg-red-50 transition-colors"
+          >
+            초기화
+          </button>
+        </div>
         <button
           onClick={onConfirm}
           className="px-6 py-3 bg-gray-900 text-white hover:bg-gray-800 transition-colors"
         >
-          서류 확인 완료 및 단계 4 진행
+          서류 확인 완료 및 단계 4 진행 →
         </button>
       </div>
     </div>

@@ -3,6 +3,9 @@ import { Step } from "@/types";
 
 interface SidebarProps {
   currentStep: number;
+  onStepClick?: (stepNumber: number) => void;
+  canGoToStep2?: boolean;
+  canGoToStep3?: boolean;
 }
 
 const stepsData: Omit<Step, "active">[] = [
@@ -21,18 +24,42 @@ const stepsData: Omit<Step, "active">[] = [
   },
 ];
 
-export default function Sidebar({ currentStep }: SidebarProps) {
+export default function Sidebar({
+  currentStep,
+  onStepClick,
+  canGoToStep2 = false,
+  canGoToStep3 = false,
+}: SidebarProps) {
   const steps: Step[] = stepsData.map((step) => ({
     ...step,
     active: step.number === currentStep,
   }));
+
+  // 단계별 클릭 가능 여부 확인
+  const canClickStep = (stepNumber: number): boolean => {
+    if (stepNumber === 1) return true;
+    if (stepNumber === 2) return canGoToStep2;
+    if (stepNumber === 3) return canGoToStep3;
+    return false; // 4, 5단계는 클릭 불가
+  };
+
+  const handleStepClick = (stepNumber: number) => {
+    if (canClickStep(stepNumber) && onStepClick) {
+      onStepClick(stepNumber);
+    }
+  };
 
   return (
     <aside className="w-64 border-r border-gray-200 p-4 bg-gray-50">
       <div className="text-sm text-gray-500 mb-4">핵심 자동화 엔진 (L1-L3)</div>
       <div className="space-y-2">
         {steps.slice(0, 3).map((step) => (
-          <StepItem key={step.number} step={step} />
+          <StepItem
+            key={step.number}
+            step={step}
+            onClick={() => handleStepClick(step.number)}
+            clickable={canClickStep(step.number)}
+          />
         ))}
       </div>
 

@@ -7,27 +7,37 @@ import { fetchWithCache } from "@/utils/apiCache";
 interface TransactionTypeFormProps {
   clubCode: string;
   clubName: string;
+  initialFormData?: TransactionFormData | null;
   onConfirm: (formData: TransactionFormData, scenario: Scenario) => void;
   onSaveDraft: (formData: TransactionFormData) => void;
+  onPreviousStep: () => void;
+  onReset: () => void;
 }
+
+const defaultFormData: TransactionFormData = {
+  side: "",
+  ownerType: "",
+  hasProxy: null,
+  isCertificateLost: null,
+  selectedScenarioId: null,
+};
 
 export default function TransactionTypeForm({
   clubCode,
   clubName,
+  initialFormData,
   onConfirm,
   onSaveDraft,
+  onPreviousStep,
+  onReset,
 }: TransactionTypeFormProps) {
   const [filters, setFilters] = useState<AvailableFilters | null>(null);
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [formData, setFormData] = useState<TransactionFormData>({
-    side: "",
-    ownerType: "",
-    hasProxy: null,
-    isCertificateLost: null,
-    selectedScenarioId: null,
-  });
+  const [formData, setFormData] = useState<TransactionFormData>(
+    initialFormData || defaultFormData
+  );
 
   useEffect(() => {
     async function fetchScenarioOptions() {
@@ -115,8 +125,8 @@ export default function TransactionTypeForm({
         <span className="text-gray-500 text-sm">L3 거래 유형 엔진 — 기술 파라미터 입력</span>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 p-4 mb-6">
-        <p>
+      <div className="bg-info-background border border-info-border p-4 mb-6">
+        <p className="text-info-text">
           입력된 거래 유형이 실제 양도 조건과 일치하는지에 대한 확인은 운영자의 책임으로 함.
           본 시스템은 입력 정보에 대한 기술적 처리를 수행할 뿐, 해당 내용의 사실관계 또는 법적 적합성에 대한 판단은 포함하지 아니함.
         </p>
@@ -299,26 +309,37 @@ export default function TransactionTypeForm({
 
       {/* 하단 액션 */}
       <div className="flex justify-between items-center">
-        <span className="text-gray-500">운영자 입력 정확성 확인 후 거래 유형 확정 진행</span>
         <div className="flex gap-4">
+          <button
+            onClick={onPreviousStep}
+            className="px-6 py-3 border border-gray-300 hover:bg-gray-50 transition-colors"
+          >
+            ← 이전 단계
+          </button>
+          <button
+            onClick={onReset}
+            className="px-6 py-3 border border-gray-300 text-red-600 hover:bg-red-50 transition-colors"
+          >
+            초기화
+          </button>
           <button
             onClick={() => onSaveDraft(formData)}
             className="px-6 py-3 border border-gray-300 hover:bg-gray-50 transition-colors"
           >
             임시 저장
           </button>
-          <button
-            onClick={() => matchedScenario && onConfirm(formData, matchedScenario)}
-            disabled={!isFormValid()}
-            className={`px-6 py-3 transition-colors ${
-              isFormValid()
-                ? "bg-gray-900 text-white hover:bg-gray-800"
-                : "bg-gray-400 text-white cursor-not-allowed"
-            }`}
-          >
-            유형 확정 및 단계 3 진행
-          </button>
         </div>
+        <button
+          onClick={() => matchedScenario && onConfirm(formData, matchedScenario)}
+          disabled={!isFormValid()}
+          className={`px-6 py-3 transition-colors ${
+            isFormValid()
+              ? "bg-gray-900 text-white hover:bg-gray-800"
+              : "bg-gray-400 text-white cursor-not-allowed"
+          }`}
+        >
+          유형 확정 및 단계 3 진행 →
+        </button>
       </div>
     </div>
   );

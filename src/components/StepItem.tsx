@@ -2,13 +2,18 @@ import { Step } from "@/types";
 
 interface StepItemProps {
   step: Step;
+  onClick?: () => void;
+  clickable?: boolean;
 }
 
-export default function StepItem({ step }: StepItemProps) {
+export default function StepItem({ step, onClick, clickable = false }: StepItemProps) {
   return (
     <div
-      className={`flex items-start gap-3 p-3 rounded ${
+      onClick={clickable ? onClick : undefined}
+      className={`flex items-start gap-3 p-3 rounded transition-colors ${
         step.active ? "bg-gray-900 text-white" : "bg-white text-gray-900"
+      } ${clickable ? "cursor-pointer hover:bg-gray-100" : ""} ${
+        clickable && step.active ? "hover:bg-gray-800" : ""
       }`}
     >
       <div

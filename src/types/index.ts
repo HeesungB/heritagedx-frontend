@@ -159,3 +159,54 @@ export interface DocumentsResponse {
   };
   timestamp: string;
 }
+
+// 시나리오 매칭 API 타입
+export interface ScenarioMatchRequest {
+  clubCode: string;
+  side: "Buyer" | "Seller";
+  ownerType: "Personal" | "Corporate" | "Family" | "Special" | "All";
+  hasProxy?: boolean;
+  isCertificateLost?: boolean;
+  transferStructure?: "Withdraw" | "Abandon" | null;
+  isFamily?: boolean;
+}
+
+export interface ScenarioMatchResponse {
+  success: boolean;
+  data: {
+    matched: boolean;
+    scenario: {
+      id: string;
+      scenarioCode: string;
+      name: string;
+      description: string | null;
+      side: "Buyer" | "Seller";
+      ownerType: "Personal" | "Corporate" | "Family" | "Special" | "All";
+      hasProxy: boolean;
+      isCertificateLost: boolean;
+      transferStructure: string | null;
+      isFamily: boolean;
+      requiresTaxInvoice: boolean;
+      displayOrder: number;
+    };
+    matchedConditions: {
+      side: string;
+      ownerType: string;
+      hasProxy: boolean;
+      isCertificateLost: boolean;
+      transferStructure: string | null;
+      isFamily: boolean;
+    };
+    clubInfo: {
+      code: string;
+      name: string;
+    };
+  };
+  timestamp: string;
+}
+
+// 트랜잭션 옵션 타입
+export interface TransactionOptions {
+  side: "Buyer" | "Seller" | "";
+  ownerType: "Personal" | "Corporate" | "";
+}

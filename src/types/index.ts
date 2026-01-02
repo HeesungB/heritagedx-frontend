@@ -52,6 +52,52 @@ export interface ClubDetail {
   submissionMethods?: string[];
   processingTime?: string;
   externalUrl?: string;
+  // 골프장 기본 정보
+  openingDate?: string;
+  holes?: string;
+  totalLength?: string;
+  memberCount?: string;
+  courseNames?: string[];
+  courseComposition?: string;
+  cityAccessibility?: string;
+  // 등록/예약 정보
+  registrationHours?: string;
+  documentLink?: string;
+  registrationProcedure?: string;
+  reservationNotes?: string;
+  weekendReservationDifficulty?: string;
+  claimFrequency?: string;
+  // 비용 정보 (숫자 또는 객체 형태 가능)
+  weekdayGreenFee?: number | Record<string, number>;
+  weekendGreenFee?: number | Record<string, number>;
+  cartFee?: number | Record<string, number>;
+  recentMarketPrice?: string;
+  recentPriceUpdateDate?: string;
+  avgMarketPrice3y?: string;
+  dealerPriceRange?: string;
+  // 거래 정보
+  registrationDifficulty?: string;
+  additionalDocumentFrequency?: string;
+  transactionTendency?: string;
+  tradableTypeSummary?: string;
+  minTransactionUnit?: string;
+  recentTransactionType?: string;
+  balanceRisk?: string;
+  transactionRiskMemo?: string;
+  dealerMemo?: string;
+  membershipInfo?: string;
+  // 시나리오 정보
+  scenariosCount?: number;
+  scenarioOptions?: ScenarioOptions;
+  // 타임스탬프
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ScenarioOptions {
+  availableFilters: AvailableFilters;
+  scenarios: Scenario[];
+  totalScenarios: number;
 }
 
 export interface ClubDetailResponse {

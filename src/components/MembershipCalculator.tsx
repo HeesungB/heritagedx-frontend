@@ -453,14 +453,6 @@ export default function MembershipCalculator({
           초기화
         </button>
       </div>
-
-      {/* 안내 문구 */}
-      <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <p className="text-sm text-yellow-800">
-          위 금액은 예상 비용으로, 실제 거래 시 세부 조건에 따라 달라질 수
-          있습니다. 정확한 비용은 전문 딜러에게 문의해 주세요.
-        </p>
-      </div>
     </div>
   );
 }

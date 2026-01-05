@@ -68,13 +68,21 @@ export default function MembershipCalculator({
     const acquisitionTax = Math.round(priceWon * 0.022);
     const acquisitionTaxManwon = Math.round(acquisitionTax / 10000);
 
-    // 총 비용
-    const totalManwon =
-      priceManwon +
+    // 총 비용 (추가 비용만)
+    const additionalCostManwon =
       transactionFeeManwon +
       transferFeeManwon +
       stampDutyManwon +
       acquisitionTaxManwon;
+
+    // 총 비용
+    const totalManwon = priceManwon + additionalCostManwon;
+
+    // 비용 부담률 (추가 비용 / 구매가)
+    const costRatio = priceManwon > 0 ? (additionalCostManwon / priceManwon) * 100 : 0;
+
+    // 세금 비중 (취득세 / 구매가)
+    const taxRatio = priceManwon > 0 ? (acquisitionTaxManwon / priceManwon) * 100 : 0;
 
     return {
       priceManwon,
@@ -82,7 +90,10 @@ export default function MembershipCalculator({
       transferFeeManwon,
       stampDutyManwon,
       acquisitionTaxManwon,
+      additionalCostManwon,
       totalManwon,
+      costRatio,
+      taxRatio,
     };
   }, [priceManwon, transferFeeManwon]);
 
@@ -129,16 +140,31 @@ export default function MembershipCalculator({
     const netProceedsManwon =
       priceManwon - transactionFeeManwon - totalTaxManwon;
 
+    // 양도차익 (만원)
+    const capitalGainManwon = Math.round(capitalGain / 10000);
+
+    // 예상 이익 = 판매 예상 수령액 - 구매가
+    const expectedProfitManwon = netProceedsManwon - purchasePriceManwon;
+
+    // 실수령률 (수령액 / 판매가)
+    const netProceedsRatio = priceManwon > 0 ? (netProceedsManwon / priceManwon) * 100 : 0;
+
+    // 세금 비중 (총 세금 / 판매가)
+    const taxRatio = priceManwon > 0 ? (totalTaxManwon / priceManwon) * 100 : 0;
+
     return {
       priceManwon,
       purchasePriceManwon,
       transactionFeeManwon,
-      capitalGainManwon: Math.round(capitalGain / 10000),
+      capitalGainManwon,
       taxableAmountManwon: Math.round(taxableAmount / 10000),
       transferTaxManwon,
       localTaxManwon,
       totalTaxManwon,
       netProceedsManwon,
+      expectedProfitManwon,
+      netProceedsRatio,
+      taxRatio,
     };
   }, [priceManwon, purchasePriceManwon, transferFeeManwon]);
 
@@ -201,53 +227,56 @@ export default function MembershipCalculator({
 
       {/* 금액 입력 */}
       <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={priceManwon.toLocaleString("ko-KR")}
-            onChange={(e) => handleInputChange(e.target.value)}
-            className="flex-1 px-4 py-3 text-xl font-bold border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
-          />
-          <span className="text-xl font-bold text-gray-700">만원</span>
-        </div>
-        <div className="mt-2 text-lg text-red-500 font-medium">
-          {formatManwon(priceManwon)}
+        <p className="text-sm text-gray-500 mb-4">거래 금액</p>
+        <div className="text-right">
+          <div className="flex items-baseline justify-end gap-2">
+            <input
+              type="text"
+              value={priceManwon.toLocaleString("ko-KR")}
+              onChange={(e) => handleInputChange(e.target.value)}
+              className="text-4xl font-bold text-right bg-transparent border-none outline-none w-40 focus:ring-0"
+            />
+            <span className="text-lg text-gray-500">만원</span>
+          </div>
+          <p className="text-sm text-gray-400 mt-1">
+            {formatManwon(priceManwon)}
+          </p>
         </div>
         {/* 금액 조절 버튼 */}
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-wrap gap-2">
           <button
             onClick={() => handlePriceChange(100)}
-            className="px-3 py-1.5 text-sm border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
+            className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-full hover:bg-gray-100 transition-colors"
           >
             +100만원
           </button>
           <button
             onClick={() => handlePriceChange(1000)}
-            className="px-3 py-1.5 text-sm border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
+            className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-full hover:bg-gray-100 transition-colors"
           >
             +1,000만원
           </button>
           <button
             onClick={() => handlePriceChange(10000)}
-            className="px-3 py-1.5 text-sm border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
+            className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-full hover:bg-gray-100 transition-colors"
           >
             +1억원
           </button>
           <button
             onClick={() => handlePriceChange(-100)}
-            className="px-3 py-1.5 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+            className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-full hover:bg-gray-100 transition-colors"
           >
             -100만원
           </button>
           <button
             onClick={() => handlePriceChange(-1000)}
-            className="px-3 py-1.5 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+            className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-full hover:bg-gray-100 transition-colors"
           >
             -1,000만원
           </button>
           <button
             onClick={() => handlePriceChange(-10000)}
-            className="px-3 py-1.5 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+            className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-full hover:bg-gray-100 transition-colors"
           >
             -1억원
           </button>
@@ -256,57 +285,59 @@ export default function MembershipCalculator({
 
       {/* 판매 시 취득가액 입력 */}
       {mode === "sell" && (
-        <div className="p-4 border border-gray-200 rounded-lg bg-blue-50">
-          <label className="block text-sm text-gray-600 mb-2">
+        <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+          <p className="text-sm text-gray-500 mb-4">
             구매했을 때 가격은 얼마였나요? (양도세 계산용)
-          </label>
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={purchasePriceManwon.toLocaleString("ko-KR")}
-              onChange={(e) => handlePurchasePriceChange(e.target.value)}
-              className="flex-1 px-4 py-3 text-lg font-bold border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
-            />
-            <span className="text-lg font-bold text-gray-700">만원</span>
-          </div>
-          <div className="mt-2 text-sm text-blue-600">
-            {formatManwon(purchasePriceManwon)}
+          </p>
+          <div className="text-right">
+            <div className="flex items-baseline justify-end gap-2">
+              <input
+                type="text"
+                value={purchasePriceManwon.toLocaleString("ko-KR")}
+                onChange={(e) => handlePurchasePriceChange(e.target.value)}
+                className="text-4xl font-bold text-right bg-transparent border-none outline-none w-40 focus:ring-0"
+              />
+              <span className="text-lg text-gray-500">만원</span>
+            </div>
+            <p className="text-sm text-gray-400 mt-1">
+              {formatManwon(purchasePriceManwon)}
+            </p>
           </div>
           {/* 금액 조절 버튼 */}
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap gap-2">
             <button
               onClick={() => handlePurchasePriceAdjust(100)}
-              className="px-3 py-1.5 text-sm border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+              className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-full hover:bg-gray-100 transition-colors"
             >
               +100만원
             </button>
             <button
               onClick={() => handlePurchasePriceAdjust(1000)}
-              className="px-3 py-1.5 text-sm border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+              className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-full hover:bg-gray-100 transition-colors"
             >
               +1,000만원
             </button>
             <button
               onClick={() => handlePurchasePriceAdjust(10000)}
-              className="px-3 py-1.5 text-sm border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+              className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-full hover:bg-gray-100 transition-colors"
             >
               +1억원
             </button>
             <button
               onClick={() => handlePurchasePriceAdjust(-100)}
-              className="px-3 py-1.5 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+              className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-full hover:bg-gray-100 transition-colors"
             >
               -100만원
             </button>
             <button
               onClick={() => handlePurchasePriceAdjust(-1000)}
-              className="px-3 py-1.5 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+              className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-full hover:bg-gray-100 transition-colors"
             >
               -1,000만원
             </button>
             <button
               onClick={() => handlePurchasePriceAdjust(-10000)}
-              className="px-3 py-1.5 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+              className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-full hover:bg-gray-100 transition-colors"
             >
               -1억원
             </button>
@@ -329,6 +360,38 @@ export default function MembershipCalculator({
             d="M19 9l-7 7-7-7"
           />
         </svg>
+      </div>
+
+      {/* 손익 요약 */}
+      <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+        <div className="flex justify-between items-center">
+          <div>
+            <p className="text-sm font-medium text-gray-700 underline decoration-gray-400">손익 요약</p>
+            <p className="text-xs text-gray-500 mt-1">
+              {mode === "buy"
+                ? `비용 부담률 ${buyCalculation.costRatio.toFixed(1)}% · 세금 비중 ${buyCalculation.taxRatio.toFixed(1)}%`
+                : `실수령률 ${sellCalculation.netProceedsRatio.toFixed(1)}% · 세금 비중 ${sellCalculation.taxRatio.toFixed(1)}%`}
+            </p>
+          </div>
+          <div
+            className={`px-3 py-1.5 rounded-full text-sm font-medium border ${
+              mode === "buy"
+                ? "border-gray-300 text-gray-700"
+                : sellCalculation.expectedProfitManwon >= 0
+                ? "border-gray-300 text-gray-700"
+                : "border-gray-300 text-gray-700"
+            }`}
+          >
+            {mode === "buy" ? (
+              <>예상 손실 -{buyCalculation.additionalCostManwon.toLocaleString()}만원</>
+            ) : (
+              <>
+                {sellCalculation.expectedProfitManwon >= 0 ? "예상 이익 +" : "예상 손실 "}
+                {sellCalculation.expectedProfitManwon.toLocaleString()}만원
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* 비용 상세 */}
@@ -360,7 +423,7 @@ export default function MembershipCalculator({
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-600">취득세(2.2% 적용)</span>
+              <span className="text-gray-600">취득세 (2.2%)</span>
               <span className="text-gray-700">
                 + 예상 {buyCalculation.acquisitionTaxManwon.toLocaleString()}
                 만원
@@ -369,7 +432,7 @@ export default function MembershipCalculator({
             <hr className="my-3" />
             <div className="flex justify-between items-center">
               <span className="font-semibold text-gray-800">예상 총 비용</span>
-              <span className="text-xl font-bold text-red-500">
+              <span className="text-xl font-bold text-gray-900">
                 {formatManwon(buyCalculation.totalManwon)}
               </span>
             </div>
@@ -388,14 +451,14 @@ export default function MembershipCalculator({
                 - {sellCalculation.transactionFeeManwon.toLocaleString()}만원
               </span>
             </div>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600">양도차익</span>
+              <span className="text-gray-700">
+                {formatManwon(sellCalculation.capitalGainManwon)}
+              </span>
+            </div>
             {sellCalculation.capitalGainManwon > 0 && (
               <>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">양도차익</span>
-                  <span className="text-gray-500">
-                    {formatManwon(sellCalculation.capitalGainManwon)}
-                  </span>
-                </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600">
                     양도세
@@ -429,7 +492,7 @@ export default function MembershipCalculator({
               <span className="font-semibold text-gray-800">
                 판매 예상 수령액
               </span>
-              <span className="text-xl font-bold text-blue-600">
+              <span className="text-xl font-bold text-gray-900">
                 {formatManwon(sellCalculation.netProceedsManwon)}
               </span>
             </div>

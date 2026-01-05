@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { ClubDetail } from "@/types";
+import MembershipCalculator from "./MembershipCalculator";
+import TaxGuideModal from "./TaxGuideModal";
 
 interface ClubProfileProps {
   detail: ClubDetail | null;
@@ -12,6 +14,7 @@ type ProfileTab = "basic" | "fee" | "transaction" | "scenario";
 
 export default function ClubProfile({ detail, loading }: ClubProfileProps) {
   const [activeTab, setActiveTab] = useState<ProfileTab>("basic");
+  const [showTaxGuide, setShowTaxGuide] = useState(false);
 
   if (loading) {
     return (
@@ -43,7 +46,7 @@ export default function ClubProfile({ detail, loading }: ClubProfileProps) {
     return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`;
   };
 
-  // 금액 포맷팅
+  // 금액 포맷팅 (숫자)
   const formatCurrency = (amount?: number | object | null) => {
     if (!amount) return "-";
     // 객체인 경우 처리
@@ -56,6 +59,24 @@ export default function ClubProfile({ detail, loading }: ClubProfileProps) {
       return "-";
     }
     return `${amount.toLocaleString()}원`;
+  };
+
+  // 금액 문자열 포맷팅 (문자열에 원 단위 추가, 세자리 콤마 적용)
+  const formatPriceString = (priceStr?: string | null) => {
+    if (!priceStr) return "-";
+    // 이미 원이 포함되어 있으면 그대로 반환
+    if (priceStr.includes("원")) return priceStr;
+    // 숫자만 추출
+    const numMatch = priceStr.match(/[\d,]+/);
+    if (numMatch) {
+      const num = parseInt(numMatch[0].replace(/,/g, ""), 10);
+      if (!isNaN(num)) {
+        // 세자리 콤마 추가하고 원 단위 붙이기
+        return `${num.toLocaleString("ko-KR")}원`;
+      }
+    }
+    // 숫자가 없으면 그대로 반환
+    return priceStr;
   };
 
   const tabs = [
@@ -217,11 +238,24 @@ export default function ClubProfile({ detail, loading }: ClubProfileProps) {
               <section>
                 <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">시세 정보</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <InfoField label="최근 시세" value={detail.recentMarketPrice} />
+                  <InfoField label="최근 시세" value={formatPriceString(detail.recentMarketPrice)} />
                   <InfoField label="시세 업데이트일" value={detail.recentPriceUpdateDate} />
-                  <InfoField label="3년 평균 시세" value={detail.avgMarketPrice3y} />
-                  <InfoField label="딜러 가격대" value={detail.dealerPriceRange} />
+                  <InfoField label="3년 평균 시세" value={formatPriceString(detail.avgMarketPrice3y)} />
+                  <InfoField label="딜러 가격대" value={formatPriceString(detail.dealerPriceRange)} />
                 </div>
+              </section>
+
+              {/* 회원권 비용 계산기 */}
+              <section>
+                <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">회원권 비용 계산기</h3>
+                <p className="text-sm text-gray-500 mb-4">
+                  회원권 구매 또는 판매 시 예상 비용을 간편하게 계산해 보세요.
+                </p>
+                <MembershipCalculator
+                  transferFee={detail.transferFee}
+                  recentMarketPrice={detail.recentMarketPrice}
+                  onShowTaxGuide={() => setShowTaxGuide(true)}
+                />
               </section>
             </div>
           )}
@@ -381,6 +415,9 @@ export default function ClubProfile({ detail, loading }: ClubProfileProps) {
           )}
         </div>
       </div>
+
+      {/* 세금 안내 모달 */}
+      <TaxGuideModal isOpen={showTaxGuide} onClose={() => setShowTaxGuide(false)} />
     </div>
   );
 }

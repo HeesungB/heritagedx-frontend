@@ -1,0 +1,485 @@
+"use client";
+
+import { useState, useMemo } from "react";
+import { formatManwon, parseTransferFee } from "@/utils/formatCurrency";
+
+interface MembershipCalculatorProps {
+  transferFee?: string | null;
+  recentMarketPrice?: string | null;
+  onShowTaxGuide: () => void;
+}
+
+type CalculatorMode = "buy" | "sell";
+
+// 양도세 세율표 (2024년 기준)
+const TAX_BRACKETS = [
+  { max: 14000000, rate: 0.06, deduction: 0 },
+  { max: 50000000, rate: 0.15, deduction: 1260000 },
+  { max: 88000000, rate: 0.24, deduction: 5760000 },
+  { max: 150000000, rate: 0.35, deduction: 15440000 },
+  { max: 300000000, rate: 0.38, deduction: 19940000 },
+  { max: 500000000, rate: 0.4, deduction: 25940000 },
+  { max: 1000000000, rate: 0.42, deduction: 35940000 },
+  { max: Infinity, rate: 0.45, deduction: 65940000 },
+];
+
+// 기본공제액 (연 1회, 250만원)
+const BASIC_DEDUCTION = 2500000;
+
+export default function MembershipCalculator({
+  transferFee,
+  recentMarketPrice,
+  onShowTaxGuide,
+}: MembershipCalculatorProps) {
+  const [mode, setMode] = useState<CalculatorMode>("buy");
+  const [priceManwon, setPriceManwon] = useState<number>(10000);
+  const [purchasePriceManwon, setPurchasePriceManwon] = useState<number>(10000); // 판매 시 취득가액
+
+  // 명의개서료 (만원)
+  const transferFeeManwon = parseTransferFee(transferFee);
+
+  // 최근 시세에서 초기값 설정
+  const getInitialPrice = () => {
+    if (recentMarketPrice) {
+      const match = recentMarketPrice.match(/([0-9,]+)/);
+      if (match) {
+        const num = parseInt(match[1].replace(/,/g, ""), 10);
+        if (!isNaN(num)) {
+          return num;
+        }
+      }
+    }
+    return 10000;
+  };
+
+  // 구매 비용 계산
+  const buyCalculation = useMemo(() => {
+    const priceWon = priceManwon * 10000; // 만원 -> 원
+
+    // 거래수수료 (0.4%)
+    const transactionFee = Math.round(priceWon * 0.004);
+    const transactionFeeManwon = Math.round(transactionFee / 10000);
+
+    // 인지세 (15만원 고정)
+    const stampDuty = 150000;
+    const stampDutyManwon = 15;
+
+    // 취득세 (2.2%)
+    const acquisitionTax = Math.round(priceWon * 0.022);
+    const acquisitionTaxManwon = Math.round(acquisitionTax / 10000);
+
+    // 총 비용
+    const totalManwon =
+      priceManwon +
+      transactionFeeManwon +
+      transferFeeManwon +
+      stampDutyManwon +
+      acquisitionTaxManwon;
+
+    return {
+      priceManwon,
+      transactionFeeManwon,
+      transferFeeManwon,
+      stampDutyManwon,
+      acquisitionTaxManwon,
+      totalManwon,
+    };
+  }, [priceManwon, transferFeeManwon]);
+
+  // 판매 비용 계산
+  const sellCalculation = useMemo(() => {
+    const priceWon = priceManwon * 10000;
+    const purchasePriceWon = purchasePriceManwon * 10000;
+
+    // 거래수수료 (0.4%)
+    const transactionFee = Math.round(priceWon * 0.004);
+    const transactionFeeManwon = Math.round(transactionFee / 10000);
+
+    // 필요경비 (구매 시 거래수수료 + 명의개서료 + 판매 시 거래수수료)
+    const buyTransactionFee = Math.round(purchasePriceWon * 0.004);
+    const necessaryExpenses =
+      buyTransactionFee + transferFeeManwon * 10000 + transactionFee;
+
+    // 양도차익 = 판매가 - 구매가 - 필요경비
+    const capitalGain = priceWon - purchasePriceWon - necessaryExpenses;
+
+    // 과세표준 = 양도차익 - 기본공제 (250만원)
+    const taxableAmount = Math.max(0, capitalGain - BASIC_DEDUCTION);
+
+    // 양도세 계산
+    let transferTax = 0;
+    if (taxableAmount > 0) {
+      const bracket =
+        TAX_BRACKETS.find((b) => taxableAmount <= b.max) ||
+        TAX_BRACKETS[TAX_BRACKETS.length - 1];
+      transferTax = Math.round(
+        taxableAmount * bracket.rate - bracket.deduction
+      );
+    }
+    const transferTaxManwon = Math.round(transferTax / 10000);
+
+    // 주민세 (양도세의 10%)
+    const localTax = Math.round(transferTax * 0.1);
+    const localTaxManwon = Math.round(localTax / 10000);
+
+    // 총 세금
+    const totalTaxManwon = transferTaxManwon + localTaxManwon;
+
+    // 예상 수령액 = 판매가 - 거래수수료 - 양도세 - 주민세
+    const netProceedsManwon =
+      priceManwon - transactionFeeManwon - totalTaxManwon;
+
+    return {
+      priceManwon,
+      purchasePriceManwon,
+      transactionFeeManwon,
+      capitalGainManwon: Math.round(capitalGain / 10000),
+      taxableAmountManwon: Math.round(taxableAmount / 10000),
+      transferTaxManwon,
+      localTaxManwon,
+      totalTaxManwon,
+      netProceedsManwon,
+    };
+  }, [priceManwon, purchasePriceManwon, transferFeeManwon]);
+
+  const handlePriceChange = (delta: number) => {
+    setPriceManwon((prev) => Math.max(0, prev + delta));
+  };
+
+  const handleInputChange = (value: string) => {
+    const num = parseInt(value.replace(/[^0-9]/g, ""), 10);
+    if (!isNaN(num)) {
+      setPriceManwon(num);
+    } else if (value === "") {
+      setPriceManwon(0);
+    }
+  };
+
+  const handlePurchasePriceChange = (value: string) => {
+    const num = parseInt(value.replace(/[^0-9]/g, ""), 10);
+    if (!isNaN(num)) {
+      setPurchasePriceManwon(num);
+    } else if (value === "") {
+      setPurchasePriceManwon(0);
+    }
+  };
+
+  const handlePurchasePriceAdjust = (delta: number) => {
+    setPurchasePriceManwon((prev) => Math.max(0, prev + delta));
+  };
+
+  const handleReset = () => {
+    setPriceManwon(getInitialPrice());
+    setPurchasePriceManwon(15000);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* 탭 선택 */}
+      <div className="flex rounded-lg overflow-hidden border border-gray-200">
+        <button
+          onClick={() => setMode("buy")}
+          className={`flex-1 py-3 text-sm font-medium transition-colors ${
+            mode === "buy"
+              ? "bg-gray-900 text-white"
+              : "bg-white text-gray-600 hover:bg-gray-50"
+          }`}
+        >
+          구매 비용
+        </button>
+        <button
+          onClick={() => setMode("sell")}
+          className={`flex-1 py-3 text-sm font-medium transition-colors ${
+            mode === "sell"
+              ? "bg-gray-900 text-white"
+              : "bg-white text-gray-600 hover:bg-gray-50"
+          }`}
+        >
+          판매 비용
+        </button>
+      </div>
+
+      {/* 금액 입력 */}
+      <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+        <label className="block text-sm text-gray-600 mb-2">
+          {mode === "buy"
+            ? "얼마에 구매하고 싶으신가요?"
+            : "얼마에 판매하고 싶으신가요?"}
+        </label>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={priceManwon.toLocaleString("ko-KR")}
+            onChange={(e) => handleInputChange(e.target.value)}
+            className="flex-1 px-4 py-3 text-xl font-bold border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
+          />
+          <span className="text-xl font-bold text-gray-700">만원</span>
+        </div>
+        <div className="mt-2 text-lg text-red-500 font-medium">
+          {formatManwon(priceManwon)}
+        </div>
+        {/* 금액 조절 버튼 */}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            onClick={() => handlePriceChange(100)}
+            className="px-3 py-1.5 text-sm border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
+          >
+            +100만원
+          </button>
+          <button
+            onClick={() => handlePriceChange(1000)}
+            className="px-3 py-1.5 text-sm border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
+          >
+            +1,000만원
+          </button>
+          <button
+            onClick={() => handlePriceChange(10000)}
+            className="px-3 py-1.5 text-sm border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
+          >
+            +1억원
+          </button>
+          <button
+            onClick={() => handlePriceChange(-100)}
+            className="px-3 py-1.5 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+          >
+            -100만원
+          </button>
+          <button
+            onClick={() => handlePriceChange(-1000)}
+            className="px-3 py-1.5 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+          >
+            -1,000만원
+          </button>
+          <button
+            onClick={() => handlePriceChange(-10000)}
+            className="px-3 py-1.5 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+          >
+            -1억원
+          </button>
+        </div>
+      </div>
+
+      {/* 판매 시 취득가액 입력 */}
+      {mode === "sell" && (
+        <div className="p-4 border border-gray-200 rounded-lg bg-blue-50">
+          <label className="block text-sm text-gray-600 mb-2">
+            구매했을 때 가격은 얼마였나요? (양도세 계산용)
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={purchasePriceManwon.toLocaleString("ko-KR")}
+              onChange={(e) => handlePurchasePriceChange(e.target.value)}
+              className="flex-1 px-4 py-3 text-lg font-bold border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
+            />
+            <span className="text-lg font-bold text-gray-700">만원</span>
+          </div>
+          <div className="mt-2 text-sm text-blue-600">
+            {formatManwon(purchasePriceManwon)}
+          </div>
+          {/* 금액 조절 버튼 */}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              onClick={() => handlePurchasePriceAdjust(100)}
+              className="px-3 py-1.5 text-sm border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+            >
+              +100만원
+            </button>
+            <button
+              onClick={() => handlePurchasePriceAdjust(1000)}
+              className="px-3 py-1.5 text-sm border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+            >
+              +1,000만원
+            </button>
+            <button
+              onClick={() => handlePurchasePriceAdjust(10000)}
+              className="px-3 py-1.5 text-sm border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+            >
+              +1억원
+            </button>
+            <button
+              onClick={() => handlePurchasePriceAdjust(-100)}
+              className="px-3 py-1.5 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+            >
+              -100만원
+            </button>
+            <button
+              onClick={() => handlePurchasePriceAdjust(-1000)}
+              className="px-3 py-1.5 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+            >
+              -1,000만원
+            </button>
+            <button
+              onClick={() => handlePurchasePriceAdjust(-10000)}
+              className="px-3 py-1.5 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+            >
+              -1억원
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 화살표 */}
+      <div className="flex justify-center">
+        <svg
+          className="w-6 h-6 text-gray-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>
+      </div>
+
+      {/* 비용 상세 */}
+      <div className="p-4 border border-gray-200 rounded-lg">
+        {mode === "buy" ? (
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600">구매가</span>
+              <span className="font-semibold">
+                {formatManwon(buyCalculation.priceManwon)}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600">거래수수료</span>
+              <span className="text-gray-700">
+                + {buyCalculation.transactionFeeManwon.toLocaleString()}만원
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600">명의개서료</span>
+              <span className="text-gray-700">
+                + {buyCalculation.transferFeeManwon.toLocaleString()}만원
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600">인지세</span>
+              <span className="text-gray-700">
+                + {buyCalculation.stampDutyManwon}만원
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600">취득세(2.2% 적용)</span>
+              <span className="text-gray-700">
+                + 예상 {buyCalculation.acquisitionTaxManwon.toLocaleString()}
+                만원
+              </span>
+            </div>
+            <hr className="my-3" />
+            <div className="flex justify-between items-center">
+              <span className="font-semibold text-gray-800">
+                구매 예상 총 비용
+              </span>
+              <span className="text-xl font-bold text-red-500">
+                {formatManwon(buyCalculation.totalManwon)}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600">판매가</span>
+              <span className="font-semibold">
+                {formatManwon(sellCalculation.priceManwon)}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600">거래수수료</span>
+              <span className="text-gray-700">
+                - {sellCalculation.transactionFeeManwon.toLocaleString()}만원
+              </span>
+            </div>
+            {sellCalculation.capitalGainManwon > 0 && (
+              <>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-500">양도차익</span>
+                  <span className="text-gray-500">
+                    {formatManwon(sellCalculation.capitalGainManwon)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">
+                    양도세
+                    <button
+                      onClick={onShowTaxGuide}
+                      className="ml-1 text-blue-500 text-xs hover:underline"
+                    >
+                      세금 안내
+                    </button>
+                  </span>
+                  <span className="text-gray-700">
+                    - 예상 {sellCalculation.transferTaxManwon.toLocaleString()}
+                    만원
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">주민세 (양도세의 10%)</span>
+                  <span className="text-gray-700">
+                    - 예상 {sellCalculation.localTaxManwon.toLocaleString()}만원
+                  </span>
+                </div>
+              </>
+            )}
+            {sellCalculation.capitalGainManwon <= 0 && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded text-sm text-green-700">
+                양도차익이 없어 양도세가 발생하지 않습니다.
+              </div>
+            )}
+            <hr className="my-3" />
+            <div className="flex justify-between items-center">
+              <span className="font-semibold text-gray-800">
+                판매 예상 수령액
+              </span>
+              <span className="text-xl font-bold text-blue-600">
+                {formatManwon(sellCalculation.netProceedsManwon)}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 버튼 그룹 */}
+      <div className="flex gap-2">
+        <button
+          onClick={handleReset}
+          className="flex-1 py-3 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+        >
+          초기화
+        </button>
+        <a
+          href="tel:02-1234-5678"
+          className="flex-1 py-3 bg-gray-700 text-white rounded-lg flex items-center justify-center gap-2 hover:bg-gray-600 transition-colors"
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+            />
+          </svg>
+          딜러 문의
+        </a>
+      </div>
+
+      {/* 안내 문구 */}
+      <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <p className="text-sm text-yellow-800">
+          위 금액은 예상 비용으로, 실제 거래 시 세부 조건에 따라 달라질 수
+          있습니다. 정확한 비용은 전문 딜러에게 문의해 주세요.
+        </p>
+      </div>
+    </div>
+  );
+}

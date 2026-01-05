@@ -201,11 +201,6 @@ export default function MembershipCalculator({
 
       {/* 금액 입력 */}
       <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-        <label className="block text-sm text-gray-600 mb-2">
-          {mode === "buy"
-            ? "얼마에 구매하고 싶으신가요?"
-            : "얼마에 판매하고 싶으신가요?"}
-        </label>
         <div className="flex items-center gap-2">
           <input
             type="text"
@@ -347,13 +342,13 @@ export default function MembershipCalculator({
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-600">거래수수료</span>
+              <span className="text-gray-600">거래 서비스 비용</span>
               <span className="text-gray-700">
                 + {buyCalculation.transactionFeeManwon.toLocaleString()}만원
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-600">명의개서료</span>
+              <span className="text-gray-600">명의변경 관련 비용</span>
               <span className="text-gray-700">
                 + {buyCalculation.transferFeeManwon.toLocaleString()}만원
               </span>
@@ -373,9 +368,7 @@ export default function MembershipCalculator({
             </div>
             <hr className="my-3" />
             <div className="flex justify-between items-center">
-              <span className="font-semibold text-gray-800">
-                구매 예상 총 비용
-              </span>
+              <span className="font-semibold text-gray-800">예상 총 비용</span>
               <span className="text-xl font-bold text-red-500">
                 {formatManwon(buyCalculation.totalManwon)}
               </span>
@@ -390,7 +383,7 @@ export default function MembershipCalculator({
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-600">거래수수료</span>
+              <span className="text-gray-600">거래 서비스 비용</span>
               <span className="text-gray-700">
                 - {sellCalculation.transactionFeeManwon.toLocaleString()}만원
               </span>

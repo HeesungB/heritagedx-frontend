@@ -166,8 +166,11 @@ export interface TransactionFormData {
 
 export interface Document {
   id: string;
-  docCode: string;
+  clubDocumentId?: string;
+  docCode?: string;
   name: string;
+  fileName?: string;
+  fileDescription?: string;
   minCount: number;
   unit: string;
   isMandatory: boolean;
@@ -175,6 +178,8 @@ export interface Document {
   displayOrder: number;
   condition?: string;
   clubRequirement?: string;
+  downloadUrl?: string;
+  downloadUrlExpiresAt?: string;
 }
 
 export interface DocumentsScenario {

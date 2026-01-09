@@ -1,8 +1,30 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Document, DocumentsResponse, DocumentsScenario, DocumentsClub, DocumentsSummary } from "@/types";
 import { fetchWithCache } from "@/utils/apiCache";
+
+// 다운로드 아이콘 컴포넌트
+function DownloadIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
+}
+
+// 프린트 아이콘 컴포넌트
+function PrintIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="6 9 6 2 18 2 18 9" />
+      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+      <rect x="6" y="14" width="12" height="8" />
+    </svg>
+  );
+}
 
 interface RequiredDocumentsProps {
   clubCode: string;
@@ -50,6 +72,79 @@ export default function RequiredDocuments({
       fetchDocuments();
     }
   }, [clubCode, scenarioCode, ownerType]);
+
+  // 파일 다운로드 핸들러
+  const handleDownload = useCallback((doc: Document) => {
+    if (!doc.downloadUrl) {
+      alert("다운로드 URL이 없습니다.");
+      return;
+    }
+
+    // 새 탭에서 열기 (브라우저가 PDF 다운로드 또는 미리보기 처리)
+    const link = document.createElement("a");
+    link.href = doc.downloadUrl;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, []);
+
+  // 파일 프린트 핸들러 - iframe 사용
+  const handlePrint = useCallback((doc: Document) => {
+    if (!doc.downloadUrl) {
+      alert("프린트할 파일 URL이 없습니다.");
+      return;
+    }
+
+    // iframe을 생성하여 PDF 로드 후 프린트
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "none";
+    iframe.src = doc.downloadUrl;
+
+    iframe.onload = () => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch {
+        // cross-origin 에러 시 새 탭에서 열기
+        window.open(doc.downloadUrl, "_blank");
+      }
+      // 프린트 다이얼로그 닫힌 후 iframe 제거
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 1000);
+    };
+
+    iframe.onerror = () => {
+      // 로드 실패 시 새 탭에서 열기
+      window.open(doc.downloadUrl, "_blank");
+      document.body.removeChild(iframe);
+    };
+
+    document.body.appendChild(iframe);
+  }, []);
+
+  // 전체 다운로드 핸들러
+  const handleDownloadAll = useCallback(() => {
+    const downloadableDocs = documents.filter(doc => doc.downloadUrl);
+    if (downloadableDocs.length === 0) {
+      alert("다운로드할 문서가 없습니다.");
+      return;
+    }
+
+    // 각 문서를 순차적으로 새 탭에서 열기
+    downloadableDocs.forEach((doc, index) => {
+      setTimeout(() => {
+        window.open(doc.downloadUrl, "_blank");
+      }, index * 300);
+    });
+  }, [documents]);
 
   // 정렬된 서류 목록
   const sortedDocuments = [...documents].sort((a, b) => {
@@ -103,7 +198,16 @@ export default function RequiredDocuments({
             핵심 자동화 엔진 (L1-L3)
           </span>
         </div>
-        <span className="text-gray-500 text-sm">자동 생성</span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleDownloadAll}
+            className="flex items-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-50 transition-colors text-sm"
+          >
+            <DownloadIcon />
+            전체 다운로드
+          </button>
+          <span className="text-gray-500 text-sm">자동 생성</span>
+        </div>
       </div>
 
       {/* 요약 박스 */}
@@ -149,6 +253,7 @@ export default function RequiredDocuments({
               <th className="text-center px-4 py-3 font-semibold">필수여부</th>
               <th className="text-left px-4 py-3 font-semibold">조건</th>
               <th className="text-left px-4 py-3 font-semibold">클럽별 요건</th>
+              <th className="text-center px-4 py-3 font-semibold">다운로드/프린트</th>
             </tr>
           </thead>
           <tbody>
@@ -184,6 +289,30 @@ export default function RequiredDocuments({
                       {doc.clubRequirement}
                     </span>
                   )}
+                </td>
+                <td className="px-4 py-4">
+                  <div className="flex items-center justify-center gap-2">
+                    {doc.downloadUrl ? (
+                      <>
+                        <button
+                          onClick={() => handleDownload(doc)}
+                          className="p-2 border border-gray-300 rounded hover:bg-gray-100 transition-colors"
+                          title="다운로드"
+                        >
+                          <DownloadIcon />
+                        </button>
+                        <button
+                          onClick={() => handlePrint(doc)}
+                          className="p-2 border border-gray-300 rounded hover:bg-gray-100 transition-colors"
+                          title="프린트"
+                        >
+                          <PrintIcon />
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-gray-400 text-sm">-</span>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

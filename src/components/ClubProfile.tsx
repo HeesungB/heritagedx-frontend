@@ -519,8 +519,8 @@ export default function ClubProfile({ detail, loading }: ClubProfileProps) {
                           key={scenario.id}
                           className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                         >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span
                                 className={`px-2 py-0.5 text-xs font-medium rounded ${
                                   scenario.side === "Seller"
@@ -555,6 +555,31 @@ export default function ClubProfile({ detail, loading }: ClubProfileProps) {
                               {scenario.scenarioCode}
                             </span>
                           </div>
+                          {/* 추가 옵션 뱃지 */}
+                          {(scenario.hasProxy || scenario.isCertificateLost || scenario.isFamily || scenario.requiresTaxInvoice) && (
+                            <div className="flex items-center gap-2 flex-wrap mt-2 pt-2 border-t border-gray-100">
+                              {scenario.hasProxy && (
+                                <span className="px-2 py-0.5 text-xs font-medium rounded bg-yellow-100 text-yellow-700">
+                                  대리인
+                                </span>
+                              )}
+                              {scenario.isCertificateLost && (
+                                <span className="px-2 py-0.5 text-xs font-medium rounded bg-red-100 text-red-700">
+                                  증권분실
+                                </span>
+                              )}
+                              {scenario.isFamily && (
+                                <span className="px-2 py-0.5 text-xs font-medium rounded bg-pink-100 text-pink-700">
+                                  가족간거래
+                                </span>
+                              )}
+                              {scenario.requiresTaxInvoice && (
+                                <span className="px-2 py-0.5 text-xs font-medium rounded bg-cyan-100 text-cyan-700">
+                                  세금계산서
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>

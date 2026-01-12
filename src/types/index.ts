@@ -260,4 +260,8 @@ export interface ScenarioMatchResponse {
 export interface TransactionOptions {
   side: "Buyer" | "Seller" | "";
   ownerType: "Personal" | "Corporate" | "";
+  hasProxy: boolean;
+  isCertificateLost: boolean;
+  isFamily: boolean;
+  requiresTaxInvoice: boolean;
 }

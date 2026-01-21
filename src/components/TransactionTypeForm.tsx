@@ -150,7 +150,7 @@ export default function TransactionTypeForm({
       </div>
 
       <div className="grid grid-cols-2 gap-6 mb-6">
-        {/* 거래 방향 (양도자/양수자) */}
+        {/* 거래 방향 (양도/양수) */}
         <div>
           <label className="block font-semibold mb-2">
             거래 방향 <span className="text-red-500">*</span>
@@ -286,7 +286,7 @@ export default function TransactionTypeForm({
               다른 조건을 선택해 주세요.
             </p>
             <p className="text-red-600 text-xs mt-2">
-              선택된 조건: {formData.side === "Seller" ? "양도자" : "양수자"} /
+              선택된 조건: {formData.side === "Seller" ? "양도" : "양수"} /
               {formData.ownerType === "Personal" ? " 개인" : " 법인"} /
               {formData.hasProxy ? " 대리인" : " 본인"}
               {formData.isCertificateLost !== null &&

@@ -210,10 +210,10 @@ export default function ClubProfile({ detail, loading }: ClubProfileProps) {
   // 시나리오 이름 매핑
   const getScenarioDisplayName = useCallback((code: string) => {
     const mapping: Record<string, string> = {
-      PS_BASIC: "개인 양도자",
-      PB_BASIC: "개인 양수자",
-      CS_BASIC: "법인 양도자",
-      CB_BASIC: "법인 양수자",
+      PS_BASIC: "개인 양도",
+      PB_BASIC: "개인 양수",
+      CS_BASIC: "법인 양도",
+      CB_BASIC: "법인 양수",
     };
     return mapping[code] || code;
   }, []);

@@ -89,6 +89,10 @@ export interface ClubDetail {
   // 시나리오 정보
   scenariosCount?: number;
   scenarioOptions?: ScenarioOptions;
+  scenarios?: ScenarioWithDocuments[];
+  // 서류 정보
+  documentsGlobal?: Document[];
+  documentsCustomer?: Document[];
   // 타임스탬프
   createdAt?: string;
   updatedAt?: string;
@@ -198,6 +202,17 @@ export interface DocumentsSummary {
   totalDocuments: number;
   mandatoryDocuments: number;
   optionalDocuments: number;
+}
+
+// 시나리오별 서류 정보 (detail API response 내 scenarios 배열)
+export interface ScenarioWithDocuments {
+  scenario: {
+    scenarioCode: string;
+    name: string;
+    description?: string;
+  };
+  documentsLocal: Document[];
+  summary: DocumentsSummary;
 }
 
 export interface DocumentsResponse {

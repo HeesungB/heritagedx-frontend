@@ -3,10 +3,8 @@
 import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import ClubProfile from "@/components/ClubProfile";
-import TransactionSidebar from "@/components/TransactionSidebar";
 import MobileNavigation from "@/components/MobileNavigation";
 import { Club, ClubDetail, ClubDetailResponse } from "@/types";
-import { fetchWithCache } from "@/utils/apiCache";
 
 interface HomeClientProps {
   initialClubs: Club[];
@@ -17,7 +15,7 @@ interface HomeClientProps {
 interface AppState {
   selectedClub: Club | null;
   clubDetail: ClubDetail | null;
-  mobileView: "clubs" | "profile" | "transaction";
+  mobileView: "clubs" | "profile";
 }
 
 export default function HomeClient({
@@ -47,9 +45,10 @@ export default function HomeClient({
 
       try {
         setDetailLoading(true);
-        const data = await fetchWithCache<ClubDetailResponse>(
+        const response = await fetch(
           `https://api.heritage-dx.com/api/clubs/${appState.selectedClub.code}`
         );
+        const data: ClubDetailResponse = await response.json();
         setAppState((prev) => ({ ...prev, clubDetail: data.data }));
       } catch (err) {
         console.error("상세 정보 로딩 실패:", err);
@@ -75,7 +74,7 @@ export default function HomeClient({
     }));
   };
 
-  const handleMobileViewChange = (view: "clubs" | "profile" | "transaction") => {
+  const handleMobileViewChange = (view: "clubs" | "profile") => {
     setAppState((prev) => ({ ...prev, mobileView: view }));
   };
 
@@ -92,14 +91,8 @@ export default function HomeClient({
           onClubSelect={handleClubSelect}
         />
 
-        {/* 가운데: 골프장 프로필 */}
+        {/* 오른쪽: 골프장 프로필 */}
         <ClubProfile detail={appState.clubDetail} loading={detailLoading} />
-
-        {/* 오른쪽: 거래 전 준비 */}
-        <TransactionSidebar
-          clubCode={appState.selectedClub?.code || null}
-          clubName={appState.clubDetail?.name || appState.selectedClub?.name || null}
-        />
       </div>
 
       {/* 모바일 컨텐츠 */}
@@ -113,11 +106,6 @@ export default function HomeClient({
         )}
         {appState.mobileView === "profile" && (
           <ClubProfile detail={appState.clubDetail} loading={detailLoading} />
-        )}
-        {appState.mobileView === "transaction" && (
-          <MobileTransactionPanel
-            clubCode={appState.selectedClub?.code || null}
-          />
         )}
       </div>
 
@@ -152,21 +140,6 @@ function ClubListSidebarWithData({
     );
   });
 
-  const getTradeStatus = (code: string): { label: string; type: "active" | "normal" | "low" } => {
-    const hash = code.split("").reduce((a, b) => a + b.charCodeAt(0), 0);
-    if (hash % 3 === 0) return { label: "거래 활발", type: "active" };
-    if (hash % 3 === 1) return { label: "거래 보통", type: "normal" };
-    return { label: "거래 적음", type: "low" };
-  };
-
-  const getBadgeStyle = (type: "active" | "normal" | "low", isSelected: boolean) => {
-    if (isSelected) return "bg-white/20 text-white";
-    switch (type) {
-      case "active": return "bg-gray-900 text-white";
-      case "normal": return "bg-gray-200 text-gray-700";
-      case "low": return "bg-gray-100 text-gray-500";
-    }
-  };
 
   return (
     <aside className="w-64 min-h-0 border-r border-gray-200 bg-white flex flex-col">
@@ -191,7 +164,6 @@ function ClubListSidebarWithData({
         ) : (
           filteredClubs.map((club) => {
             const isSelected = selectedClubCode === club.code;
-            const tradeStatus = getTradeStatus(club.code);
             return (
               <div
                 key={club.code}
@@ -201,15 +173,9 @@ function ClubListSidebarWithData({
                 <div className="flex justify-between items-start mb-1">
                   <span className={`font-semibold ${isSelected ? "text-white" : "text-gray-900"}`}>{club.name}</span>
                 </div>
-                <div className={`text-sm mb-2 ${isSelected ? "text-gray-300" : "text-gray-500"}`}>
+                <div className={`text-sm ${isSelected ? "text-gray-300" : "text-gray-500"}`}>
                   {club.code} · {club.region || "-"}
                 </div>
-                <span className={`inline-block px-2 py-0.5 text-xs rounded ${getBadgeStyle(tradeStatus.type, isSelected)}`}>
-                  {tradeStatus.type === "active" && "↗ "}
-                  {tradeStatus.type === "normal" && "— "}
-                  {tradeStatus.type === "low" && "↘ "}
-                  {tradeStatus.label}
-                </span>
               </div>
             );
           })
@@ -270,107 +236,3 @@ function MobileClubList({
   );
 }
 
-// 모바일 거래 패널 컴포넌트
-function MobileTransactionPanel({ clubCode }: { clubCode: string | null }) {
-  const [options, setOptions] = useState<{ side: "Seller" | "Buyer"; ownerType: "Personal" | "Corporate" }>({
-    side: "Seller",
-    ownerType: "Personal",
-  });
-  const [documents, setDocuments] = useState<{ id: string; name: string; minCount: number; unit: string; isMandatory: boolean; notes: string }[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    async function fetchDocuments() {
-      if (!clubCode) return;
-      try {
-        setLoading(true);
-        const matchResponse = await fetch("https://api.heritage-dx.com/api/scenarios/match", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            clubCode,
-            side: options.side,
-            ownerType: options.ownerType,
-            hasProxy: false,
-          }),
-        });
-        const matchData = await matchResponse.json();
-        if (matchData.success && matchData.data.matched) {
-          const docsResponse = await fetchWithCache<{ data: { documents: typeof documents } }>(
-            `https://api.heritage-dx.com/api/scenarios/${matchData.data.scenario.scenarioCode}/documents?clubCode=${clubCode}&ownerType=${options.ownerType}`
-          );
-          setDocuments(docsResponse.data.documents);
-        }
-      } catch (err) {
-        console.error("서류 로딩 실패:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchDocuments();
-  }, [clubCode, options]);
-
-  if (!clubCode) {
-    return (
-      <div className="flex items-center justify-center h-full bg-white">
-        <p className="text-gray-500">골프장을 선택해 주세요.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col h-full bg-white overflow-y-auto">
-      <div className="p-4 border-b border-gray-200">
-        <h2 className="text-lg font-bold">거래 전 준비</h2>
-      </div>
-      <div className="p-4">
-        <div className="mb-4">
-          <label className="block text-sm text-gray-600 mb-2">거래 대상</label>
-          <div className="flex">
-            <button
-              onClick={() => setOptions((p) => ({ ...p, side: "Seller" }))}
-              className={`flex-1 py-2 text-sm font-medium ${options.side === "Seller" ? "bg-gray-900 text-white" : "bg-white border border-gray-300"}`}
-            >
-              양도인
-            </button>
-            <button
-              onClick={() => setOptions((p) => ({ ...p, side: "Buyer" }))}
-              className={`flex-1 py-2 text-sm font-medium ${options.side === "Buyer" ? "bg-gray-900 text-white" : "bg-white border border-gray-300"}`}
-            >
-              양수인
-            </button>
-          </div>
-        </div>
-        <div className="mb-4">
-          <label className="block text-sm text-gray-600 mb-2">명의자 유형</label>
-          <div className="flex">
-            <button
-              onClick={() => setOptions((p) => ({ ...p, ownerType: "Personal" }))}
-              className={`flex-1 py-2 text-sm font-medium ${options.ownerType === "Personal" ? "bg-gray-900 text-white" : "bg-white border border-gray-300"}`}
-            >
-              개인
-            </button>
-            <button
-              onClick={() => setOptions((p) => ({ ...p, ownerType: "Corporate" }))}
-              className={`flex-1 py-2 text-sm font-medium ${options.ownerType === "Corporate" ? "bg-gray-900 text-white" : "bg-white border border-gray-300"}`}
-            >
-              법인
-            </button>
-          </div>
-        </div>
-        {loading ? (
-          <div className="text-center py-4 text-gray-500">로딩 중...</div>
-        ) : (
-          <div className="space-y-3">
-            {documents.map((doc) => (
-              <div key={doc.id} className="p-3 border border-gray-200 rounded">
-                <div className="font-medium text-sm">{doc.name} {doc.minCount}{doc.unit}</div>
-                <div className="text-xs text-gray-500 mt-1">{doc.isMandatory ? "필수" : "선택"}</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}

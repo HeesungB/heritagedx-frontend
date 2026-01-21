@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { ClubDetail } from "@/types";
+import { useState, useEffect, useCallback } from "react";
+import { PDFDocument } from "pdf-lib";
+import { ClubDetail, Document } from "@/types";
 import MembershipCalculator from "./MembershipCalculator";
 import TaxGuideModal from "./TaxGuideModal";
 
@@ -10,12 +11,220 @@ interface ClubProfileProps {
   loading: boolean;
 }
 
-type ProfileTab = "basic" | "fee" | "transaction" | "scenario";
+type ProfileTab = "basic" | "fee" | "documents";
 
 export default function ClubProfile({ detail, loading }: ClubProfileProps) {
+  // 모든 hooks는 early return 전에 선언되어야 합니다
   const [activeTab, setActiveTab] = useState<ProfileTab>("basic");
   const [showTaxGuide, setShowTaxGuide] = useState(false);
+  const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
+  const [printAllLoading, setPrintAllLoading] = useState(false);
+  const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
+  const [selectedScenarioCode, setSelectedScenarioCode] = useState<string | null>(null);
 
+  // 체크박스 토글
+  const toggleDocSelection = useCallback((docId: string) => {
+    setSelectedDocIds(prev => {
+      const next = new Set(prev);
+      if (next.has(docId)) {
+        next.delete(docId);
+      } else {
+        next.add(docId);
+      }
+      return next;
+    });
+  }, []);
+
+  // 전체 선택/해제
+  const toggleAllSelection = useCallback((docs: Document[]) => {
+    const validDocs = docs.filter(doc => doc.downloadUrl);
+    const allSelected = validDocs.every(doc => selectedDocIds.has(doc.id));
+
+    setSelectedDocIds(prev => {
+      const next = new Set(prev);
+      if (allSelected) {
+        validDocs.forEach(doc => next.delete(doc.id));
+      } else {
+        validDocs.forEach(doc => next.add(doc.id));
+      }
+      return next;
+    });
+  }, [selectedDocIds]);
+
+  // 선택된 서류 가져오기
+  const getSelectedDocuments = useCallback((): Document[] => {
+    const allDocs: Document[] = [];
+    // detail.scenarios에서 documentsLocal 수집
+    detail?.scenarios?.forEach(scenario => {
+      scenario.documentsLocal?.forEach(doc => {
+        if (selectedDocIds.has(doc.id)) {
+          allDocs.push(doc);
+        }
+      });
+    });
+    // documentsGlobal에서도 수집
+    detail?.documentsGlobal?.forEach(doc => {
+      if (selectedDocIds.has(doc.id)) {
+        allDocs.push(doc);
+      }
+    });
+    return allDocs;
+  }, [detail?.scenarios, detail?.documentsGlobal, selectedDocIds]);
+
+  // URL 만료 여부 체크
+  const isUrlExpired = useCallback((doc: Document): boolean => {
+    if (!doc.downloadUrlExpiresAt) return false;
+    const expiresAt = new Date(doc.downloadUrlExpiresAt).getTime();
+    return Date.now() > expiresAt;
+  }, []);
+
+  // 파일 다운로드 핸들러
+  const handleDownload = useCallback(async (doc: Document) => {
+    if (!doc.downloadUrl) {
+      alert("다운로드 URL이 없습니다.");
+      return;
+    }
+
+    if (isUrlExpired(doc)) {
+      alert("다운로드 링크가 만료되었습니다. 페이지를 새로고침해주세요.");
+      return;
+    }
+
+    setDownloadingIds(prev => new Set(prev).add(doc.id));
+
+    try {
+      const response = await fetch(doc.downloadUrl);
+      if (!response.ok) throw new Error(`다운로드 실패: ${response.status}`);
+
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = doc.fileName || doc.name || "document.pdf";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error("다운로드 에러:", error);
+      window.open(doc.downloadUrl, "_blank");
+    } finally {
+      setDownloadingIds(prev => {
+        const next = new Set(prev);
+        next.delete(doc.id);
+        return next;
+      });
+    }
+  }, [isUrlExpired]);
+
+  // 파일 프린트 핸들러
+  const handlePrint = useCallback(async (doc: Document) => {
+    if (!doc.downloadUrl) {
+      alert("프린트할 파일 URL이 없습니다.");
+      return;
+    }
+
+    if (isUrlExpired(doc)) {
+      alert("프린트 링크가 만료되었습니다. 페이지를 새로고침해주세요.");
+      return;
+    }
+
+    try {
+      const response = await fetch(doc.downloadUrl);
+      if (!response.ok) throw new Error("파일 로드 실패");
+
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+
+      const printWindow = window.open(blobUrl, "_blank");
+      if (printWindow) {
+        printWindow.onload = () => {
+          printWindow.print();
+        };
+      }
+
+      setTimeout(() => {
+        window.URL.revokeObjectURL(blobUrl);
+      }, 60000);
+    } catch (error) {
+      console.error("프린트 에러:", error);
+      window.open(doc.downloadUrl, "_blank");
+    }
+  }, [isUrlExpired]);
+
+  // 전체 서류 인쇄 핸들러
+  const handlePrintAllDocuments = useCallback(async (docs: Document[]) => {
+    const docsWithUrl = docs.filter(doc => doc.downloadUrl && !isUrlExpired(doc));
+
+    if (docsWithUrl.length === 0) {
+      alert("인쇄할 서류가 없습니다.");
+      return;
+    }
+
+    setPrintAllLoading(true);
+
+    try {
+      const mergedPdf = await PDFDocument.create();
+
+      for (const doc of docsWithUrl) {
+        try {
+          const response = await fetch(doc.downloadUrl!);
+          if (!response.ok) continue;
+
+          const pdfBytes = await response.arrayBuffer();
+          const pdfDoc = await PDFDocument.load(pdfBytes);
+          const pages = await mergedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
+          pages.forEach(page => mergedPdf.addPage(page));
+        } catch (error) {
+          console.error(`${doc.name} PDF 로드 실패:`, error);
+        }
+      }
+
+      if (mergedPdf.getPageCount() === 0) {
+        alert("합칠 수 있는 PDF가 없습니다.");
+        return;
+      }
+
+      const mergedPdfBytes = await mergedPdf.save();
+      const blob = new Blob([new Uint8Array(mergedPdfBytes)], { type: "application/pdf" });
+      const blobUrl = window.URL.createObjectURL(blob);
+
+      const printWindow = window.open(blobUrl, "_blank");
+      if (printWindow) {
+        printWindow.onload = () => {
+          printWindow.print();
+        };
+      }
+
+      setTimeout(() => {
+        window.URL.revokeObjectURL(blobUrl);
+      }, 60000);
+    } catch (error) {
+      console.error("PDF 합치기 실패:", error);
+      alert("PDF 합치기에 실패했습니다.");
+    } finally {
+      setPrintAllLoading(false);
+    }
+  }, [isUrlExpired]);
+
+  // 시나리오 이름 매핑
+  const getScenarioDisplayName = useCallback((code: string) => {
+    const mapping: Record<string, string> = {
+      PS_BASIC: "개인 양도자",
+      PB_BASIC: "개인 양수자",
+      CS_BASIC: "법인 양도자",
+      CB_BASIC: "법인 양수자",
+    };
+    return mapping[code] || code;
+  }, []);
+
+  // 골프장 변경 시 선택 초기화
+  useEffect(() => {
+    setSelectedDocIds(new Set());
+    setSelectedScenarioCode(null);
+  }, [detail?.code]);
+
+  // Early returns - 모든 hooks 이후에 위치
   if (loading) {
     return (
       <div className="flex-1 min-h-0 p-6 bg-gray-50 overflow-y-auto">
@@ -40,59 +249,46 @@ export default function ClubProfile({ detail, loading }: ClubProfileProps) {
     );
   }
 
+  // 일반 변수들 (hooks 아님)
   const primaryContact =
     detail.contacts?.find((c) => c.isPrimary) || detail.contacts?.[0];
   const bankAccount = detail.bankAccounts?.[0];
 
-  // 개장일 포맷팅
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return "-";
     const date = new Date(dateStr);
-    return `${date.getFullYear()}년 ${
-      date.getMonth() + 1
-    }월 ${date.getDate()}일`;
+    return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`;
   };
 
-  // 금액 포맷팅 (숫자)
   const formatCurrency = (amount?: number | object | null) => {
     if (!amount) return "-";
-    // 객체인 경우 처리
     if (typeof amount === "object") {
-      // 객체에서 숫자 값을 추출 시도
       const values = Object.values(amount).filter((v) => typeof v === "number");
       if (values.length > 0) {
-        return values
-          .map((v) => `${(v as number).toLocaleString()}원`)
-          .join(" / ");
+        return values.map((v) => `${(v as number).toLocaleString()}원`).join(" / ");
       }
       return "-";
     }
     return `${amount.toLocaleString()}원`;
   };
 
-  // 금액 문자열 포맷팅 (문자열에 원 단위 추가, 세자리 콤마 적용)
   const formatPriceString = (priceStr?: string | null) => {
     if (!priceStr) return "-";
-    // 이미 원이 포함되어 있으면 그대로 반환
     if (priceStr.includes("원")) return priceStr;
-    // 숫자만 추출
     const numMatch = priceStr.match(/[\d,]+/);
     if (numMatch) {
       const num = parseInt(numMatch[0].replace(/,/g, ""), 10);
       if (!isNaN(num)) {
-        // 세자리 콤마 추가하고 원 단위 붙이기
         return `${num.toLocaleString("ko-KR")}원`;
       }
     }
-    // 숫자가 없으면 그대로 반환
     return priceStr;
   };
 
   const tabs = [
     { id: "basic" as ProfileTab, label: "기본 정보" },
     { id: "fee" as ProfileTab, label: "수수료/비용" },
-    { id: "transaction" as ProfileTab, label: "거래 정보" },
-    { id: "scenario" as ProfileTab, label: "시나리오" },
+    { id: "documents" as ProfileTab, label: "서류" },
   ];
 
   return (
@@ -222,6 +418,48 @@ export default function ClubProfile({ detail, loading }: ClubProfileProps) {
                 </div>
               </section>
 
+              {/* 이용 비용 */}
+              <section>
+                <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
+                  이용 비용
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <GreenFeeField label="평일 그린피" data={detail.weekdayGreenFee} />
+                  <GreenFeeField label="주말 그린피" data={detail.weekendGreenFee} />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <InfoField
+                    label="카트피"
+                    value={formatCurrency(detail.cartFee)}
+                  />
+                </div>
+              </section>
+
+              {/* 시세 정보 */}
+              <section>
+                <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
+                  시세 정보
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <InfoField
+                    label="최근 시세"
+                    value={formatPriceString(detail.recentMarketPrice)}
+                  />
+                  <InfoField
+                    label="시세 업데이트일"
+                    value={detail.recentPriceUpdateDate}
+                  />
+                  <InfoField
+                    label="3년 평균 시세"
+                    value={formatPriceString(detail.avgMarketPrice3y)}
+                  />
+                  <InfoField
+                    label="딜러 가격대"
+                    value={formatPriceString(detail.dealerPriceRange)}
+                  />
+                </div>
+              </section>
+
               {/* 특이 사항 */}
               {detail.memo && (
                 <section>
@@ -275,52 +513,6 @@ export default function ClubProfile({ detail, loading }: ClubProfileProps) {
                 </div>
               </section>
 
-              {/* 이용 비용 */}
-              <section>
-                <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
-                  이용 비용
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <InfoField
-                    label="평일 그린피"
-                    value={formatCurrency(detail.weekdayGreenFee)}
-                  />
-                  <InfoField
-                    label="주말 그린피"
-                    value={formatCurrency(detail.weekendGreenFee)}
-                  />
-                  <InfoField
-                    label="카트피"
-                    value={formatCurrency(detail.cartFee)}
-                  />
-                </div>
-              </section>
-
-              {/* 시세 정보 */}
-              <section>
-                <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
-                  시세 정보
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <InfoField
-                    label="최근 시세"
-                    value={formatPriceString(detail.recentMarketPrice)}
-                  />
-                  <InfoField
-                    label="시세 업데이트일"
-                    value={detail.recentPriceUpdateDate}
-                  />
-                  <InfoField
-                    label="3년 평균 시세"
-                    value={formatPriceString(detail.avgMarketPrice3y)}
-                  />
-                  <InfoField
-                    label="딜러 가격대"
-                    value={formatPriceString(detail.dealerPriceRange)}
-                  />
-                </div>
-              </section>
-
               {/* 회원권 비용 계산기 */}
               <section>
                 <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
@@ -335,256 +527,330 @@ export default function ClubProfile({ detail, loading }: ClubProfileProps) {
             </div>
           )}
 
-          {activeTab === "transaction" && (
+          {activeTab === "documents" && (
             <div className="space-y-6">
-              {/* 거래 동향 */}
-              <section>
-                <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
-                  거래 동향
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <InfoField
-                    label="거래 경향"
-                    value={detail.transactionTendency}
-                  />
-                  <InfoField
-                    label="최근 거래 유형"
-                    value={detail.recentTransactionType}
-                  />
-                  <InfoField
-                    label="거래 가능 유형"
-                    value={detail.tradableTypeSummary}
-                  />
-                  <InfoField
-                    label="최소 거래 단위"
-                    value={detail.minTransactionUnit}
-                  />
-                </div>
-              </section>
-
-              {/* 등록 정보 */}
-              <section>
-                <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
-                  등록 정보
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <InfoField
-                    label="등록 난이도"
-                    value={detail.registrationDifficulty}
-                  />
-                  <InfoField
-                    label="추가 서류 빈도"
-                    value={detail.additionalDocumentFrequency}
-                  />
-                  <InfoField
-                    label="등록 시간"
-                    value={detail.registrationHours}
-                  />
-                  <InfoField
-                    label="등록 절차"
-                    value={detail.registrationProcedure}
-                  />
-                </div>
-              </section>
-
-              {/* 예약/이용 */}
-              <section>
-                <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
-                  예약/이용
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <InfoField
-                    label="주말 예약 난이도"
-                    value={detail.weekendReservationDifficulty}
-                  />
-                  <InfoField
-                    label="클레임 빈도"
-                    value={detail.claimFrequency}
-                  />
-                  <InfoField
-                    label="예약 참고사항"
-                    value={detail.reservationNotes}
-                    fullWidth
-                  />
-                </div>
-              </section>
-
-              {/* 리스크 정보 */}
-              <section>
-                <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
-                  리스크 정보
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <InfoField label="밸런스 리스크" value={detail.balanceRisk} />
-                  <InfoField
-                    label="거래 리스크 메모"
-                    value={detail.transactionRiskMemo}
-                  />
-                </div>
-              </section>
-
-              {/* 딜러/회원권 메모 */}
-              {(detail.dealerMemo || detail.membershipInfo) && (
-                <section>
-                  <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
-                    참고 정보
-                  </h3>
-                  <div className="space-y-4">
-                    {detail.dealerMemo && (
-                      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                        <label className="block text-sm font-medium text-blue-800 mb-1">
-                          딜러 메모
-                        </label>
-                        <p className="text-blue-900 whitespace-pre-wrap">
-                          {detail.dealerMemo}
-                        </p>
-                      </div>
-                    )}
-                    {detail.membershipInfo && (
-                      <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                        <label className="block text-sm font-medium text-purple-800 mb-1">
-                          회원권 정보
-                        </label>
-                        <p className="text-purple-900 whitespace-pre-wrap">
-                          {detail.membershipInfo}
-                        </p>
-                      </div>
-                    )}
+              {/* 선택된 서류 플로팅 액션 바 */}
+              {selectedDocIds.size > 0 && (
+                <div className="sticky top-0 z-10 bg-gray-900 text-white rounded-lg p-3 flex items-center justify-between shadow-lg">
+                  <span className="text-sm font-medium">{selectedDocIds.size}개 서류 선택됨</span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={async () => {
+                        const selectedDocs = getSelectedDocuments();
+                        for (const doc of selectedDocs) {
+                          await handleDownload(doc);
+                        }
+                      }}
+                      disabled={downloadingIds.size > 0}
+                      className={`px-4 py-1.5 text-sm bg-white text-gray-900 rounded font-medium transition-colors ${
+                        downloadingIds.size > 0 ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-100"
+                      }`}
+                    >
+                      {downloadingIds.size > 0 ? "다운로드 중..." : "선택 다운로드"}
+                    </button>
+                    <button
+                      onClick={() => handlePrintAllDocuments(getSelectedDocuments())}
+                      disabled={printAllLoading}
+                      className={`px-4 py-1.5 text-sm bg-white text-gray-900 rounded font-medium transition-colors ${
+                        printAllLoading ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-100"
+                      }`}
+                    >
+                      {printAllLoading ? "인쇄 준비 중..." : "선택 인쇄"}
+                    </button>
+                    <button
+                      onClick={() => setSelectedDocIds(new Set())}
+                      className="px-3 py-1.5 text-sm text-gray-300 hover:text-white transition-colors"
+                    >
+                      선택 해제
+                    </button>
                   </div>
-                </section>
-              )}
-            </div>
-          )}
-
-          {activeTab === "scenario" && (
-            <div className="space-y-6">
-              {/* 가능한 필터 옵션 */}
-              {detail.scenarioOptions?.availableFilters && (
-                <section>
-                  <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
-                    거래 옵션
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* 거래 측면 */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        거래 측면
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {detail.scenarioOptions.availableFilters.sides?.map(
-                          (side, idx) => (
-                            <span
-                              key={`side-${idx}`}
-                              className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
-                            >
-                              {side.label} ({side.count})
-                            </span>
-                          )
-                        )}
-                      </div>
-                    </div>
-
-                    {/* 소유자 유형 */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        소유자 유형
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {detail.scenarioOptions.availableFilters.ownerTypes?.map(
-                          (type, idx) => (
-                            <span
-                              key={`owner-${idx}`}
-                              className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
-                            >
-                              {type.label} ({type.count})
-                            </span>
-                          )
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </section>
+                </div>
               )}
 
-              {/* 시나리오 목록 */}
-              {detail.scenarioOptions?.scenarios &&
-                detail.scenarioOptions.scenarios.length > 0 && (
-                  <section>
-                    <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
-                      시나리오 목록
-                    </h3>
+              {/* 고객 구비서류 - 맨 상단, 다운로드/인쇄 없음 */}
+              <section className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="bg-purple-50 px-4 py-3 border-b border-purple-200">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <h3 className="font-semibold text-purple-800">고객 구비서류</h3>
+                    <span className="px-2 py-0.5 text-xs bg-purple-200 text-purple-700 rounded">고객이 직접 준비</span>
+                    {detail.documentsCustomer && detail.documentsCustomer.length > 0 && (
+                      <span className="text-sm text-purple-600">{detail.documentsCustomer.length}건</span>
+                    )}
+                  </div>
+                </div>
+                <div className="p-4">
+                  {detail.documentsCustomer && detail.documentsCustomer.length > 0 ? (
                     <div className="space-y-2">
-                      {detail.scenarioOptions.scenarios.map((scenario) => (
-                        <div
-                          key={scenario.id}
-                          className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span
-                                className={`px-2 py-0.5 text-xs font-medium rounded ${
-                                  scenario.side === "Seller"
-                                    ? "bg-orange-100 text-orange-700"
-                                    : "bg-blue-100 text-blue-700"
-                                }`}
-                              >
-                                {scenario.side === "Seller"
-                                  ? "양도자"
-                                  : "양수자"}
-                              </span>
-                              <span
-                                className={`px-2 py-0.5 text-xs font-medium rounded ${
-                                  scenario.ownerType === "Personal"
-                                    ? "bg-green-100 text-green-700"
-                                    : scenario.ownerType === "Corporate"
-                                    ? "bg-purple-100 text-purple-700"
-                                    : "bg-pink-100 text-pink-700"
-                                }`}
-                              >
-                                {scenario.ownerType === "Personal"
-                                  ? "개인"
-                                  : scenario.ownerType === "Corporate"
-                                  ? "법인"
-                                  : "가족"}
-                              </span>
-                              <span className="font-medium text-gray-900">
-                                {scenario.name}
-                              </span>
+                      {detail.documentsCustomer.map((doc) => (
+                        <div key={doc.id} className="p-3 border border-gray-200 rounded bg-white">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <span className="font-medium text-sm text-gray-900">{doc.name}</span>
+                              {doc.minCount && doc.unit && (
+                                <span className="text-sm text-gray-500 ml-2">
+                                  {doc.minCount}{doc.unit}
+                                </span>
+                              )}
+                              {doc.notes && (
+                                <p className="text-xs text-gray-500 mt-1">{doc.notes}</p>
+                              )}
                             </div>
-                            <span className="text-xs text-gray-400 font-mono">
-                              {scenario.scenarioCode}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              {doc.isMandatory ? (
+                                <span className="px-2 py-0.5 text-xs bg-red-100 text-red-700 rounded">필수</span>
+                              ) : (
+                                <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded">선택</span>
+                              )}
+                            </div>
                           </div>
-                          {/* 추가 옵션 뱃지 */}
-                          {(scenario.hasProxy || scenario.isCertificateLost || scenario.isFamily || scenario.requiresTaxInvoice) && (
-                            <div className="flex items-center gap-2 flex-wrap mt-2 pt-2 border-t border-gray-100">
-                              {scenario.hasProxy && (
-                                <span className="px-2 py-0.5 text-xs font-medium rounded bg-yellow-100 text-yellow-700">
-                                  대리인
-                                </span>
-                              )}
-                              {scenario.isCertificateLost && (
-                                <span className="px-2 py-0.5 text-xs font-medium rounded bg-red-100 text-red-700">
-                                  증권분실
-                                </span>
-                              )}
-                              {scenario.isFamily && (
-                                <span className="px-2 py-0.5 text-xs font-medium rounded bg-pink-100 text-pink-700">
-                                  가족간거래
-                                </span>
-                              )}
-                              {scenario.requiresTaxInvoice && (
-                                <span className="px-2 py-0.5 text-xs font-medium rounded bg-cyan-100 text-cyan-700">
-                                  세금계산서
-                                </span>
-                              )}
-                            </div>
-                          )}
                         </div>
                       ))}
                     </div>
-                  </section>
+                  ) : (
+                    <p className="text-sm text-gray-500 text-center py-4">
+                      고객 구비서류가 없습니다.
+                    </p>
+                  )}
+                </div>
+              </section>
+
+              {/* 공용 서류함 */}
+              <section className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="bg-green-50 px-4 py-3 border-b border-green-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                      </svg>
+                      <h3 className="font-semibold text-green-800">공용 서류함</h3>
+                      <span className="px-2 py-0.5 text-xs bg-green-200 text-green-700 rounded">전 골프장 공통</span>
+                      {detail.documentsGlobal && detail.documentsGlobal.length > 0 && (
+                        <span className="text-sm text-green-600">{detail.documentsGlobal.length}건</span>
+                      )}
+                    </div>
+                    {/* 공용 서류 전체 선택 */}
+                    {detail.documentsGlobal && detail.documentsGlobal.filter(d => d.downloadUrl).length > 0 && (
+                      <button
+                        onClick={() => toggleAllSelection(detail.documentsGlobal || [])}
+                        className="text-xs text-green-700 hover:text-green-900"
+                      >
+                        {detail.documentsGlobal.filter(d => d.downloadUrl).every(d => selectedDocIds.has(d.id))
+                          ? "전체 해제"
+                          : "전체 선택"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="p-4">
+                  {detail.documentsGlobal && detail.documentsGlobal.length > 0 ? (
+                    <div className="space-y-2">
+                      {detail.documentsGlobal.map((doc) => (
+                        <div
+                          key={doc.id}
+                          className={`p-3 border rounded bg-white cursor-pointer transition-colors ${
+                            selectedDocIds.has(doc.id) ? "border-green-400 bg-green-50" : "border-gray-200 hover:border-gray-300"
+                          }`}
+                          onClick={() => doc.downloadUrl && !isUrlExpired(doc) && toggleDocSelection(doc.id)}
+                        >
+                          <div className="flex items-center gap-3">
+                            {doc.downloadUrl && !isUrlExpired(doc) ? (
+                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                                selectedDocIds.has(doc.id) ? "border-green-500 bg-green-500" : "border-gray-300"
+                              }`}>
+                                {selectedDocIds.has(doc.id) && (
+                                  <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="w-5 h-5 rounded-full border-2 border-gray-200 flex items-center justify-center">
+                                <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </div>
+                            )}
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <span className="font-medium text-sm text-gray-900">{doc.name}</span>
+                                  {doc.fileDescription && doc.fileDescription !== doc.name && (
+                                    <p className="text-xs text-gray-500">{doc.fileDescription}</p>
+                                  )}
+                                </div>
+                                <span className={`text-xs ${doc.downloadUrl && !isUrlExpired(doc) ? "text-green-600" : "text-gray-400"}`}>
+                                  {doc.downloadUrl && !isUrlExpired(doc) ? "연결됨" : "미연결"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 text-center py-4">
+                      공용 서류가 없습니다.
+                    </p>
+                  )}
+                </div>
+              </section>
+
+              {/* 시나리오별 서류 */}
+              <section className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    <h3 className="font-semibold text-gray-800">시나리오별 서류</h3>
+                  </div>
+                </div>
+
+                {detail.scenarios && detail.scenarios.length > 0 ? (
+                  <div>
+                    {/* 시나리오 선택 카드 그리드 */}
+                    <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {detail.scenarios.map((scenarioItem) => {
+                        const isSelected = selectedScenarioCode === scenarioItem.scenario.scenarioCode;
+                        const isSeller = scenarioItem.scenario.scenarioCode?.includes("S");
+                        const isPersonal = scenarioItem.scenario.scenarioCode?.startsWith("P");
+
+                        return (
+                          <button
+                            key={scenarioItem.scenario.scenarioCode}
+                            onClick={() => setSelectedScenarioCode(
+                              isSelected ? null : scenarioItem.scenario.scenarioCode
+                            )}
+                            className={`p-4 rounded-lg border-2 text-left transition-all ${
+                              isSelected
+                                ? "border-gray-900 bg-gray-50"
+                                : "border-gray-200 hover:border-gray-300 bg-white"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-medium text-sm text-gray-900">
+                                {getScenarioDisplayName(scenarioItem.scenario.scenarioCode || "")}
+                              </span>
+                              <span className="text-sm text-gray-500">
+                                {scenarioItem.documentsLocal?.length || 0}
+                              </span>
+                            </div>
+                            <div className="flex gap-1.5">
+                              <span className={`px-2 py-0.5 text-xs rounded ${
+                                isSeller ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"
+                              }`}>
+                                {isSeller ? "매도인" : "매수인"}
+                              </span>
+                              <span className={`px-2 py-0.5 text-xs rounded ${
+                                isPersonal ? "bg-gray-100 text-gray-600" : "bg-purple-100 text-purple-700"
+                              }`}>
+                                {isPersonal ? "개인" : "법인"}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* 선택된 시나리오의 서류 목록 */}
+                    {selectedScenarioCode && (() => {
+                      const selectedScenario = detail.scenarios?.find(
+                        s => s.scenario.scenarioCode === selectedScenarioCode
+                      );
+                      if (!selectedScenario) return null;
+
+                      const validDocs = selectedScenario.documentsLocal?.filter(d => d.downloadUrl) || [];
+
+                      return (
+                        <div className="border-t border-gray-200 p-4">
+                          <div className="flex items-center justify-between mb-4">
+                            <div>
+                              <h4 className="font-medium text-gray-900">
+                                {getScenarioDisplayName(selectedScenarioCode)} - 기본
+                              </h4>
+                              <p className="text-sm text-gray-500">이 시나리오에 필요한 서류를 선택하세요</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              {validDocs.length > 0 && (
+                                <button
+                                  onClick={() => toggleAllSelection(selectedScenario.documentsLocal || [])}
+                                  className="text-xs text-gray-600 hover:text-gray-900"
+                                >
+                                  {validDocs.every(d => selectedDocIds.has(d.id)) ? "전체 해제" : "전체 선택"}
+                                </button>
+                              )}
+                              <span className="text-sm text-gray-500">
+                                {selectedScenario.documentsLocal?.length || 0}개 서류 연결됨
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            {selectedScenario.documentsLocal?.map((doc) => (
+                              <div
+                                key={doc.id}
+                                className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                                  selectedDocIds.has(doc.id)
+                                    ? "border-gray-900 bg-gray-50"
+                                    : "border-gray-200 hover:border-gray-300 bg-white"
+                                }`}
+                                onClick={() => doc.downloadUrl && !isUrlExpired(doc) && toggleDocSelection(doc.id)}
+                              >
+                                <div className="flex items-center gap-3">
+                                  {doc.downloadUrl && !isUrlExpired(doc) ? (
+                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                                      selectedDocIds.has(doc.id) ? "border-gray-900 bg-gray-900" : "border-gray-300"
+                                    }`}>
+                                      {selectedDocIds.has(doc.id) && (
+                                        <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                        </svg>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <div className="w-5 h-5 rounded-full border-2 border-gray-200 flex items-center justify-center">
+                                      <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                      </svg>
+                                    </div>
+                                  )}
+                                  <div className="flex-1">
+                                    <div className="flex items-center justify-between">
+                                      <div>
+                                        <span className="font-medium text-sm text-gray-900">{doc.name}</span>
+                                        {doc.fileDescription && doc.fileDescription !== doc.name && (
+                                          <p className="text-xs text-gray-500">{doc.fileDescription}</p>
+                                        )}
+                                      </div>
+                                      <span className={`text-xs ${doc.downloadUrl && !isUrlExpired(doc) ? "text-green-600" : "text-gray-400"}`}>
+                                        {doc.downloadUrl && !isUrlExpired(doc) ? "연결됨" : "미연결"}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* 시나리오 미선택 시 안내 */}
+                    {!selectedScenarioCode && (
+                      <div className="p-8 text-center text-gray-500 border-t border-gray-200">
+                        <p>시나리오를 선택하면 필요한 서류 목록이 표시됩니다</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    시나리오별 서류 정보가 없습니다.
+                  </div>
                 )}
+              </section>
             </div>
           )}
         </div>
@@ -650,6 +916,66 @@ function InfoField({
         ) : (
           displayValue
         )}
+      </div>
+    </div>
+  );
+}
+
+// 그린피 정보 필드 컴포넌트
+interface GreenFeeFieldProps {
+  label: string;
+  data?: number | Record<string, number>;
+}
+
+function GreenFeeField({ label, data }: GreenFeeFieldProps) {
+  if (!data) {
+    return (
+      <div>
+        <label className="block text-sm text-gray-500 mb-1">{label}</label>
+        <div className="p-3 bg-gray-50 border border-gray-200 rounded text-gray-900">
+          -
+        </div>
+      </div>
+    );
+  }
+
+  // 숫자인 경우 단순 표시
+  if (typeof data === "number") {
+    return (
+      <div>
+        <label className="block text-sm text-gray-500 mb-1">{label}</label>
+        <div className="p-3 bg-gray-50 border border-gray-200 rounded text-gray-900">
+          {data.toLocaleString()}원
+        </div>
+      </div>
+    );
+  }
+
+  // 객체인 경우 key-value로 표시
+  const entries = Object.entries(data);
+  if (entries.length === 0) {
+    return (
+      <div>
+        <label className="block text-sm text-gray-500 mb-1">{label}</label>
+        <div className="p-3 bg-gray-50 border border-gray-200 rounded text-gray-900">
+          -
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <label className="block text-sm text-gray-500 mb-1">{label}</label>
+      <div className="p-3 bg-gray-50 border border-gray-200 rounded">
+        <div className="space-y-1">
+          {entries.map(([key, value]) => (
+            <div key={key} className="flex justify-between items-center text-sm">
+              <span className="text-gray-600">{key}</span>
+              <span className="font-medium text-gray-900">{value.toLocaleString()}원</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

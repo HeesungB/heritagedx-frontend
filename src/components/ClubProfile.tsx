@@ -715,8 +715,14 @@ export default function ClubProfile({ detail, loading }: ClubProfileProps) {
                     <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
                       {detail.scenarios.map((scenarioItem) => {
                         const isSelected = selectedScenarioCode === scenarioItem.scenario.scenarioCode;
-                        const isSeller = scenarioItem.scenario.scenarioCode?.includes("S");
-                        const isPersonal = scenarioItem.scenario.scenarioCode?.startsWith("P");
+                        const code = scenarioItem.scenario.scenarioCode || "";
+                        const getTopBarColor = () => {
+                          if (code.includes("PS")) return "bg-orange-400";
+                          if (code.includes("PB")) return "bg-blue-400";
+                          if (code.includes("CS")) return "bg-green-400";
+                          if (code.includes("CB")) return "bg-purple-400";
+                          return "bg-gray-400";
+                        };
 
                         return (
                           <button
@@ -724,31 +730,22 @@ export default function ClubProfile({ detail, loading }: ClubProfileProps) {
                             onClick={() => setSelectedScenarioCode(
                               isSelected ? null : scenarioItem.scenario.scenarioCode
                             )}
-                            className={`p-4 rounded-lg border-2 text-left transition-all ${
+                            className={`rounded-lg border-2 text-left transition-all overflow-hidden ${
                               isSelected
                                 ? "border-gray-900 bg-gray-50"
                                 : "border-gray-200 hover:border-gray-300 bg-white"
                             }`}
                           >
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="font-medium text-sm text-gray-900">
-                                {getScenarioDisplayName(scenarioItem.scenario.scenarioCode || "")}
-                              </span>
-                              <span className="text-sm text-gray-500">
-                                {scenarioItem.documentsLocal?.length || 0}
-                              </span>
-                            </div>
-                            <div className="flex gap-1.5">
-                              <span className={`px-2 py-0.5 text-xs rounded ${
-                                isSeller ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"
-                              }`}>
-                                {isSeller ? "매도인" : "매수인"}
-                              </span>
-                              <span className={`px-2 py-0.5 text-xs rounded ${
-                                isPersonal ? "bg-gray-100 text-gray-600" : "bg-purple-100 text-purple-700"
-                              }`}>
-                                {isPersonal ? "개인" : "법인"}
-                              </span>
+                            <div className={`h-1 ${getTopBarColor()}`} />
+                            <div className="p-4">
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium text-sm text-gray-900">
+                                  {getScenarioDisplayName(scenarioItem.scenario.scenarioCode || "")}
+                                </span>
+                                <span className="text-sm text-gray-500">
+                                  {scenarioItem.documentsLocal?.length || 0}
+                                </span>
+                              </div>
                             </div>
                           </button>
                         );

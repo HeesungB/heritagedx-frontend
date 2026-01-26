@@ -379,6 +379,20 @@ export default function ClubProfile({ detail, loading }: ClubProfileProps) {
                 </div>
               </section>
 
+              {/* 예약 정보 */}
+              {detail.reservationNotes && (
+                <section>
+                  <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
+                    예약 안내
+                  </h3>
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-gray-800 whitespace-pre-wrap">
+                      {detail.reservationNotes}
+                    </p>
+                  </div>
+                </section>
+              )}
+
               {/* 연락처 정보 */}
               <section>
                 <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
@@ -404,61 +418,170 @@ export default function ClubProfile({ detail, loading }: ClubProfileProps) {
                 </div>
               </section>
 
-              {/* 세무/행정 */}
-              <section>
-                <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
-                  세무/행정 정보
-                </h3>
-                <div className="grid grid-cols-1 gap-4">
-                  <InfoField
-                    label="관할 세무서"
-                    value={detail.taxOfficial}
-                    fullWidth
-                  />
-                </div>
-              </section>
+              {/* 시세 정보 - membership에서 가져옴 */}
+              {detail.memberships && detail.memberships.length > 0 && (
+                <section>
+                  <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
+                    시세 정보
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <InfoField
+                      label="최근 시세"
+                      value={formatPriceString(detail.memberships[0].recentMarketPrice)}
+                    />
+                    <InfoField
+                      label="시세 업데이트일"
+                      value={detail.memberships[0].recentPriceUpdateDate}
+                    />
+                    <InfoField
+                      label="3년 평균 시세"
+                      value={formatPriceString(detail.memberships[0].avgMarketPrice3y)}
+                    />
+                    <InfoField
+                      label="딜러 가격대"
+                      value={formatPriceString(detail.memberships[0].dealerPriceRange)}
+                    />
+                  </div>
+                </section>
+              )}
 
-              {/* 이용 비용 */}
-              <section>
-                <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
-                  이용 비용
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <GreenFeeField label="평일 그린피" data={detail.weekdayGreenFee} />
-                  <GreenFeeField label="주말 그린피" data={detail.weekendGreenFee} />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                  <InfoField
-                    label="카트피"
-                    value={formatCurrency(detail.cartFee)}
-                  />
-                </div>
-              </section>
+              {/* 회원권 정보 */}
+              {detail.memberships && detail.memberships.length > 0 && (
+                <section>
+                  <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
+                    회원권 정보
+                  </h3>
+                  {detail.memberships.map((membership) => (
+                    <div key={membership.id} className="space-y-4 mb-6 last:mb-0">
+                      {/* 회원권 종류 */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <InfoField
+                          label="회원권 종류"
+                          value={membership.membershipType}
+                        />
+                      </div>
 
-              {/* 시세 정보 */}
-              <section>
-                <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
-                  시세 정보
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <InfoField
-                    label="최근 시세"
-                    value={formatPriceString(detail.recentMarketPrice)}
-                  />
-                  <InfoField
-                    label="시세 업데이트일"
-                    value={detail.recentPriceUpdateDate}
-                  />
-                  <InfoField
-                    label="3년 평균 시세"
-                    value={formatPriceString(detail.avgMarketPrice3y)}
-                  />
-                  <InfoField
-                    label="딜러 가격대"
-                    value={formatPriceString(detail.dealerPriceRange)}
-                  />
-                </div>
-              </section>
+                      {/* 가족회원 정보 */}
+                      <div className="mt-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-3">가족회원</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <InfoField
+                            label="가족회원 유무"
+                            value={membership.hasFamilyMember ? "있음" : "없음"}
+                          />
+                          {membership.hasFamilyMember && (
+                            <>
+                              <InfoField
+                                label="가족회원 조건"
+                                value={membership.familyMemberCondition}
+                              />
+                              <InfoField
+                                label="평일 요금"
+                                value={membership.familyMemberWeekdayFee ? `${membership.familyMemberWeekdayFee.toLocaleString()}원` : undefined}
+                              />
+                              <InfoField
+                                label="주말 요금"
+                                value={membership.familyMemberWeekendFee ? `${membership.familyMemberWeekendFee.toLocaleString()}원` : undefined}
+                              />
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 준회원 정보 */}
+                      <div className="mt-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-3">준회원</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <InfoField
+                            label="준회원 유무"
+                            value={membership.hasAssociateMember ? "있음" : "없음"}
+                          />
+                          {membership.hasAssociateMember && (
+                            <>
+                              <InfoField
+                                label="준회원 조건"
+                                value={membership.associateMemberCondition}
+                              />
+                              <InfoField
+                                label="평일 요금"
+                                value={membership.associateMemberWeekdayFee ? `${membership.associateMemberWeekdayFee.toLocaleString()}원` : undefined}
+                              />
+                              <InfoField
+                                label="주말 요금"
+                                value={membership.associateMemberWeekendFee ? `${membership.associateMemberWeekendFee.toLocaleString()}원` : undefined}
+                              />
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 기명인/위임 정보 */}
+                      <div className="mt-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-3">기명인 및 위임</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <InfoField
+                            label="기명인 수"
+                            value={membership.registeredPersonCount ? `${membership.registeredPersonCount}명` : undefined}
+                          />
+                          <InfoField
+                            label="위임 가능 여부"
+                            value={membership.canDelegate ? "가능" : "불가"}
+                          />
+                          {membership.canDelegate && (
+                            <>
+                              <InfoField
+                                label="평일 위임 규정"
+                                value={membership.delegationWeekdayRule}
+                              />
+                              <InfoField
+                                label="주말 위임 규정"
+                                value={membership.delegationWeekendRule}
+                              />
+                              <InfoField
+                                label="위임 제한사항"
+                                value={membership.delegationRestriction}
+                                fullWidth
+                              />
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 분양 정보 */}
+                      <div className="mt-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-3">분양 정보</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <InfoField
+                            label="초기 분양가"
+                            value={membership.initialSalePrice}
+                            fullWidth
+                          />
+                          <InfoField
+                            label="분양 연도"
+                            value={membership.initialSaleYear ? (membership.initialSaleYear.includes("년") ? membership.initialSaleYear : `${membership.initialSaleYear}년`) : undefined}
+                          />
+                          <InfoField
+                            label="분양 방법"
+                            value={membership.initialSaleMethod}
+                          />
+                          <InfoField
+                            label="입회 연령"
+                            value={membership.admissionAge ? `만 ${membership.admissionAge}세 이상` : undefined}
+                          />
+                          <InfoField
+                            label="예상 시세"
+                            value={membership.estimatedSalePrice}
+                          />
+                          <InfoField
+                            label="예상 시세 기준일"
+                            value={membership.estimatedPriceDate}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </section>
+              )}
 
               {/* 특이 사항 */}
               {detail.memo && (
@@ -478,6 +601,30 @@ export default function ClubProfile({ detail, loading }: ClubProfileProps) {
 
           {activeTab === "fee" && (
             <div className="space-y-6">
+              {/* 이용 비용 - membership에서 가져옴 */}
+              {detail.memberships && detail.memberships.length > 0 && (
+                <section>
+                  <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
+                    이용 비용
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <GreenFeeField label="평일 그린피" data={detail.memberships[0].weekdayGreenFee} />
+                    <GreenFeeField label="주말 그린피" data={detail.memberships[0].weekendGreenFee} />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <InfoField
+                      label="캐디피"
+                      value={formatCurrency(detail.memberships[0].caddyFee)}
+                    />
+                    <InfoField
+                      label="카트피"
+                      value={formatCurrency(detail.memberships[0].cartFee)}
+                    />
+                  </div>
+                </section>
+              )}
+
+              {/* 명의변경 관련 비용 */}
               <section>
                 <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
                   명의변경 관련 비용
@@ -513,6 +660,20 @@ export default function ClubProfile({ detail, loading }: ClubProfileProps) {
                 </div>
               </section>
 
+              {/* 세무/행정 정보 */}
+              <section>
+                <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
+                  세무/행정 정보
+                </h3>
+                <div className="grid grid-cols-1 gap-4">
+                  <InfoField
+                    label="관할 세무서"
+                    value={detail.taxOfficial}
+                    fullWidth
+                  />
+                </div>
+              </section>
+
               {/* 회원권 비용 계산기 */}
               <section>
                 <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
@@ -520,7 +681,7 @@ export default function ClubProfile({ detail, loading }: ClubProfileProps) {
                 </h3>
                 <MembershipCalculator
                   transferFee={detail.transferFee}
-                  recentMarketPrice={detail.recentMarketPrice}
+                  recentMarketPrice={detail.memberships?.[0]?.recentMarketPrice}
                   onShowTaxGuide={() => setShowTaxGuide(true)}
                 />
               </section>

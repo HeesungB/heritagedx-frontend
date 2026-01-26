@@ -1,4 +1,5 @@
 export interface Club {
+  id?: string;
   code: string;
   name: string;
   region: string;
@@ -36,6 +37,60 @@ export interface BankAccount {
   bankName?: string;
   accountNumber?: string;
   accountHolder?: string;
+}
+
+export interface Membership {
+  id: string;
+  clubId: string;
+  membershipType: string;
+  // 비용 정보
+  weekdayGreenFee?: Record<string, number>;
+  weekendGreenFee?: Record<string, number>;
+  caddyFee?: number;
+  cartFee?: number;
+  // 시세 정보
+  recentMarketPrice?: string;
+  recentPriceUpdateDate?: string;
+  avgMarketPrice3y?: string;
+  dealerPriceRange?: string;
+  // 거래 정보
+  minTransactionUnit?: string;
+  transactionTendency?: string;
+  recentTransactionType?: string;
+  tradableTypeSummary?: string;
+  registrationDifficulty?: string;
+  additionalDocumentFrequency?: string;
+  balanceRisk?: string;
+  transactionRiskMemo?: string;
+  // 가족회원
+  hasFamilyMember: boolean;
+  familyMemberCondition?: string;
+  familyMemberWeekdayFee?: number;
+  familyMemberWeekendFee?: number;
+  // 준회원
+  hasAssociateMember: boolean;
+  associateMemberCondition?: string;
+  associateMemberWeekdayFee?: number;
+  associateMemberWeekendFee?: number;
+  // 기명인
+  registeredPersonCount?: number;
+  // 위임
+  canDelegate: boolean;
+  delegationWeekdayRule?: string;
+  delegationWeekendRule?: string;
+  delegationRestriction?: string;
+  // 분양 정보
+  initialSalePrice?: string;
+  initialSaleYear?: string;
+  initialSaleMethod?: string;
+  estimatedSalePrice?: string;
+  estimatedPriceDate?: string;
+  admissionAge?: number;
+  // 메타
+  isActive: boolean;
+  displayOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ClubDetail {
@@ -93,6 +148,8 @@ export interface ClubDetail {
   // 서류 정보
   documentsGlobal?: Document[];
   documentsCustomer?: Document[];
+  // 회원권 정보
+  memberships?: Membership[];
   // 타임스탬프
   createdAt?: string;
   updatedAt?: string;

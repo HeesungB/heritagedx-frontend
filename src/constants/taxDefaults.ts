@@ -38,7 +38,7 @@ export const DEFAULT_TAX_SETTINGS: TaxRateSettings = {
   capitalGainsTax: {
     enabled: true,
     defaultRate: 0.22, // 22%
-    useBrackets: false, // 기본은 단일 세율
+    useBrackets: true, // 구간별 누진세율 적용
     brackets: CAPITAL_GAINS_TAX_BRACKETS,
   },
   // 법인세 (디폴트: 22% 단일 세율)

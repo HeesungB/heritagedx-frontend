@@ -64,6 +64,8 @@ export interface CalculatorInput {
   bookValue?: number; // 장부가 (법인 매도 시, 만원)
   brokerageFeeRate?: number; // 중개수수료율 (기본 0.4%)
   transferFee?: number; // 명의개서료 (만원)
+  necessaryExpenses?: number; // 필요경비 (만원, 사용자 직접 입력)
+  useBasicDeduction?: boolean; // 기본공제 적용 여부 (기본 true)
 }
 
 // 계산 결과 항목

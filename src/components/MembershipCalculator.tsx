@@ -26,6 +26,8 @@ export default function MembershipCalculator({
   const [priceManwon, setPriceManwon] = useState<number>(10000);
   const [acquisitionPriceManwon, setAcquisitionPriceManwon] = useState<number>(10000); // 개인 매도 시 취득가액
   const [bookValueManwon, setBookValueManwon] = useState<number>(10000); // 법인 매도 시 장부가
+  const [necessaryExpensesManwon, setNecessaryExpensesManwon] = useState<number>(50); // 필요경비 (만원)
+  const [useBasicDeduction, setUseBasicDeduction] = useState<boolean>(true); // 기본공제 적용 여부
 
   // 설정 모달
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -65,6 +67,8 @@ export default function MembershipCalculator({
     if (transactionType === "sell") {
       if (entityType === "personal") {
         input.acquisitionPrice = acquisitionPriceManwon;
+        input.necessaryExpenses = necessaryExpensesManwon;
+        input.useBasicDeduction = useBasicDeduction;
       } else {
         input.bookValue = bookValueManwon;
       }
@@ -77,6 +81,8 @@ export default function MembershipCalculator({
     priceManwon,
     acquisitionPriceManwon,
     bookValueManwon,
+    necessaryExpensesManwon,
+    useBasicDeduction,
     transferFeeManwon,
     settings,
     isLoaded,
@@ -121,10 +127,21 @@ export default function MembershipCalculator({
     setBookValueManwon((prev) => Math.max(0, prev + delta));
   };
 
+  const handleNecessaryExpensesChange = (value: string) => {
+    const num = parseInt(value.replace(/[^0-9]/g, ""), 10);
+    if (!isNaN(num)) {
+      setNecessaryExpensesManwon(num);
+    } else if (value === "") {
+      setNecessaryExpensesManwon(0);
+    }
+  };
+
   const handleReset = () => {
     setPriceManwon(getInitialPrice());
     setAcquisitionPriceManwon(15000);
     setBookValueManwon(15000);
+    setNecessaryExpensesManwon(50);
+    setUseBasicDeduction(true);
   };
 
   // 손익 계산
@@ -302,6 +319,62 @@ export default function MembershipCalculator({
             </p>
           </div>
           {renderAdjustButtons(handleAcquisitionPriceAdjust)}
+        </div>
+      )}
+
+      {/* 매도 시 추가 입력 - 개인: 필요경비 + 기본공제 */}
+      {transactionType === "sell" && entityType === "personal" && (
+        <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+          {/* 필요경비 입력 */}
+          <div className="mb-4">
+            <p className="text-sm text-gray-500 mb-1">필요경비</p>
+            <p className="text-xs text-gray-400 mb-3">
+              양도시 수수료 + 취득시 개서료 + 취득세 + 수수료 (증빙서류 기준)
+            </p>
+            <div className="flex items-baseline justify-end gap-2">
+              <input
+                type="text"
+                value={necessaryExpensesManwon.toLocaleString("ko-KR")}
+                onChange={(e) => handleNecessaryExpensesChange(e.target.value)}
+                className="text-2xl font-bold text-right bg-transparent border-none outline-none w-32 focus:ring-0"
+              />
+              <span className="text-lg text-gray-500">만원</span>
+            </div>
+          </div>
+
+          {/* 기본공제 선택 */}
+          <div>
+            <p className="text-sm text-gray-500 mb-1">기본공제 (연 1회 250만원)</p>
+            <p className="text-xs text-gray-400 mb-3">
+              해당 연도에 부동산 등 다른 양도가 없으면 적용 가능
+            </p>
+            <div className="flex gap-3">
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="radio"
+                  name="basicDeduction"
+                  checked={useBasicDeduction}
+                  onChange={() => setUseBasicDeduction(true)}
+                  className="w-4 h-4 text-gray-900"
+                />
+                <span className={`text-sm ${useBasicDeduction ? "font-medium text-gray-900" : "text-gray-500"}`}>
+                  적용 (Yes)
+                </span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="radio"
+                  name="basicDeduction"
+                  checked={!useBasicDeduction}
+                  onChange={() => setUseBasicDeduction(false)}
+                  className="w-4 h-4 text-gray-900"
+                />
+                <span className={`text-sm ${!useBasicDeduction ? "font-medium text-gray-900" : "text-gray-500"}`}>
+                  미적용 (No)
+                </span>
+              </label>
+            </div>
+          </div>
         </div>
       )}
 

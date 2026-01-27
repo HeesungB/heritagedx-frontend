@@ -157,15 +157,24 @@ function calculatePersonalSell(
     isAddition: false,
   });
 
-  // 필요경비 계산 (구매 시 중개수수료 + 명의개서료 + 판매 시 중개수수료)
-  const buyBrokerageFee = Math.round(acquisitionPrice * brokerageRate);
-  const necessaryExpenses = buyBrokerageFee + transferFee + sellBrokerageFee;
+  // 필요경비: 사용자 직접 입력값이 있으면 사용, 없으면 자동 계산
+  const necessaryExpenses =
+    input.necessaryExpenses != null
+      ? input.necessaryExpenses
+      : (() => {
+          const buyBrokerageFee = Math.round(acquisitionPrice * brokerageRate);
+          return buyBrokerageFee + transferFee + sellBrokerageFee;
+        })();
 
   // 양도차익 = 판매가 - 구매가 - 필요경비
   const capitalGain = transactionPrice - acquisitionPrice - necessaryExpenses;
 
+  // 기본공제 적용 여부 (기본값: true)
+  const useBasicDeduction = input.useBasicDeduction !== false;
+  const basicDeduction = useBasicDeduction ? settings.basicDeduction : 0;
+
   // 과세표준 = 양도차익 - 기본공제
-  const taxableAmount = Math.max(0, capitalGain - settings.basicDeduction);
+  const taxableAmount = Math.max(0, capitalGain - basicDeduction);
 
   let capitalGainsTax = 0;
   let taxRate = 0;
@@ -285,19 +294,21 @@ function calculateCorporateBuy(
     }
   }
 
-  // 법인 취득세 과세표준 = 거래금액 + 중개수수료 + 명의개서료
+  // 법인 취득세 과세표준 = (거래금액 + 중개수수료 + 명의개서료)의 공급가액 (부가세 제외)
+  // 인지세는 제외
   const taxBase = transactionPrice + brokerageFee + transferFee;
+  const supplyPrice = Math.round(taxBase / 1.1); // 공급가액 (부가세 10% 제외)
 
   // 취득세
   if (settings.acquisitionTax.enabled) {
-    const acquisitionTax = Math.round(taxBase * settings.acquisitionTax.rate);
+    const acquisitionTax = Math.round(supplyPrice * settings.acquisitionTax.rate);
     items.push({
       key: "acquisitionTax",
       label: `취득세 (${(settings.acquisitionTax.rate * 100).toFixed(1)}%)`,
       amount: acquisitionTax,
       rate: settings.acquisitionTax.rate,
       description:
-        "법인의 경우 거래금액 + 중개수수료 + 명의개서료를 과세표준으로 취득세가 부과됩니다.",
+        "법인의 경우 공급가액(부가세 제외) 기준으로 취득세가 부과됩니다. 인지세는 제외됩니다.",
       isAddition: true,
     });
   }

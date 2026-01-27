@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import ClubProfile from "@/components/ClubProfile";
 import MobileNavigation from "@/components/MobileNavigation";
@@ -19,35 +19,12 @@ interface AppState {
   mobileView: "clubs" | "profile";
 }
 
-// Suspense로 감싸는 래퍼 컴포넌트
-export default function HomeClient(props: HomeClientProps) {
-  return (
-    <Suspense fallback={<HomeClientLoading />}>
-      <HomeClientInner {...props} />
-    </Suspense>
-  );
-}
-
-// 로딩 폴백 컴포넌트
-function HomeClientLoading() {
-  return (
-    <div className="h-screen flex flex-col bg-gray-100 overflow-hidden">
-      <div className="h-16 bg-white border-b border-gray-200" />
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-gray-500">로딩 중...</div>
-      </div>
-    </div>
-  );
-}
-
-// 실제 로직을 담은 내부 컴포넌트
-function HomeClientInner({
+export default function HomeClient({
   initialClubs,
   initialClub,
   initialClubDetail,
 }: HomeClientProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [appState, setAppState] = useState<AppState>({
     selectedClub: initialClub,
@@ -56,65 +33,77 @@ function HomeClientInner({
   });
   const [detailLoading, setDetailLoading] = useState(false);
 
+  // ref로 현재 clubs를 추적 (popstate 핸들러에서 사용)
+  const clubsRef = useRef(initialClubs);
+  clubsRef.current = initialClubs;
+
   // 브라우저 뒤로가기/앞으로가기 시 URL 변경 감지
   useEffect(() => {
-    const urlClubCode = searchParams.get("club");
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const urlClubCode = params.get("club");
 
-    // URL의 클럽 코드와 현재 선택된 클럽이 다르면 동기화
-    if (urlClubCode && urlClubCode !== appState.selectedClub?.code) {
-      const club = initialClubs.find((c) => c.code === urlClubCode);
-      if (club) {
-        setAppState((prev) => ({
-          ...prev,
-          selectedClub: club,
-          clubDetail: null,
-          mobileView: "profile",
-        }));
-      }
-    } else if (!urlClubCode && initialClubs.length > 0) {
-      // URL에 club 파라미터가 없으면 첫 번째 골프장으로 (초기 상태)
-      const firstClub = initialClubs[0];
-      if (appState.selectedClub?.code !== firstClub.code) {
+      if (urlClubCode) {
+        const club = clubsRef.current.find((c) => c.code === urlClubCode);
+        if (club) {
+          setDetailLoading(true);
+          setAppState((prev) => ({
+            ...prev,
+            selectedClub: club,
+            clubDetail: null,
+            mobileView: "profile",
+          }));
+        }
+      } else if (clubsRef.current.length > 0) {
+        const firstClub = clubsRef.current[0];
+        setDetailLoading(true);
         setAppState((prev) => ({
           ...prev,
           selectedClub: firstClub,
           clubDetail: null,
         }));
       }
-    }
-  }, [searchParams, initialClubs, appState.selectedClub?.code]);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   // 골프장 선택 변경 시 상세 정보 로드
+  const selectedClubCode = appState.selectedClub?.code;
+  const hasMatchingDetail = appState.clubDetail?.code === selectedClubCode;
+
   useEffect(() => {
+    if (!selectedClubCode || hasMatchingDetail) {
+      return;
+    }
+
+    let cancelled = false;
+
     async function fetchClubDetail() {
-      // 초기 데이터와 같은 골프장이면 스킵
-      if (!appState.selectedClub) {
-        return;
-      }
-
-      // 이미 같은 골프장의 상세 정보가 있으면 스킵
-      if (appState.clubDetail?.code === appState.selectedClub.code) {
-        return;
-      }
-
       try {
         setDetailLoading(true);
         const response = await fetch(
-          `https://api.heritage-dx.com/api/clubs/${appState.selectedClub.code}`
+          `https://api.heritage-dx.com/api/clubs/${selectedClubCode}`
         );
         const data: ClubDetailResponse = await response.json();
-        setAppState((prev) => ({ ...prev, clubDetail: data.data }));
+        if (!cancelled) {
+          setAppState((prev) => ({ ...prev, clubDetail: data.data }));
+        }
       } catch (err) {
         console.error("상세 정보 로딩 실패:", err);
       } finally {
-        setDetailLoading(false);
+        if (!cancelled) {
+          setDetailLoading(false);
+        }
       }
     }
 
     fetchClubDetail();
-  }, [appState.selectedClub?.code, appState.clubDetail?.code]);
+    return () => { cancelled = true; };
+  }, [selectedClubCode, hasMatchingDetail]);
 
-  const handleClubSelect = (club: Club) => {
+  const handleClubSelect = useCallback((club: Club) => {
     // 같은 골프장 클릭 시 무시
     if (appState.selectedClub?.code === club.code) {
       return;
@@ -123,13 +112,15 @@ function HomeClientInner({
     // URL 업데이트 (브라우저 히스토리에 추가)
     router.push(`/?club=${club.code}`, { scroll: false });
 
+    // 즉시 로딩 상태로 전환 (빈 화면 깜빡임 방지)
+    setDetailLoading(true);
     setAppState((prev) => ({
       ...prev,
       selectedClub: club,
-      clubDetail: null, // 새 골프장 선택 시 상세 정보 초기화
+      clubDetail: null,
       mobileView: "profile",
     }));
-  };
+  }, [appState.selectedClub?.code, router]);
 
   const handleMobileViewChange = (view: "clubs" | "profile") => {
     setAppState((prev) => ({ ...prev, mobileView: view }));

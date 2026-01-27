@@ -52,3 +52,130 @@
   --color-link: #000000;
   --color-link-hover: #374151;
 }
+
+/* 인쇄 스타일 */
+@media print {
+  /* 기본 설정 */
+  html, body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    height: auto !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* 페이지 설정 */
+  @page {
+    size: A4;
+    margin: 10mm 15mm;
+  }
+
+  /* 불필요한 요소 숨기기 */
+  .print\\:hidden,
+  nav,
+  button:not(.print\\:block),
+  .no-print {
+    display: none !important;
+  }
+
+  /* 인쇄 영역 표시 */
+  .print\\:block {
+    display: block !important;
+  }
+
+  /* 스크롤 및 오버플로 해제 - 전체 내용 표시 */
+  * {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  /* 전체 너비로 표시 */
+  .print\\:w-full,
+  .flex-1,
+  .overflow-y-auto,
+  .overflow-auto,
+  .overflow-hidden {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* 레이아웃 초기화 */
+  .min-h-0,
+  .min-h-screen,
+  .h-screen,
+  .h-full {
+    min-height: auto !important;
+    height: auto !important;
+  }
+
+  /* flex 레이아웃 해제 (print:hidden이 아닌 요소만) */
+  .flex:not(.print\:hidden) {
+    display: block !important;
+  }
+
+  /* print:hidden 요소는 반드시 숨김 (flex 규칙보다 우선) */
+  [class*="print:hidden"],
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* 배경색 유지 */
+  .bg-gray-100,
+  .bg-gray-50,
+  [class*="bg-"] {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* 테이블 스타일 */
+  table {
+    page-break-inside: auto;
+    width: 100% !important;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tfoot {
+    display: table-footer-group;
+  }
+
+  /* 섹션 페이지 나눔 */
+  section {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  /* 큰 섹션은 나눔 허용 */
+  .page-break-allow {
+    page-break-inside: auto !important;
+  }
+
+  /* 그림자 제거 */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* 링크 색상 유지 */
+  a {
+    color: inherit !important;
+    text-decoration: none !important;
+  }
+
+  /* 회원권 시트 특별 스타일 */
+  .max-w-4xl {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}

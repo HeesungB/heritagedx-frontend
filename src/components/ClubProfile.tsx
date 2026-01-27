@@ -2,16 +2,17 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { PDFDocument } from "pdf-lib";
-import { ClubDetail, Document } from "@/types";
+import { ClubDetail, Document, CustomFieldValue } from "@/types";
 import MembershipCalculator from "./MembershipCalculator";
 import TaxGuideModal from "./TaxGuideModal";
+import MembershipInfoSheet from "./MembershipInfoSheet";
 
 interface ClubProfileProps {
   detail: ClubDetail | null;
   loading: boolean;
 }
 
-type ProfileTab = "basic" | "fee" | "documents";
+type ProfileTab = "basic" | "infoSheet" | "fee" | "documents";
 
 export default function ClubProfile({ detail, loading }: ClubProfileProps) {
   // 모든 hooks는 early return 전에 선언되어야 합니다
@@ -21,6 +22,15 @@ export default function ClubProfile({ detail, loading }: ClubProfileProps) {
   const [printAllLoading, setPrintAllLoading] = useState(false);
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
   const [selectedScenarioCode, setSelectedScenarioCode] = useState<string | null>(null);
+
+  // 회원권 시트 입력 필드 상태
+  const [sheetRecipient, setSheetRecipient] = useState("");
+  const [sheetBenefits, setSheetBenefits] = useState("");
+  const [sheetMarketNote, setSheetMarketNote] = useState("");
+  const [sheetNotes, setSheetNotes] = useState("");
+  const [sheetManagerName, setSheetManagerName] = useState("");
+  const [sheetManagerTitle, setSheetManagerTitle] = useState("");
+  const [sheetManagerPhone, setSheetManagerPhone] = useState("");
 
   // 체크박스 토글
   const toggleDocSelection = useCallback((docId: string) => {
@@ -287,15 +297,16 @@ export default function ClubProfile({ detail, loading }: ClubProfileProps) {
 
   const tabs = [
     { id: "basic" as ProfileTab, label: "기본 정보" },
+    { id: "infoSheet" as ProfileTab, label: "회원권 시트" },
     { id: "fee" as ProfileTab, label: "수수료/비용" },
     { id: "documents" as ProfileTab, label: "서류" },
   ];
 
   return (
-    <div className="flex-1 min-h-0 p-6 bg-gray-50 overflow-y-auto">
-      <div className="bg-white rounded-lg border border-gray-200">
+    <div className="flex-1 min-h-0 p-6 bg-gray-50 overflow-y-auto print:p-0 print:bg-white print:overflow-visible">
+      <div className="bg-white rounded-lg border border-gray-200 print:border-0 print:rounded-none">
         {/* 헤더 */}
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-6 border-b border-gray-200 print:hidden">
           <div className="flex items-start justify-between">
             <div>
               <h2 className="text-xl font-bold mb-2">{detail.name}</h2>
@@ -329,7 +340,7 @@ export default function ClubProfile({ detail, loading }: ClubProfileProps) {
         </div>
 
         {/* 탭 네비게이션 */}
-        <div className="border-b border-gray-200">
+        <div className="border-b border-gray-200 print:hidden">
           <div className="flex">
             {tabs.map((tab) => (
               <button
@@ -350,252 +361,207 @@ export default function ClubProfile({ detail, loading }: ClubProfileProps) {
         {/* 탭 컨텐츠 */}
         <div className="p-6">
           {activeTab === "basic" && (
-            <div className="space-y-6">
-              {/* 기본 정보 */}
-              <section>
-                <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
-                  골프장 정보
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <InfoField label="소재지" value={detail.address} />
-                  <InfoField label="지역" value={detail.region} />
-                  <InfoField
-                    label="개장일"
-                    value={formatDate(detail.openingDate)}
-                  />
-                  <InfoField label="운영 형태" value={detail.holes} />
-                  <InfoField label="총 거리" value={detail.totalLength} />
-                  <InfoField label="총 회원 수" value={detail.memberCount} />
-                  {detail.courseNames && detail.courseNames.length > 0 && (
-                    <InfoField
-                      label="코스 구성"
-                      value={detail.courseNames.join(", ")}
-                    />
-                  )}
-                  <InfoField
-                    label="도시 접근성"
-                    value={detail.cityAccessibility}
-                  />
-                </div>
-              </section>
+            <div className="space-y-4">
+              {/* 1. 골프장 정보 */}
+              <CollapsibleSection title="골프장 정보" icon={SectionIcons.club} defaultOpen={true}>
+                <table className="w-full border-collapse">
+                  <tbody>
+                    <tr>
+                      <td className="bg-gray-100 border border-gray-300 px-3 py-2 w-28 text-sm text-gray-600 font-medium">골프장명</td>
+                      <td className="border border-gray-300 px-3 py-2 text-sm">{detail.name || "-"}</td>
+                      <td className="bg-gray-100 border border-gray-300 px-3 py-2 w-28 text-sm text-gray-600 font-medium">회 사 명</td>
+                      <td className="border border-gray-300 px-3 py-2 text-sm">-</td>
+                    </tr>
+                    <tr>
+                      <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium">코스규모</td>
+                      <td className="border border-gray-300 px-3 py-2 text-sm">{detail.holes || "-"}</td>
+                      <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium">회 원 수</td>
+                      <td className="border border-gray-300 px-3 py-2 text-sm">{detail.memberCount || "-"}</td>
+                    </tr>
+                    <tr>
+                      <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium">위 치</td>
+                      <td className="border border-gray-300 px-3 py-2 text-sm">{detail.address || detail.region || "-"}</td>
+                      <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium">전화번호</td>
+                      <td className="border border-gray-300 px-3 py-2 text-sm">
+                        {primaryContact?.phoneNumber ? (
+                          <a href={`tel:${primaryContact.phoneNumber}`} className="text-blue-600 hover:underline">
+                            {primaryContact.phoneNumber}
+                          </a>
+                        ) : "-"}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium">홈페이지</td>
+                      <td colSpan={3} className="border border-gray-300 px-3 py-2 text-sm">
+                        {detail.externalUrl ? (
+                          <a href={detail.externalUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                            {detail.externalUrl}
+                          </a>
+                        ) : "-"}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </CollapsibleSection>
 
-              {/* 예약 정보 */}
+              {/* 2. 회원권 정보 */}
+              {detail.memberships && detail.memberships.length > 0 && (
+                <MembershipInfoSection memberships={detail.memberships} memo={detail.memo} />
+              )}
+
+              {/* 3. 부가 정보 (커스텀 필드) */}
+              {detail.customFields && Object.keys(detail.customFields).length > 0 && (
+                <CustomFieldsSection customFields={detail.customFields} />
+              )}
+
+              {/* 5. 예약 안내 */}
               {detail.reservationNotes && (
-                <section>
-                  <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
-                    예약 안내
-                  </h3>
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-gray-800 whitespace-pre-wrap">
+                <CollapsibleSection title="예약 안내" icon={SectionIcons.reservation} defaultOpen={true}>
+                  <div className="p-4">
+                    <p className="text-gray-800 whitespace-pre-wrap text-sm">
                       {detail.reservationNotes}
                     </p>
                   </div>
+                </CollapsibleSection>
+              )}
+
+              {/* 6. 추가 부가 정보 (특이사항) - Collapsible 아님 */}
+              {detail.memo && (
+                <section className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <h3 className="text-sm font-semibold text-yellow-800 mb-2">특이 사항</h3>
+                  <p className="text-gray-800 whitespace-pre-wrap text-sm">
+                    {detail.memo}
+                  </p>
                 </section>
               )}
 
-              {/* 연락처 정보 */}
-              <section>
-                <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
-                  연락처
+            </div>
+          )}
+
+          {activeTab === "infoSheet" && (
+            <div className="space-y-6">
+              {/* 입력 필드 섹션 */}
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 print:hidden">
+                <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  추가 정보 입력
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <InfoField
-                    label="담당자"
-                    value={primaryContact?.contactPerson}
-                  />
-                  <InfoField label="부서" value={primaryContact?.department} />
-                  <InfoField
-                    label="전화번호"
-                    value={primaryContact?.phoneNumber}
-                    isPhone
-                  />
-                  <InfoField label="팩스" value={primaryContact?.fax} />
-                  <InfoField
-                    label="이메일"
-                    value={primaryContact?.email}
-                    isEmail
-                  />
+                  {/* 수신자 정보 */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">수신자 (귀중)</label>
+                    <input
+                      type="text"
+                      value={sheetRecipient}
+                      onChange={(e) => setSheetRecipient(e.target.value)}
+                      placeholder="예: 수산    (주)한아 귀중"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    />
+                  </div>
+
+                  {/* 회원 혜택 */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">회원 혜택</label>
+                    <textarea
+                      value={sheetBenefits}
+                      onChange={(e) => setSheetBenefits(e.target.value)}
+                      placeholder="예: - 월 주중 8회 주말 7회 우선예약"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
+                      rows={2}
+                    />
+                  </div>
+
+                  {/* 시세 메모 */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">시세 메모</label>
+                    <input
+                      type="text"
+                      value={sheetMarketNote}
+                      onChange={(e) => setSheetMarketNote(e.target.value)}
+                      placeholder="예: *현재 시장가: 3억 4,000만원"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    />
+                  </div>
+
+                  {/* 기타 사항 */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">기타 사항</label>
+                    <textarea
+                      value={sheetNotes}
+                      onChange={(e) => setSheetNotes(e.target.value)}
+                      placeholder="추가로 기재할 내용을 입력하세요"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
+                      rows={2}
+                    />
+                  </div>
+
+                  {/* 담당자 정보 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">담당자 이름</label>
+                    <input
+                      type="text"
+                      value={sheetManagerName}
+                      onChange={(e) => setSheetManagerName(e.target.value)}
+                      placeholder="김민정"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">담당자 직책</label>
+                    <input
+                      type="text"
+                      value={sheetManagerTitle}
+                      onChange={(e) => setSheetManagerTitle(e.target.value)}
+                      placeholder="팀장"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">담당자 연락처</label>
+                    <input
+                      type="text"
+                      value={sheetManagerPhone}
+                      onChange={(e) => setSheetManagerPhone(e.target.value)}
+                      placeholder="연락처"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    />
+                  </div>
                 </div>
-              </section>
+              </div>
 
-              {/* 시세 정보 - membership에서 가져옴 */}
-              {detail.memberships && detail.memberships.length > 0 && (
-                <section>
-                  <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
-                    시세 정보
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <InfoField
-                      label="최근 시세"
-                      value={formatPriceString(detail.memberships[0].recentMarketPrice)}
-                    />
-                    <InfoField
-                      label="시세 업데이트일"
-                      value={detail.memberships[0].recentPriceUpdateDate}
-                    />
-                    <InfoField
-                      label="3년 평균 시세"
-                      value={formatPriceString(detail.memberships[0].avgMarketPrice3y)}
-                    />
-                    <InfoField
-                      label="딜러 가격대"
-                      value={formatPriceString(detail.memberships[0].dealerPriceRange)}
-                    />
-                  </div>
-                </section>
-              )}
+              {/* 미리보기 구분선 */}
+              <div className="flex items-center gap-4 print:hidden">
+                <div className="flex-1 border-t border-gray-300"></div>
+                <span className="text-sm text-gray-500 font-medium">미리보기</span>
+                <div className="flex-1 border-t border-gray-300"></div>
+              </div>
 
-              {/* 회원권 정보 */}
-              {detail.memberships && detail.memberships.length > 0 && (
-                <section>
-                  <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
-                    회원권 정보
-                  </h3>
-                  {detail.memberships.map((membership) => (
-                    <div key={membership.id} className="space-y-4 mb-6 last:mb-0">
-                      {/* 회원권 종류 */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <InfoField
-                          label="회원권 종류"
-                          value={membership.membershipType}
-                        />
-                      </div>
+              {/* 회원권 시트 */}
+              <MembershipInfoSheet
+                detail={detail}
+                recipient={sheetRecipient || undefined}
+                benefits={sheetBenefits || undefined}
+                marketNote={sheetMarketNote || undefined}
+                notes={sheetNotes ? [sheetNotes] : (detail.memo ? [detail.memo] : undefined)}
+                managerName={sheetManagerName || "김민정"}
+                managerTitle={sheetManagerTitle || "팀장"}
+                managerPhone={sheetManagerPhone || undefined}
+              />
 
-                      {/* 가족회원 정보 */}
-                      <div className="mt-4">
-                        <h4 className="text-sm font-medium text-gray-700 mb-3">가족회원</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <InfoField
-                            label="가족회원 유무"
-                            value={membership.hasFamilyMember ? "있음" : "없음"}
-                          />
-                          {membership.hasFamilyMember && (
-                            <>
-                              <InfoField
-                                label="가족회원 조건"
-                                value={membership.familyMemberCondition}
-                              />
-                              <InfoField
-                                label="평일 요금"
-                                value={membership.familyMemberWeekdayFee ? `${membership.familyMemberWeekdayFee.toLocaleString()}원` : undefined}
-                              />
-                              <InfoField
-                                label="주말 요금"
-                                value={membership.familyMemberWeekendFee ? `${membership.familyMemberWeekendFee.toLocaleString()}원` : undefined}
-                              />
-                            </>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* 준회원 정보 */}
-                      <div className="mt-4">
-                        <h4 className="text-sm font-medium text-gray-700 mb-3">준회원</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <InfoField
-                            label="준회원 유무"
-                            value={membership.hasAssociateMember ? "있음" : "없음"}
-                          />
-                          {membership.hasAssociateMember && (
-                            <>
-                              <InfoField
-                                label="준회원 조건"
-                                value={membership.associateMemberCondition}
-                              />
-                              <InfoField
-                                label="평일 요금"
-                                value={membership.associateMemberWeekdayFee ? `${membership.associateMemberWeekdayFee.toLocaleString()}원` : undefined}
-                              />
-                              <InfoField
-                                label="주말 요금"
-                                value={membership.associateMemberWeekendFee ? `${membership.associateMemberWeekendFee.toLocaleString()}원` : undefined}
-                              />
-                            </>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* 기명인/위임 정보 */}
-                      <div className="mt-4">
-                        <h4 className="text-sm font-medium text-gray-700 mb-3">기명인 및 위임</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <InfoField
-                            label="기명인 수"
-                            value={membership.registeredPersonCount ? `${membership.registeredPersonCount}명` : undefined}
-                          />
-                          <InfoField
-                            label="위임 가능 여부"
-                            value={membership.canDelegate ? "가능" : "불가"}
-                          />
-                          {membership.canDelegate && (
-                            <>
-                              <InfoField
-                                label="평일 위임 규정"
-                                value={membership.delegationWeekdayRule}
-                              />
-                              <InfoField
-                                label="주말 위임 규정"
-                                value={membership.delegationWeekendRule}
-                              />
-                              <InfoField
-                                label="위임 제한사항"
-                                value={membership.delegationRestriction}
-                                fullWidth
-                              />
-                            </>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* 분양 정보 */}
-                      <div className="mt-4">
-                        <h4 className="text-sm font-medium text-gray-700 mb-3">분양 정보</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <InfoField
-                            label="초기 분양가"
-                            value={membership.initialSalePrice}
-                            fullWidth
-                          />
-                          <InfoField
-                            label="분양 연도"
-                            value={membership.initialSaleYear ? (membership.initialSaleYear.includes("년") ? membership.initialSaleYear : `${membership.initialSaleYear}년`) : undefined}
-                          />
-                          <InfoField
-                            label="분양 방법"
-                            value={membership.initialSaleMethod}
-                          />
-                          <InfoField
-                            label="입회 연령"
-                            value={membership.admissionAge ? `만 ${membership.admissionAge}세 이상` : undefined}
-                          />
-                          <InfoField
-                            label="예상 시세"
-                            value={membership.estimatedSalePrice}
-                          />
-                          <InfoField
-                            label="예상 시세 기준일"
-                            value={membership.estimatedPriceDate}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </section>
-              )}
-
-              {/* 특이 사항 */}
-              {detail.memo && (
-                <section>
-                  <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-gray-200">
-                    특이 사항
-                  </h3>
-                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-gray-800 whitespace-pre-wrap">
-                      {detail.memo}
-                    </p>
-                  </div>
-                </section>
-              )}
+              {/* 인쇄 버튼 */}
+              <div className="flex justify-center gap-4 print:hidden">
+                <button
+                  onClick={() => window.print()}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                  </svg>
+                  인쇄하기
+                </button>
+              </div>
             </div>
           )}
 
@@ -1011,6 +977,7 @@ export default function ClubProfile({ detail, loading }: ClubProfileProps) {
               </section>
             </div>
           )}
+
         </div>
       </div>
 
@@ -1138,3 +1105,364 @@ function GreenFeeField({ label, data }: GreenFeeFieldProps) {
     </div>
   );
 }
+
+// Collapsible 섹션 컴포넌트
+interface CollapsibleSectionProps {
+  title: string;
+  icon?: React.ReactNode;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}
+
+function CollapsibleSection({
+  title,
+  icon,
+  defaultOpen = true,
+  children,
+}: CollapsibleSectionProps) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <section className="border border-gray-200 rounded-lg overflow-hidden print:border-gray-300 print:mb-4">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors print:cursor-default print:hover:bg-gray-50"
+      >
+        <div className="flex items-center gap-2">
+          {icon && <span className="text-[#8BC34A]">{icon}</span>}
+          <span className="font-semibold text-gray-800">{title}</span>
+        </div>
+        <svg
+          className={`w-5 h-5 text-gray-500 transition-transform duration-200 print:hidden ${
+            isOpen ? "rotate-180" : ""
+          }`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {/* 화면에서는 isOpen 상태에 따라, 인쇄 시에는 항상 표시 */}
+      <div className={`border-t border-gray-200 ${isOpen ? "block" : "hidden"} print:block`}>
+        {children}
+      </div>
+    </section>
+  );
+}
+
+// 회원권 정보 섹션 컴포넌트 (탭 지원)
+interface Membership {
+  id?: string;
+  membershipType?: string;
+  initialSalePrice?: string;
+  registeredPersonCount?: number;
+  hasAssociateMember?: boolean;
+  associateMemberCondition?: string;
+  hasFamilyMember?: boolean;
+  familyMemberCondition?: string;
+  familyMemberWeekdayFee?: number;
+  familyMemberWeekendFee?: number;
+  weekdayGreenFee?: number | Record<string, number>;
+  weekendGreenFee?: number | Record<string, number>;
+  cartFee?: number;
+  caddyFee?: number;
+  recentMarketPrice?: string;
+  estimatedSalePrice?: string;
+  estimatedPriceDate?: string;
+  canDelegate?: boolean;
+  delegationWeekdayRule?: string;
+  delegationWeekendRule?: string;
+  delegationRestriction?: string;
+}
+
+interface MembershipInfoSectionProps {
+  memberships: Membership[];
+  memo?: string | null;
+}
+
+function MembershipInfoSection({ memberships, memo }: MembershipInfoSectionProps) {
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const membership = memberships[selectedIndex];
+
+  // 탭 전환 핸들러 (애니메이션 포함)
+  const handleTabChange = (index: number) => {
+    if (index === selectedIndex) return;
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setSelectedIndex(index);
+      setIsTransitioning(false);
+    }, 150);
+  };
+
+  // 그린피 포맷 함수
+  const formatFeeInManwon = (fee?: number) => {
+    if (!fee && fee !== 0) return "-";
+    return `${(fee / 10000).toLocaleString()}`;
+  };
+
+  // 그린피 객체에서 회원 유형 키 추출
+  const getGreenFeeTypes = (weekdayFee?: number | Record<string, number>, weekendFee?: number | Record<string, number>) => {
+    const types = new Set<string>();
+    if (weekdayFee && typeof weekdayFee === "object") {
+      Object.keys(weekdayFee).forEach(key => types.add(key));
+    }
+    if (weekendFee && typeof weekendFee === "object") {
+      Object.keys(weekendFee).forEach(key => types.add(key));
+    }
+    const order = ["정회원", "가족회원", "비회원"];
+    return Array.from(types).sort((a, b) => {
+      const aIndex = order.indexOf(a);
+      const bIndex = order.indexOf(b);
+      if (aIndex === -1 && bIndex === -1) return 0;
+      if (aIndex === -1) return 1;
+      if (bIndex === -1) return -1;
+      return aIndex - bIndex;
+    });
+  };
+
+  const getGreenFeeValue = (fee?: number | Record<string, number>, type?: string) => {
+    if (!fee && fee !== 0) return "-";
+    if (typeof fee === "number") return formatFeeInManwon(fee);
+    if (typeof fee === "object" && type && fee[type] !== undefined) {
+      return formatFeeInManwon(fee[type]);
+    }
+    return "-";
+  };
+
+  const greenFeeTypes = getGreenFeeTypes(membership?.weekdayGreenFee, membership?.weekendGreenFee);
+
+  return (
+    <CollapsibleSection title="회원권 정보" icon={SectionIcons.membership} defaultOpen={true}>
+      {/* 회원권 탭 (여러 개인 경우) */}
+      {memberships.length > 1 && (
+        <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+          <div className="relative flex gap-1 p-1 bg-gray-200 rounded-lg">
+            {memberships.map((m, index) => (
+              <button
+                key={m.id || index}
+                onClick={() => handleTabChange(index)}
+                className={`relative z-10 flex-1 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                  selectedIndex === index
+                    ? "text-gray-900"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                {selectedIndex === index && (
+                  <span className="absolute inset-0 bg-white rounded-md shadow-sm transition-all duration-200" />
+                )}
+                <span className="relative">{m.membershipType || `회원권 ${index + 1}`}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className={`transition-opacity duration-150 ${isTransitioning ? "opacity-0" : "opacity-100"}`}>
+        <table className="w-full border-collapse">
+        <tbody>
+          {/* 회원권명, 분양가 */}
+          <tr>
+            <td className="bg-gray-100 border border-gray-300 px-3 py-2 w-28 text-sm text-gray-600 font-medium">회원권명</td>
+            <td className="border border-gray-300 px-3 py-2 text-sm">{membership?.membershipType || "-"}</td>
+            <td className="bg-gray-100 border border-gray-300 px-3 py-2 w-28 text-sm text-gray-600 font-medium">분 양 가</td>
+            <td className="border border-gray-300 px-3 py-2 text-sm">{membership?.initialSalePrice || "-"}</td>
+          </tr>
+          {/* 구분, 회원구성 */}
+          <tr>
+            <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium">구 분</td>
+            <td className="border border-gray-300 px-3 py-2 text-sm">{membership?.membershipType || "-"}</td>
+            <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium">회원구성</td>
+            <td className="border border-gray-300 px-3 py-2 text-sm">
+              {membership?.registeredPersonCount ? `${membership.registeredPersonCount}인` : "-"}
+            </td>
+          </tr>
+          {/* 준회원 제도 */}
+          <tr>
+            <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium">준회원 제도</td>
+            <td className="border border-gray-300 px-3 py-2 text-sm">{membership?.hasAssociateMember ? "있음" : "-"}</td>
+            <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium">준회원 조건</td>
+            <td className="border border-gray-300 px-3 py-2 text-sm">{membership?.associateMemberCondition || "-"}</td>
+          </tr>
+          {/* 가족회원 */}
+          <tr>
+            <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium">가족회원</td>
+            <td className="border border-gray-300 px-3 py-2 text-sm">{membership?.hasFamilyMember ? "있음" : "-"}</td>
+            <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium">가족회원 조건</td>
+            <td className="border border-gray-300 px-3 py-2 text-sm">{membership?.familyMemberCondition || "-"}</td>
+          </tr>
+          {/* 카트비, 캐디피 */}
+          <tr>
+            <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium">카 트 비</td>
+            <td className="border border-gray-300 px-3 py-2 text-sm">
+              {membership?.cartFee ? `${(membership.cartFee / 10000).toLocaleString()} 만원` : "-"}
+            </td>
+            <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium">캐 디 피</td>
+            <td className="border border-gray-300 px-3 py-2 text-sm">
+              {membership?.caddyFee ? `${(membership.caddyFee / 10000).toLocaleString()} 만원` : "-"}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* 그린피 테이블 - 보기 좋게 별도 표시 */}
+      <div className="px-3 py-3 border-t border-gray-200">
+        <div className="text-sm font-medium text-gray-700 mb-2">그린피 (단위: 만원)</div>
+        <table className="w-full border-collapse border border-gray-300">
+          <thead>
+            <tr>
+              <th className="bg-gray-100 border border-gray-300 px-3 py-2 text-xs text-gray-600 font-medium w-16">구분</th>
+              {greenFeeTypes.length > 0 ? (
+                greenFeeTypes.map(type => (
+                  <th key={type} className="bg-gray-100 border border-gray-300 px-3 py-2 text-xs text-gray-600 font-medium text-center">
+                    {type}
+                  </th>
+                ))
+              ) : (
+                <th className="bg-gray-100 border border-gray-300 px-3 py-2 text-xs text-gray-600 font-medium text-center">회원</th>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-xs text-gray-600 text-center font-medium">주중</td>
+              {greenFeeTypes.length > 0 ? (
+                greenFeeTypes.map(type => (
+                  <td key={type} className="border border-gray-300 px-3 py-2 text-sm text-center">
+                    {getGreenFeeValue(membership?.weekdayGreenFee, type)}
+                  </td>
+                ))
+              ) : (
+                <td className="border border-gray-300 px-3 py-2 text-sm text-center">
+                  {typeof membership?.weekdayGreenFee === "number" ? formatFeeInManwon(membership.weekdayGreenFee) : "-"}
+                </td>
+              )}
+            </tr>
+            <tr>
+              <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-xs text-gray-600 text-center font-medium">주말</td>
+              {greenFeeTypes.length > 0 ? (
+                greenFeeTypes.map(type => (
+                  <td key={type} className="border border-gray-300 px-3 py-2 text-sm text-center">
+                    {getGreenFeeValue(membership?.weekendGreenFee, type)}
+                  </td>
+                ))
+              ) : (
+                <td className="border border-gray-300 px-3 py-2 text-sm text-center">
+                  {typeof membership?.weekendGreenFee === "number" ? formatFeeInManwon(membership.weekendGreenFee) : "-"}
+                </td>
+              )}
+            </tr>
+          </tbody>
+        </table>
+        {/* 가족회원 그린피 별도 표시 */}
+        {membership?.hasFamilyMember && (membership?.familyMemberWeekdayFee || membership?.familyMemberWeekendFee) && (
+          <div className="mt-2 text-xs text-gray-600">
+            * 가족회원 그린피: 주중 {membership.familyMemberWeekdayFee ? `${(membership.familyMemberWeekdayFee / 10000).toLocaleString()}만원` : "-"} /
+            주말 {membership.familyMemberWeekendFee ? `${(membership.familyMemberWeekendFee / 10000).toLocaleString()}만원` : "-"}
+          </div>
+        )}
+      </div>
+
+        {/* 추가 정보 */}
+        <table className="w-full border-collapse border-t border-gray-200">
+          <tbody>
+            {/* 회원권 시세 */}
+            <tr>
+              <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium w-28">회원권 시세</td>
+              <td colSpan={3} className="border border-gray-300 px-3 py-2 text-sm">
+                {membership?.estimatedSalePrice
+                  ? `${membership.estimatedSalePrice} (${membership.estimatedPriceDate || "-"})`
+                  : membership?.recentMarketPrice
+                    ? `*현재 시장가: ${membership.recentMarketPrice}`
+                    : "-"}
+              </td>
+            </tr>
+            {/* 기타 사항 */}
+            <tr>
+              <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium align-top">기타 사항</td>
+              <td colSpan={3} className="border border-gray-300 px-3 py-2 text-sm whitespace-pre-wrap">
+                {memo || "-"}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </CollapsibleSection>
+  );
+}
+
+// 부가 정보 (커스텀 필드) 섹션 컴포넌트
+interface CustomFieldsSectionProps {
+  customFields: Record<string, CustomFieldValue>;
+}
+
+function CustomFieldsSection({ customFields }: CustomFieldsSectionProps) {
+  const fieldsArray = Object.entries(customFields).map(([key, field]) => ({
+    key,
+    ...field,
+  }));
+
+  // 커스텀 필드 값 포맷 함수
+  const formatCustomFieldValue = (field: CustomFieldValue) => {
+    if (field.type === "boolean") {
+      return field.value ? "있음" : "없음";
+    }
+    return String(field.value);
+  };
+
+  return (
+    <CollapsibleSection title="부가 정보" icon={SectionIcons.info} defaultOpen={true}>
+      <table className="w-full border-collapse">
+        <tbody>
+          {/* 2열씩 표시 */}
+          {Array.from({ length: Math.ceil(fieldsArray.length / 2) }).map((_, rowIndex) => {
+            const firstField = fieldsArray[rowIndex * 2];
+            const secondField = fieldsArray[rowIndex * 2 + 1];
+            return (
+              <tr key={rowIndex}>
+                <td className="bg-gray-100 border border-gray-300 px-3 py-2 w-28 text-sm text-gray-600 font-medium">{firstField.label}</td>
+                <td className="border border-gray-300 px-3 py-2 text-sm">{formatCustomFieldValue(firstField)}</td>
+                {secondField ? (
+                  <>
+                    <td className="bg-gray-100 border border-gray-300 px-3 py-2 w-28 text-sm text-gray-600 font-medium">{secondField.label}</td>
+                    <td className="border border-gray-300 px-3 py-2 text-sm">{formatCustomFieldValue(secondField)}</td>
+                  </>
+                ) : (
+                  <>
+                    <td className="bg-gray-100 border border-gray-300 px-3 py-2 w-28 text-sm text-gray-600 font-medium"></td>
+                    <td className="border border-gray-300 px-3 py-2 text-sm"></td>
+                  </>
+                )}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </CollapsibleSection>
+  );
+}
+
+// 섹션 아이콘
+const SectionIcons = {
+  club: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+    </svg>
+  ),
+  membership: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+    </svg>
+  ),
+  info: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ),
+  reservation: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+  ),
+};

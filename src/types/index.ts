@@ -93,6 +93,17 @@ export interface Membership {
   updatedAt?: string;
 }
 
+// 커스텀 필드 타입
+export interface CustomFieldValue {
+  type: "boolean" | "text" | "number";
+  label: string;
+  value: boolean | string | number;
+}
+
+export interface CustomFields {
+  [key: string]: CustomFieldValue;
+}
+
 export interface ClubDetail {
   id: string;
   code: string;
@@ -104,6 +115,7 @@ export interface ClubDetail {
   memo: string;
   contacts: ClubContact[];
   bankAccounts: BankAccount[];
+  customFields?: CustomFields;
   submissionMethods?: string[];
   processingTime?: string;
   externalUrl?: string;

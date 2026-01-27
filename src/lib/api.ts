@@ -30,8 +30,8 @@ export async function getClubDetail(code: string): Promise<ClubDetail> {
   return data.data;
 }
 
-// 초기 데이터 프리로드 (첫 번째 골프장의 상세 정보까지 가져옴)
-export async function getInitialData(): Promise<{
+// 초기 데이터 프리로드 (특정 또는 첫 번째 골프장의 상세 정보까지 가져옴)
+export async function getInitialData(clubCode?: string): Promise<{
   clubs: Club[];
   initialClub: Club | null;
   initialClubDetail: ClubDetail | null;
@@ -43,7 +43,15 @@ export async function getInitialData(): Promise<{
       return { clubs: [], initialClub: null, initialClubDetail: null };
     }
 
-    const initialClub = clubs[0];
+    // URL에 clubCode가 있으면 해당 골프장 찾기, 없으면 첫 번째
+    let initialClub: Club;
+    if (clubCode) {
+      const foundClub = clubs.find((c) => c.code === clubCode);
+      initialClub = foundClub || clubs[0];
+    } else {
+      initialClub = clubs[0];
+    }
+
     const initialClubDetail = await getClubDetail(initialClub.code);
 
     return {

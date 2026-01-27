@@ -12,7 +12,7 @@ export default function MobileNavigation({
   hasSelectedClub,
 }: MobileNavigationProps) {
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 print:hidden">
       <div className="flex">
         <button
           onClick={() => onViewChange("clubs")}

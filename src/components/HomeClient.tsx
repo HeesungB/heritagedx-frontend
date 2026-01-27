@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Header from "@/components/Header";
 import ClubProfile from "@/components/ClubProfile";
 import MobileNavigation from "@/components/MobileNavigation";
@@ -18,17 +19,70 @@ interface AppState {
   mobileView: "clubs" | "profile";
 }
 
-export default function HomeClient({
+// Suspense로 감싸는 래퍼 컴포넌트
+export default function HomeClient(props: HomeClientProps) {
+  return (
+    <Suspense fallback={<HomeClientLoading />}>
+      <HomeClientInner {...props} />
+    </Suspense>
+  );
+}
+
+// 로딩 폴백 컴포넌트
+function HomeClientLoading() {
+  return (
+    <div className="h-screen flex flex-col bg-gray-100 overflow-hidden">
+      <div className="h-16 bg-white border-b border-gray-200" />
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-gray-500">로딩 중...</div>
+      </div>
+    </div>
+  );
+}
+
+// 실제 로직을 담은 내부 컴포넌트
+function HomeClientInner({
   initialClubs,
   initialClub,
   initialClubDetail,
 }: HomeClientProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [appState, setAppState] = useState<AppState>({
     selectedClub: initialClub,
     clubDetail: initialClubDetail,
     mobileView: "clubs",
   });
   const [detailLoading, setDetailLoading] = useState(false);
+
+  // 브라우저 뒤로가기/앞으로가기 시 URL 변경 감지
+  useEffect(() => {
+    const urlClubCode = searchParams.get("club");
+
+    // URL의 클럽 코드와 현재 선택된 클럽이 다르면 동기화
+    if (urlClubCode && urlClubCode !== appState.selectedClub?.code) {
+      const club = initialClubs.find((c) => c.code === urlClubCode);
+      if (club) {
+        setAppState((prev) => ({
+          ...prev,
+          selectedClub: club,
+          clubDetail: null,
+          mobileView: "profile",
+        }));
+      }
+    } else if (!urlClubCode && initialClubs.length > 0) {
+      // URL에 club 파라미터가 없으면 첫 번째 골프장으로 (초기 상태)
+      const firstClub = initialClubs[0];
+      if (appState.selectedClub?.code !== firstClub.code) {
+        setAppState((prev) => ({
+          ...prev,
+          selectedClub: firstClub,
+          clubDetail: null,
+        }));
+      }
+    }
+  }, [searchParams, initialClubs, appState.selectedClub?.code]);
 
   // 골프장 선택 변경 시 상세 정보 로드
   useEffect(() => {
@@ -66,6 +120,9 @@ export default function HomeClient({
       return;
     }
 
+    // URL 업데이트 (브라우저 히스토리에 추가)
+    router.push(`/?club=${club.code}`, { scroll: false });
+
     setAppState((prev) => ({
       ...prev,
       selectedClub: club,
@@ -79,24 +136,26 @@ export default function HomeClient({
   };
 
   return (
-    <div className="h-screen flex flex-col bg-gray-100 overflow-hidden">
+    <div className="h-screen flex flex-col bg-gray-100 overflow-hidden print:h-auto print:overflow-visible print:bg-white">
       <Header clubName={appState.clubDetail?.name || appState.selectedClub?.name || null} />
 
       {/* 데스크탑 레이아웃 */}
-      <div className="hidden lg:flex flex-1 min-h-0">
+      <div className="hidden lg:flex flex-1 min-h-0 print:block print:min-h-0">
         {/* 왼쪽: 골프장 목록 */}
-        <ClubListSidebarWithData
-          initialClubs={initialClubs}
-          selectedClubCode={appState.selectedClub?.code || null}
-          onClubSelect={handleClubSelect}
-        />
+        <div className="h-full print:hidden">
+          <ClubListSidebarWithData
+            initialClubs={initialClubs}
+            selectedClubCode={appState.selectedClub?.code || null}
+            onClubSelect={handleClubSelect}
+          />
+        </div>
 
         {/* 오른쪽: 골프장 프로필 */}
         <ClubProfile detail={appState.clubDetail} loading={detailLoading} />
       </div>
 
       {/* 모바일 컨텐츠 */}
-      <div className="lg:hidden flex-1 min-h-0 flex flex-col pb-16">
+      <div className="lg:hidden flex-1 min-h-0 flex flex-col pb-16 print:hidden">
         {appState.mobileView === "clubs" && (
           <MobileClubList
             initialClubs={initialClubs}
@@ -142,7 +201,7 @@ function ClubListSidebarWithData({
 
 
   return (
-    <aside className="w-64 min-h-0 border-r border-gray-200 bg-white flex flex-col">
+    <aside className="w-64 h-full min-h-0 border-r border-gray-200 bg-white flex flex-col">
       <div className="p-4 border-b border-gray-200">
         <h2 className="text-lg font-bold mb-3">골프장 목록</h2>
         <div className="relative">

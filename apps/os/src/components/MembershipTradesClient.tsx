@@ -8,6 +8,7 @@ import {
   Club,
 } from "@/types";
 import { useClubRepository, useMembershipTradeRepository } from "@heritage-dx/api";
+import { mapTradeRecordDtoToEntity } from "@heritage-dx/store";
 import { ClubSearchSelect, Button, Loading } from "@heritage-dx/ui";
 
 type TradeFilter = "전체" | "매수" | "매도";
@@ -127,7 +128,7 @@ export default function MembershipTradesClient() {
         search: searchQuery.trim() || undefined,
       });
       if (response.data) {
-        setRawTrades((response.data.trades || []) as unknown as MembershipTradeRecord[]);
+        setRawTrades((response.data.trades || []).map(mapTradeRecordDtoToEntity));
         if (response.data.pagination) {
           setTotalPages(response.data.pagination.totalPages);
         }
@@ -296,19 +297,20 @@ export default function MembershipTradesClient() {
         <div className="px-4 py-6">
           {/* 페이지 헤더 */}
           <div className="bg-white rounded-lg border border-gray-200 border-l-4 border-l-emerald-500 p-5 mb-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
                 <div className="w-11 h-11 bg-emerald-50 rounded-lg flex items-center justify-center flex-shrink-0">
                   <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                   </svg>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h2 className="text-xl font-bold text-gray-900">거래 내역</h2>
                   <p className="text-sm text-gray-500 mt-0.5">회원권 거래 내역을 관리합니다</p>
                 </div>
               </div>
               <Button
+                className="flex-shrink-0"
                 onClick={() => { setShowForm(true); setEditingTrade(null); setForm(emptyForm); setErrorMessage(null); }}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -366,18 +368,18 @@ export default function MembershipTradesClient() {
                   type="date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-gray-500 w-[130px]"
+                  className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-gray-500 w-full sm:w-[130px]"
                 />
                 <span className="text-gray-400 text-xs">~</span>
                 <input
                   type="date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-gray-500 w-[130px]"
+                  className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-gray-500 w-full sm:w-[130px]"
                 />
               </div>
 
-              <div className="relative w-56">
+              <div className="relative w-full sm:w-56">
                 <input
                   type="text"
                   placeholder="회원권명, 고객명, 거래처 검색"
@@ -747,24 +749,24 @@ export default function MembershipTradesClient() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse min-w-[1200px]">
+                <table className="w-full border-collapse min-w-[500px]">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
                       <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">유형</th>
                       <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">골프장</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">회원권</th>
+                      <th className="hidden md:table-cell px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">회원권</th>
                       <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">고객명</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">연락처</th>
-                      <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">매매대금</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">거래처</th>
+                      <th className="hidden md:table-cell px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">연락처</th>
+                      <th className="hidden md:table-cell px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">매매대금</th>
+                      <th className="hidden md:table-cell px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">거래처</th>
                       <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">거래금액</th>
-                      <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">수수료</th>
+                      <th className="hidden md:table-cell px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">수수료</th>
                       <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">순이익</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">계약일</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">담당자</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">작성자</th>
-                      <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">잔금</th>
-                      <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">관리</th>
+                      <th className="hidden md:table-cell px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">계약일</th>
+                      <th className="hidden md:table-cell px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">담당자</th>
+                      <th className="hidden md:table-cell px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">작성자</th>
+                      <th className="hidden md:table-cell px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">잔금</th>
+                      <th className="hidden md:table-cell px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">관리</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -782,13 +784,13 @@ export default function MembershipTradesClient() {
                           </span>
                         </td>
                         <td className="px-3 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">{trade.clubName || "-"}</td>
-                        <td className="px-3 py-3 text-sm text-gray-600 whitespace-nowrap">{trade.trade.membershipName}</td>
+                        <td className="hidden md:table-cell px-3 py-3 text-sm text-gray-600 whitespace-nowrap">{trade.trade.membershipName}</td>
                         <td className="px-3 py-3 text-sm text-gray-900 whitespace-nowrap">{trade.customer.name}</td>
-                        <td className="px-3 py-3 text-sm text-gray-600 whitespace-nowrap">{trade.customer.contact}</td>
-                        <td className="px-3 py-3 text-sm text-right text-gray-900 whitespace-nowrap">{formatPrice(trade.trade.amount)}</td>
-                        <td className="px-3 py-3 text-sm text-gray-600 whitespace-nowrap">{trade.trade.tradingPartner || "-"}</td>
+                        <td className="hidden md:table-cell px-3 py-3 text-sm text-gray-600 whitespace-nowrap">{trade.customer.contact}</td>
+                        <td className="hidden md:table-cell px-3 py-3 text-sm text-right text-gray-900 whitespace-nowrap">{formatPrice(trade.trade.amount)}</td>
+                        <td className="hidden md:table-cell px-3 py-3 text-sm text-gray-600 whitespace-nowrap">{trade.trade.tradingPartner || "-"}</td>
                         <td className="px-3 py-3 text-sm text-right text-gray-900 whitespace-nowrap">{formatPrice(trade.trade.tradeAmount)}</td>
-                        <td className="px-3 py-3 text-sm text-right text-gray-600 whitespace-nowrap">{formatPrice(trade.trade.commission)}</td>
+                        <td className="hidden md:table-cell px-3 py-3 text-sm text-right text-gray-600 whitespace-nowrap">{formatPrice(trade.trade.commission)}</td>
                         <td className={`px-3 py-3 text-sm text-right whitespace-nowrap font-medium ${
                           trade.financials.netProfit !== null && trade.financials.netProfit > 0
                             ? "text-green-700"
@@ -798,10 +800,10 @@ export default function MembershipTradesClient() {
                         }`}>
                           {formatPrice(trade.financials.netProfit)}
                         </td>
-                        <td className="px-3 py-3 text-sm text-gray-600 whitespace-nowrap">{trade.trade.contractDate || "-"}</td>
-                        <td className="px-3 py-3 text-sm text-gray-600 whitespace-nowrap">{trade.manager || "-"}</td>
-                        <td className="px-3 py-3 text-sm text-gray-600 whitespace-nowrap">{trade.createdByName || "-"}</td>
-                        <td className="px-3 py-3 text-center">
+                        <td className="hidden md:table-cell px-3 py-3 text-sm text-gray-600 whitespace-nowrap">{trade.trade.contractDate || "-"}</td>
+                        <td className="hidden md:table-cell px-3 py-3 text-sm text-gray-600 whitespace-nowrap">{trade.manager || "-"}</td>
+                        <td className="hidden md:table-cell px-3 py-3 text-sm text-gray-600 whitespace-nowrap">{trade.createdByName || "-"}</td>
+                        <td className="hidden md:table-cell px-3 py-3 text-center">
                           {trade.balance.balanceCompleted ? (
                             <svg className="w-4 h-4 text-green-600 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -810,7 +812,7 @@ export default function MembershipTradesClient() {
                             <span className="text-gray-300">-</span>
                           )}
                         </td>
-                        <td className="px-3 py-3 text-center">
+                        <td className="hidden md:table-cell px-3 py-3 text-center">
                           <div className="flex items-center justify-center gap-1">
                             <button
                               onClick={() => handleEdit(trade)}

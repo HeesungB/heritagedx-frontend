@@ -332,19 +332,20 @@ export default function TradesPageClient() {
         <div className="px-4 py-6">
           {/* 페이지 헤더 */}
           <div className="bg-white rounded-lg border border-gray-200 border-l-4 border-l-amber-500 p-5 mb-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
                 <div className="w-11 h-11 bg-amber-50 rounded-lg flex items-center justify-center flex-shrink-0">
                   <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h2 className="text-xl font-bold text-gray-900">거래 메모</h2>
                   <p className="text-sm text-gray-500 mt-0.5">전체 골프장의 회원권 거래 메모를 관리합니다</p>
                 </div>
               </div>
               <Button
+                className="flex-shrink-0"
                 onClick={() => { setShowForm(true); setEditingTrade(null); setForm(emptyForm); setFormClubCode(""); setFormMemberships([]); setManualClubInput(false); setManualMembershipInput(false); }}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -414,19 +415,19 @@ export default function TradesPageClient() {
                   type="date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-gray-500 w-[130px]"
+                  className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-gray-500 w-full sm:w-[130px]"
                 />
                 <span className="text-gray-400 text-xs">~</span>
                 <input
                   type="date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-gray-500 w-[130px]"
+                  className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-gray-500 w-full sm:w-[130px]"
                 />
               </div>
 
               {/* 검색 */}
-              <div className="relative w-52">
+              <div className="relative w-full sm:w-52">
                 <input
                   type="text"
                   placeholder="골프장명, 고객명 검색"
@@ -769,21 +770,21 @@ export default function TradesPageClient() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse min-w-[1000px]">
+                <table className="w-full border-collapse min-w-[600px]">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
                       <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">상태</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">유형</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">골프장</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">회원권</th>
+                      <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">회원권</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">고객명</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">연락처</th>
+                      <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">연락처</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">제시가</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">희망가</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">등록일</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">작성자</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">메모</th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">관리</th>
+                      <th className="hidden md:table-cell px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">희망가</th>
+                      <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">등록일</th>
+                      <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">작성자</th>
+                      <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">메모</th>
+                      <th className="hidden md:table-cell px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">관리</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -812,27 +813,27 @@ export default function TradesPageClient() {
                           </span>
                         </td>
                         <td className={`px-4 py-3 text-sm font-medium whitespace-nowrap ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>{trade.clubName}</td>
-                        <td className={`px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.membershipType}</td>
+                        <td className={`hidden md:table-cell px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.membershipType}</td>
                         <td className={`px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>{trade.customerName}</td>
-                        <td className={`px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.contact}</td>
+                        <td className={`hidden md:table-cell px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.contact}</td>
                         <td className={`px-4 py-3 text-sm text-right whitespace-nowrap ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>
                           {formatPrice(trade.offerPrice)}
                           {trade.offerPriceNote && (
                             <span className="text-xs text-gray-400 ml-1">({trade.offerPriceNote})</span>
                           )}
                         </td>
-                        <td className={`px-4 py-3 text-sm text-right whitespace-nowrap ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>
+                        <td className={`hidden md:table-cell px-4 py-3 text-sm text-right whitespace-nowrap ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>
                           {formatPrice(trade.desiredPrice)}
                           {trade.desiredPriceNote && (
                             <span className="text-xs text-gray-400 ml-1">({trade.desiredPriceNote})</span>
                           )}
                         </td>
-                        <td className={`px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.registrationDate}</td>
-                        <td className={`px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.createdByName || "-"}</td>
-                        <td className={`px-4 py-3 text-sm max-w-[200px] truncate ${trade.isDone ? "text-gray-400" : "text-gray-500"}`}>
+                        <td className={`hidden md:table-cell px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.registrationDate}</td>
+                        <td className={`hidden md:table-cell px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.createdByName || "-"}</td>
+                        <td className={`hidden md:table-cell px-4 py-3 text-sm max-w-[200px] truncate ${trade.isDone ? "text-gray-400" : "text-gray-500"}`}>
                           {trade.notes || trade.remarks || "-"}
                         </td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="hidden md:table-cell px-4 py-3 text-center">
                           <div className="flex items-center justify-center gap-1">
                             <button
                               onClick={() => handleEdit(trade)}

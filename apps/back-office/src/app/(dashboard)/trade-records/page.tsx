@@ -434,7 +434,7 @@ export default function TradeRecordsPage() {
               value={selectedMembership}
               onChange={(e) => setSelectedMembership(e.target.value)}
               disabled={!selectedClubCode}
-              className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 bg-white disabled:opacity-50 disabled:cursor-not-allowed w-[160px] h-[34px]"
+              className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 bg-white disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-[160px] h-[34px]"
             >
               <option value="">전체 회원권</option>
               {memberships.map((m) => (
@@ -446,17 +446,17 @@ export default function TradeRecordsPage() {
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="w-[130px] text-sm"
+                className="w-full sm:w-[130px] text-sm"
               />
               <span className="text-gray-400 text-sm">~</span>
               <Input
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="w-[130px] text-sm"
+                className="w-full sm:w-[130px] text-sm"
               />
             </div>
-            <div className="relative w-56">
+            <div className="relative w-full sm:w-56">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
                 placeholder="고객명, 회원권명으로 검색..."
@@ -484,23 +484,23 @@ export default function TradeRecordsPage() {
           ) : (
             <>
               <div className="overflow-x-auto">
-                <table className="min-w-[1400px] w-full text-sm">
+                <table className="min-w-[500px] w-full text-sm">
                   <thead>
                     <tr className="border-b text-left text-xs text-gray-500">
                       <th className="py-2 pr-3 font-medium">유형</th>
                       <th className="py-2 pr-3 font-medium">회원권</th>
                       <th className="py-2 pr-3 font-medium">고객명</th>
-                      <th className="py-2 pr-3 font-medium">연락처</th>
-                      <th className="py-2 pr-3 font-medium">매매가</th>
-                      <th className="py-2 pr-3 font-medium">거래상대</th>
+                      <th className="hidden md:table-cell py-2 pr-3 font-medium">연락처</th>
+                      <th className="hidden md:table-cell py-2 pr-3 font-medium">매매가</th>
+                      <th className="hidden md:table-cell py-2 pr-3 font-medium">거래상대</th>
                       <th className="py-2 pr-3 font-medium">거래금</th>
-                      <th className="py-2 pr-3 font-medium">수수료</th>
+                      <th className="hidden md:table-cell py-2 pr-3 font-medium">수수료</th>
                       <th className="py-2 pr-3 font-medium">순이익</th>
-                      <th className="py-2 pr-3 font-medium">계약일</th>
-                      <th className="py-2 pr-3 font-medium">담당자</th>
-                      <th className="py-2 pr-3 font-medium">작성자</th>
-                      <th className="py-2 pr-3 font-medium">잔금</th>
-                      <th className="py-2 font-medium w-16"></th>
+                      <th className="hidden md:table-cell py-2 pr-3 font-medium">계약일</th>
+                      <th className="hidden md:table-cell py-2 pr-3 font-medium">담당자</th>
+                      <th className="hidden md:table-cell py-2 pr-3 font-medium">작성자</th>
+                      <th className="hidden md:table-cell py-2 pr-3 font-medium">잔금</th>
+                      <th className="hidden md:table-cell py-2 font-medium w-16"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -511,11 +511,11 @@ export default function TradeRecordsPage() {
                         </td>
                         <td className="py-2.5 pr-3 font-medium text-gray-800 whitespace-nowrap">{record.membershipName}</td>
                         <td className="py-2.5 pr-3 font-medium text-gray-900 whitespace-nowrap">{record.customerName}</td>
-                        <td className="py-2.5 pr-3 text-gray-500 whitespace-nowrap">{record.contact}</td>
-                        <td className="py-2.5 pr-3 text-gray-800 whitespace-nowrap">{formatPrice(record.amount)}</td>
-                        <td className="py-2.5 pr-3 text-gray-600 whitespace-nowrap">{record.tradingPartner || "-"}</td>
+                        <td className="hidden md:table-cell py-2.5 pr-3 text-gray-500 whitespace-nowrap">{record.contact}</td>
+                        <td className="hidden md:table-cell py-2.5 pr-3 text-gray-800 whitespace-nowrap">{formatPrice(record.amount)}</td>
+                        <td className="hidden md:table-cell py-2.5 pr-3 text-gray-600 whitespace-nowrap">{record.tradingPartner || "-"}</td>
                         <td className="py-2.5 pr-3 text-gray-800 whitespace-nowrap">{formatPrice(record.tradeAmount)}</td>
-                        <td className="py-2.5 pr-3 text-gray-800 whitespace-nowrap">{formatPrice(record.commission)}</td>
+                        <td className="hidden md:table-cell py-2.5 pr-3 text-gray-800 whitespace-nowrap">{formatPrice(record.commission)}</td>
                         <td className={`py-2.5 pr-3 font-medium whitespace-nowrap ${
                           record.netProfit != null && record.netProfit > 0
                             ? "text-green-600"
@@ -525,17 +525,17 @@ export default function TradeRecordsPage() {
                         }`}>
                           {formatPrice(record.netProfit)}
                         </td>
-                        <td className="py-2.5 pr-3 text-gray-400 whitespace-nowrap">{record.contractDate || "-"}</td>
-                        <td className="py-2.5 pr-3 text-gray-600 whitespace-nowrap">{record.manager || "-"}</td>
-                        <td className="py-2.5 pr-3 text-gray-500 whitespace-nowrap">{record.createdByName || "-"}</td>
-                        <td className="py-2.5 pr-3">
+                        <td className="hidden md:table-cell py-2.5 pr-3 text-gray-400 whitespace-nowrap">{record.contractDate || "-"}</td>
+                        <td className="hidden md:table-cell py-2.5 pr-3 text-gray-600 whitespace-nowrap">{record.manager || "-"}</td>
+                        <td className="hidden md:table-cell py-2.5 pr-3 text-gray-500 whitespace-nowrap">{record.createdByName || "-"}</td>
+                        <td className="hidden md:table-cell py-2.5 pr-3">
                           {record.balanceCompleted ? (
                             <Check className="w-4 h-4 text-green-500" />
                           ) : (
                             <span className="text-xs text-gray-400">-</span>
                           )}
                         </td>
-                        <td className="py-2.5">
+                        <td className="hidden md:table-cell py-2.5">
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onClick={() => handleEdit(record)} className="p-1 hover:bg-gray-200 rounded" title="수정">
                               <Edit3 className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
@@ -587,18 +587,18 @@ export default function TradeRecordsPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">회원권명 <span className="text-red-500">*</span></label>
             <Input value={form.membershipName} onChange={(e) => setForm((f) => ({ ...f, membershipName: e.target.value }))} placeholder="예: 개인정회원" />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><label className="block text-sm font-medium text-gray-700 mb-1">고객명 <span className="text-red-500">*</span></label><Input value={form.customerName} onChange={(e) => setForm((f) => ({ ...f, customerName: e.target.value }))} placeholder="홍길동" /></div>
             <div><label className="block text-sm font-medium text-gray-700 mb-1">연락처</label><Input value={form.contact} onChange={(e) => setForm((f) => ({ ...f, contact: e.target.value }))} placeholder="010-1234-5678" /></div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><label className="block text-sm font-medium text-gray-700 mb-1">거래상대</label><Input value={form.tradingPartner} onChange={(e) => setForm((f) => ({ ...f, tradingPartner: e.target.value }))} placeholder="거래상대 이름" /></div>
             <div><label className="block text-sm font-medium text-gray-700 mb-1">담당자</label><Input value={form.manager} onChange={(e) => setForm((f) => ({ ...f, manager: e.target.value }))} placeholder="담당자 이름" /></div>
           </div>
 
           <div className="border-t pt-4">
             <p className="text-sm font-medium text-gray-800 mb-3">금액 정보</p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">매매가 (원)</label>
                 <Input type="number" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} placeholder="0" />
@@ -622,7 +622,7 @@ export default function TradeRecordsPage() {
 
           <div className="border-t pt-4">
             <p className="text-sm font-medium text-gray-800 mb-3">일정</p>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div><label className="block text-sm font-medium text-gray-700 mb-1">계약일</label><Input type="date" value={form.contractDate} onChange={(e) => setForm((f) => ({ ...f, contractDate: e.target.value }))} /></div>
               <div><label className="block text-sm font-medium text-gray-700 mb-1">잔금일</label><Input type="date" value={form.balanceDate} onChange={(e) => setForm((f) => ({ ...f, balanceDate: e.target.value }))} /></div>
               <div><label className="block text-sm font-medium text-gray-700 mb-1">실거래일</label><Input type="date" value={form.actualTransactionDate} onChange={(e) => setForm((f) => ({ ...f, actualTransactionDate: e.target.value }))} /></div>
@@ -642,7 +642,7 @@ export default function TradeRecordsPage() {
                 <input type="checkbox" checked={form.taxAcquisition} onChange={(e) => setForm((f) => ({ ...f, taxAcquisition: e.target.checked }))} className="rounded border-gray-300" />취득세
               </label>
             </div>
-            <div className="grid grid-cols-2 gap-3 mt-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
               <div><label className="block text-sm font-medium text-gray-700 mb-1">세금계산서 매출</label><Input type="number" value={form.invoiceSales} onChange={(e) => setForm((f) => ({ ...f, invoiceSales: e.target.value }))} placeholder="0" /></div>
               <div><label className="block text-sm font-medium text-gray-700 mb-1">세금계산서 매입</label><Input type="number" value={form.invoicePurchase} onChange={(e) => setForm((f) => ({ ...f, invoicePurchase: e.target.value }))} placeholder="0" /></div>
             </div>

@@ -64,7 +64,7 @@ export default function Drawer({
         }`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b bg-white sticky top-0 z-10">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b bg-white sticky top-0 z-10">
           <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
           <button
             onClick={onClose}
@@ -76,7 +76,7 @@ export default function Drawer({
 
         {/* Content */}
         <div className="overflow-y-auto h-[calc(100vh-65px)]">
-          <div className="p-6">{children}</div>
+          <div className="p-4 sm:p-6">{children}</div>
         </div>
       </div>
     </>

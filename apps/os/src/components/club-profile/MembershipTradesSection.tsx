@@ -666,23 +666,23 @@ export default function MembershipTradesSection() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse min-w-[1100px]">
+            <table className="w-full border-collapse min-w-[500px]">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="px-2.5 py-2 text-left text-[11px] font-medium text-gray-500 uppercase whitespace-nowrap">유형</th>
-                  <th className="px-2.5 py-2 text-left text-[11px] font-medium text-gray-500 uppercase whitespace-nowrap">회원권</th>
+                  <th className="hidden md:table-cell px-2.5 py-2 text-left text-[11px] font-medium text-gray-500 uppercase whitespace-nowrap">회원권</th>
                   <th className="px-2.5 py-2 text-left text-[11px] font-medium text-gray-500 uppercase whitespace-nowrap">고객명</th>
-                  <th className="px-2.5 py-2 text-left text-[11px] font-medium text-gray-500 uppercase whitespace-nowrap">연락처</th>
-                  <th className="px-2.5 py-2 text-right text-[11px] font-medium text-gray-500 uppercase whitespace-nowrap">매매대금</th>
-                  <th className="px-2.5 py-2 text-left text-[11px] font-medium text-gray-500 uppercase whitespace-nowrap">거래처</th>
+                  <th className="hidden md:table-cell px-2.5 py-2 text-left text-[11px] font-medium text-gray-500 uppercase whitespace-nowrap">연락처</th>
+                  <th className="hidden md:table-cell px-2.5 py-2 text-right text-[11px] font-medium text-gray-500 uppercase whitespace-nowrap">매매대금</th>
+                  <th className="hidden md:table-cell px-2.5 py-2 text-left text-[11px] font-medium text-gray-500 uppercase whitespace-nowrap">거래처</th>
                   <th className="px-2.5 py-2 text-right text-[11px] font-medium text-gray-500 uppercase whitespace-nowrap">거래금액</th>
-                  <th className="px-2.5 py-2 text-right text-[11px] font-medium text-gray-500 uppercase whitespace-nowrap">수수료</th>
+                  <th className="hidden md:table-cell px-2.5 py-2 text-right text-[11px] font-medium text-gray-500 uppercase whitespace-nowrap">수수료</th>
                   <th className="px-2.5 py-2 text-right text-[11px] font-medium text-gray-500 uppercase whitespace-nowrap">순이익</th>
-                  <th className="px-2.5 py-2 text-left text-[11px] font-medium text-gray-500 uppercase whitespace-nowrap">계약일</th>
-                  <th className="px-2.5 py-2 text-left text-[11px] font-medium text-gray-500 uppercase whitespace-nowrap">담당자</th>
-                  <th className="px-2.5 py-2 text-left text-[11px] font-medium text-gray-500 uppercase whitespace-nowrap">작성자</th>
-                  <th className="px-2.5 py-2 text-center text-[11px] font-medium text-gray-500 uppercase whitespace-nowrap">잔금</th>
-                  <th className="px-2.5 py-2 text-center text-[11px] font-medium text-gray-500 uppercase whitespace-nowrap">관리</th>
+                  <th className="hidden md:table-cell px-2.5 py-2 text-left text-[11px] font-medium text-gray-500 uppercase whitespace-nowrap">계약일</th>
+                  <th className="hidden md:table-cell px-2.5 py-2 text-left text-[11px] font-medium text-gray-500 uppercase whitespace-nowrap">담당자</th>
+                  <th className="hidden md:table-cell px-2.5 py-2 text-left text-[11px] font-medium text-gray-500 uppercase whitespace-nowrap">작성자</th>
+                  <th className="hidden md:table-cell px-2.5 py-2 text-center text-[11px] font-medium text-gray-500 uppercase whitespace-nowrap">잔금</th>
+                  <th className="hidden md:table-cell px-2.5 py-2 text-center text-[11px] font-medium text-gray-500 uppercase whitespace-nowrap">관리</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -699,13 +699,13 @@ export default function MembershipTradesSection() {
                         {trade.tradeType}
                       </span>
                     </td>
-                    <td className="px-2.5 py-2 text-xs font-medium text-gray-900 whitespace-nowrap">{trade.trade.membershipName}</td>
+                    <td className="hidden md:table-cell px-2.5 py-2 text-xs font-medium text-gray-900 whitespace-nowrap">{trade.trade.membershipName}</td>
                     <td className="px-2.5 py-2 text-xs text-gray-900 whitespace-nowrap">{trade.customer.name}</td>
-                    <td className="px-2.5 py-2 text-xs text-gray-600 whitespace-nowrap">{trade.customer.contact}</td>
-                    <td className="px-2.5 py-2 text-xs text-right text-gray-900 whitespace-nowrap">{formatPrice(trade.trade.amount)}</td>
-                    <td className="px-2.5 py-2 text-xs text-gray-600 whitespace-nowrap">{trade.trade.tradingPartner || "-"}</td>
+                    <td className="hidden md:table-cell px-2.5 py-2 text-xs text-gray-600 whitespace-nowrap">{trade.customer.contact}</td>
+                    <td className="hidden md:table-cell px-2.5 py-2 text-xs text-right text-gray-900 whitespace-nowrap">{formatPrice(trade.trade.amount)}</td>
+                    <td className="hidden md:table-cell px-2.5 py-2 text-xs text-gray-600 whitespace-nowrap">{trade.trade.tradingPartner || "-"}</td>
                     <td className="px-2.5 py-2 text-xs text-right text-gray-900 whitespace-nowrap">{formatPrice(trade.trade.tradeAmount)}</td>
-                    <td className="px-2.5 py-2 text-xs text-right text-gray-600 whitespace-nowrap">{formatPrice(trade.trade.commission)}</td>
+                    <td className="hidden md:table-cell px-2.5 py-2 text-xs text-right text-gray-600 whitespace-nowrap">{formatPrice(trade.trade.commission)}</td>
                     <td className={`px-2.5 py-2 text-xs text-right whitespace-nowrap font-medium ${
                       trade.financials.netProfit !== null && trade.financials.netProfit > 0
                         ? "text-green-700"
@@ -715,10 +715,10 @@ export default function MembershipTradesSection() {
                     }`}>
                       {formatPrice(trade.financials.netProfit)}
                     </td>
-                    <td className="px-2.5 py-2 text-xs text-gray-600 whitespace-nowrap">{trade.trade.contractDate || "-"}</td>
-                    <td className="px-2.5 py-2 text-xs text-gray-600 whitespace-nowrap">{trade.manager || "-"}</td>
-                    <td className="px-2.5 py-2 text-xs text-gray-600 whitespace-nowrap">{trade.createdByName || "-"}</td>
-                    <td className="px-2.5 py-2 text-center">
+                    <td className="hidden md:table-cell px-2.5 py-2 text-xs text-gray-600 whitespace-nowrap">{trade.trade.contractDate || "-"}</td>
+                    <td className="hidden md:table-cell px-2.5 py-2 text-xs text-gray-600 whitespace-nowrap">{trade.manager || "-"}</td>
+                    <td className="hidden md:table-cell px-2.5 py-2 text-xs text-gray-600 whitespace-nowrap">{trade.createdByName || "-"}</td>
+                    <td className="hidden md:table-cell px-2.5 py-2 text-center">
                       {trade.balance.balanceCompleted ? (
                         <svg className="w-3.5 h-3.5 text-green-600 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -727,7 +727,7 @@ export default function MembershipTradesSection() {
                         <span className="text-gray-300 text-xs">-</span>
                       )}
                     </td>
-                    <td className="px-2.5 py-2 text-center">
+                    <td className="hidden md:table-cell px-2.5 py-2 text-center">
                       <div className="flex items-center justify-center gap-0.5">
                         <button
                           onClick={() => handleEdit(trade)}

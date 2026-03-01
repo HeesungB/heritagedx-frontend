@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,6 +12,7 @@ interface HeaderProps {
 export default function Header({ clubName }: HeaderProps) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navItems = [
     {
@@ -50,6 +52,13 @@ export default function Header({ clubName }: HeaderProps) {
       ),
     },
   ];
+
+  const mobileNavLinkClass = (active: boolean) =>
+    `flex items-center gap-2.5 px-4 py-3 text-sm font-medium rounded-lg transition-all ${
+      active
+        ? "bg-white/20 text-white"
+        : "text-emerald-100 hover:text-white hover:bg-white/10"
+    }`;
 
   return (
     <header className="sticky top-0 z-30 h-14 bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-600 shadow-md px-4 lg:px-8 print:hidden">
@@ -104,8 +113,61 @@ export default function Header({ clubName }: HeaderProps) {
               </button>
             </div>
           )}
+
+          {/* Mobile menu button */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="sm:hidden p-2 text-emerald-100 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+          >
+            {mobileMenuOpen ? (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+              </svg>
+            )}
+          </button>
         </div>
       </div>
+
+      {/* Mobile dropdown menu */}
+      {mobileMenuOpen && (
+        <div className="sm:hidden absolute top-14 left-0 right-0 bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-600 border-t border-white/10 shadow-lg z-40">
+          <nav className="flex flex-col p-3 gap-1">
+            {navItems.map((item) => {
+              const isActive = pathname === item.href.split("?")[0];
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={mobileNavLinkClass(isActive)}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <span className="w-4 h-4">{item.icon}</span>
+                  {item.label}
+                </Link>
+              );
+            })}
+            {user && (
+              <>
+                <div className="border-t border-white/10 my-1" />
+                <div className="px-4 py-2 text-sm font-medium text-white">{user.name}</div>
+                <button
+                  onClick={() => { setMobileMenuOpen(false); logout(); }}
+                  className={mobileNavLinkClass(false)}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                  </svg>
+                  로그아웃
+                </button>
+              </>
+            )}
+          </nav>
+        </div>
+      )}
     </header>
   );
 }

@@ -11,6 +11,7 @@ import {
   Pencil,
   Trash2,
   MoreVertical,
+  X,
 } from "lucide-react";
 import { useAdminRepositories } from "@heritage-dx/api";
 import { Club } from "@/types";
@@ -26,7 +27,7 @@ import { useData } from "@/contexts/DataContext";
 
 type FilterMode = "initial" | "region" | null;
 
-export default function Sidebar() {
+export default function Sidebar({ onClose }: { onClose?: () => void } = {}) {
   const { clubs: clubsAdmin } = useAdminRepositories();
   const router = useRouter();
   const pathname = usePathname();
@@ -196,13 +197,23 @@ export default function Sidebar() {
             <Building2 className="w-5 h-5 text-gray-600" />
             <span className="font-semibold text-gray-900">골프장</span>
           </div>
-          <Link
-            href="/clubs/new"
-            className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-            title="새 골프장 등록"
-          >
-            <Plus className="w-4 h-4" />
-          </Link>
+          <div className="flex items-center gap-1">
+            <Link
+              href="/clubs/new"
+              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+              title="새 골프장 등록"
+            >
+              <Plus className="w-4 h-4" />
+            </Link>
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="lg:hidden p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* 검색 */}

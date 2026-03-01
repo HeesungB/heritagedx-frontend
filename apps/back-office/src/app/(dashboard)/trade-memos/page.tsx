@@ -566,7 +566,7 @@ export default function TradeMemosPage() {
               value={selectedMembership}
               onChange={(e) => setSelectedMembership(e.target.value)}
               disabled={!selectedClubCode}
-              className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 bg-white disabled:opacity-50 disabled:cursor-not-allowed w-[160px] h-[34px]"
+              className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 bg-white disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-[160px] h-[34px]"
             >
               <option value="">전체 회원권</option>
               {memberships.map((m) => (
@@ -578,17 +578,17 @@ export default function TradeMemosPage() {
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="w-[130px] text-sm"
+                className="w-full sm:w-[130px] text-sm"
               />
               <span className="text-gray-400 text-sm">~</span>
               <Input
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="w-[130px] text-sm"
+                className="w-full sm:w-[130px] text-sm"
               />
             </div>
-            <div className="relative w-56">
+            <div className="relative w-full sm:w-56">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
                 placeholder="고객명, 골프장명으로 검색..."
@@ -616,20 +616,20 @@ export default function TradeMemosPage() {
           ) : (
             <>
               <div className="overflow-x-auto">
-              <table className="min-w-[1000px] w-full text-sm">
+              <table className="min-w-[400px] w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs text-gray-500">
                     <th className="py-2 pr-3 font-medium">유형</th>
                     <th className="py-2 pr-3 font-medium">골프장</th>
-                    <th className="py-2 pr-3 font-medium">회원권</th>
+                    <th className="hidden md:table-cell py-2 pr-3 font-medium">회원권</th>
                     <th className="py-2 pr-3 font-medium">고객명</th>
-                    <th className="py-2 pr-3 font-medium">연락처</th>
+                    <th className="hidden md:table-cell py-2 pr-3 font-medium">연락처</th>
                     <th className="py-2 pr-3 font-medium">제시가</th>
-                    <th className="py-2 pr-3 font-medium">희망가</th>
-                    <th className="py-2 pr-3 font-medium">메모</th>
-                    <th className="py-2 pr-3 font-medium">등록일</th>
-                    <th className="py-2 pr-3 font-medium">작성자</th>
-                    <th className="py-2 font-medium w-16"></th>
+                    <th className="hidden md:table-cell py-2 pr-3 font-medium">희망가</th>
+                    <th className="hidden md:table-cell py-2 pr-3 font-medium">메모</th>
+                    <th className="hidden md:table-cell py-2 pr-3 font-medium">등록일</th>
+                    <th className="hidden md:table-cell py-2 pr-3 font-medium">작성자</th>
+                    <th className="hidden md:table-cell py-2 font-medium w-16"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -639,15 +639,15 @@ export default function TradeMemosPage() {
                         <Badge variant={trade.tradeType === "매수" ? "info" : "error"}>{trade.tradeType}</Badge>
                       </td>
                       <td className="py-2.5 pr-3 font-medium text-gray-800 whitespace-nowrap">{trade.clubName}</td>
-                      <td className="py-2.5 pr-3 text-gray-600 whitespace-nowrap">{trade.membershipType}</td>
+                      <td className="hidden md:table-cell py-2.5 pr-3 text-gray-600 whitespace-nowrap">{trade.membershipType}</td>
                       <td className="py-2.5 pr-3 font-medium text-gray-900 whitespace-nowrap">{trade.customerName}</td>
-                      <td className="py-2.5 pr-3 text-gray-500 whitespace-nowrap">{trade.contact}</td>
+                      <td className="hidden md:table-cell py-2.5 pr-3 text-gray-500 whitespace-nowrap">{trade.contact}</td>
                       <td className="py-2.5 pr-3 text-gray-800 whitespace-nowrap">{formatPrice(trade.offerPrice)}</td>
-                      <td className="py-2.5 pr-3 text-gray-800 whitespace-nowrap">{formatPrice(trade.desiredPrice)}</td>
-                      <td className="py-2.5 pr-3 text-gray-500 max-w-[200px] truncate" title={trade.notes || ""}>{trade.notes || "-"}</td>
-                      <td className="py-2.5 pr-3 text-gray-400 whitespace-nowrap">{trade.registrationDate || "-"}</td>
-                      <td className="py-2.5 pr-3 text-gray-500 whitespace-nowrap">{trade.createdByName || "-"}</td>
-                      <td className="py-2.5">
+                      <td className="hidden md:table-cell py-2.5 pr-3 text-gray-800 whitespace-nowrap">{formatPrice(trade.desiredPrice)}</td>
+                      <td className="hidden md:table-cell py-2.5 pr-3 text-gray-500 max-w-[200px] truncate" title={trade.notes || ""}>{trade.notes || "-"}</td>
+                      <td className="hidden md:table-cell py-2.5 pr-3 text-gray-400 whitespace-nowrap">{trade.registrationDate || "-"}</td>
+                      <td className="hidden md:table-cell py-2.5 pr-3 text-gray-500 whitespace-nowrap">{trade.createdByName || "-"}</td>
+                      <td className="hidden md:table-cell py-2.5">
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button onClick={(e) => { e.stopPropagation(); handleEdit(trade); }} className="p-1 hover:bg-gray-200 rounded" title="수정">
                             <Edit3 className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
@@ -804,7 +804,7 @@ export default function TradeMemosPage() {
               </div>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">고객명 <span className="text-red-500">*</span></label>
               <Input value={form.customerName} onChange={(e) => setForm((f) => ({ ...f, customerName: e.target.value }))} placeholder="홍길동" />
@@ -839,7 +839,7 @@ export default function TradeMemosPage() {
               placeholder="타회원권 교환 희망 등"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><label className="block text-sm font-medium text-gray-700 mb-1">등록일</label><Input type="date" value={form.registrationDate} onChange={(e) => setForm((f) => ({ ...f, registrationDate: e.target.value }))} /></div>
             <div><label className="block text-sm font-medium text-gray-700 mb-1">거래일</label><Input type="date" value={form.tradeDate} onChange={(e) => setForm((f) => ({ ...f, tradeDate: e.target.value }))} /></div>
           </div>

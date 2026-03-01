@@ -116,7 +116,7 @@ export default function MapSidebar({ currentAddress, clubName, onClose }: MapSid
   }, [currentAddress, clubName]);
 
   return (
-    <aside className="w-[480px] flex-shrink-0 h-full border-l border-gray-200 bg-white flex flex-col print:hidden">
+    <aside className="fixed inset-0 z-40 lg:static lg:inset-auto lg:z-auto w-full lg:w-[480px] flex-shrink-0 h-full border-l border-gray-200 bg-white flex flex-col print:hidden">
       {/* 헤더 */}
       <div className="px-3 py-2.5 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
         <h3 className="font-semibold text-xs text-gray-700">골프장 지도</h3>

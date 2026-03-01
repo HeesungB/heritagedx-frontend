@@ -194,7 +194,7 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
   ) || [];
 
   return (
-    <aside className="w-80 h-full min-h-0 border-l border-gray-200 bg-white flex flex-col print:hidden">
+    <aside className="fixed inset-0 z-40 lg:static lg:inset-auto lg:z-auto w-full lg:w-80 h-full min-h-0 border-l border-gray-200 bg-white flex flex-col print:hidden">
       {/* 헤더 */}
       <div className="px-3 py-2.5 border-b border-gray-100 flex items-center justify-between">
         <h3 className="font-semibold text-xs text-gray-700">거래 메모</h3>

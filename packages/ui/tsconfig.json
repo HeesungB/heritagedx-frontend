@@ -1,0 +1,4 @@
+{
+  "extends": "@heritage-dx/typescript-config/react-library.json",
+  "include": ["src"]
+}

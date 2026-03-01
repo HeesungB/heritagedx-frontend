@@ -1,0 +1,23 @@
+{
+  "name": "@heritage-dx/api",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/server.ts"
+  },
+  "dependencies": {
+    "@heritage-dx/types": "workspace:*",
+    "@heritage-dx/api-client": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": ">=19.0.0"
+  },
+  "devDependencies": {
+    "@heritage-dx/typescript-config": "workspace:*",
+    "@types/react": "^19.0.1",
+    "typescript": "^5.7.2"
+  }
+}

@@ -688,7 +688,7 @@ export default function MembershipTradesSection() {
               <tbody className="divide-y divide-gray-100">
                 {trades.map((trade) => (
                   <tr key={trade.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-2.5 py-2">
+                    <td className="px-2.5 py-2 whitespace-nowrap">
                       <span
                         className={`px-1.5 py-0.5 rounded text-[11px] font-medium ${
                           trade.tradeType === "매수"

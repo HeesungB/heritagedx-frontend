@@ -635,7 +635,7 @@ export default function TradeMemosPage() {
                 <tbody>
                   {displayMemos.map((trade) => (
                     <tr key={trade.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors group cursor-pointer ${trade.isDone ? "opacity-50" : ""}`} onClick={() => handleRowClick(trade)}>
-                      <td className="py-2.5 pr-3">
+                      <td className="py-2.5 pr-3 whitespace-nowrap">
                         <Badge variant={trade.tradeType === "매수" ? "info" : "error"}>{trade.tradeType}</Badge>
                       </td>
                       <td className="py-2.5 pr-3 font-medium text-gray-800 whitespace-nowrap">{trade.clubName}</td>

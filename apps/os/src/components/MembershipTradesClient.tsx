@@ -749,7 +749,7 @@ export default function MembershipTradesClient() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse min-w-[500px]">
+                <table className="w-full border-collapse min-w-[320px]">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
                       <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">유형</th>
@@ -759,9 +759,9 @@ export default function MembershipTradesClient() {
                       <th className="hidden md:table-cell px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">연락처</th>
                       <th className="hidden md:table-cell px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">매매대금</th>
                       <th className="hidden md:table-cell px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">거래처</th>
-                      <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">거래금액</th>
+                      <th className="hidden md:table-cell px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">거래금액</th>
                       <th className="hidden md:table-cell px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">수수료</th>
-                      <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">순이익</th>
+                      <th className="hidden md:table-cell px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">순이익</th>
                       <th className="hidden md:table-cell px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">계약일</th>
                       <th className="hidden md:table-cell px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">담당자</th>
                       <th className="hidden md:table-cell px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">작성자</th>
@@ -772,7 +772,7 @@ export default function MembershipTradesClient() {
                   <tbody className="divide-y divide-gray-100">
                     {trades.map((trade) => (
                       <tr key={trade.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-3 py-3">
+                        <td className="px-3 py-3 whitespace-nowrap">
                           <span
                             className={`px-2 py-0.5 rounded text-xs font-medium ${
                               trade.tradeType === "매수"
@@ -789,9 +789,9 @@ export default function MembershipTradesClient() {
                         <td className="hidden md:table-cell px-3 py-3 text-sm text-gray-600 whitespace-nowrap">{trade.customer.contact}</td>
                         <td className="hidden md:table-cell px-3 py-3 text-sm text-right text-gray-900 whitespace-nowrap">{formatPrice(trade.trade.amount)}</td>
                         <td className="hidden md:table-cell px-3 py-3 text-sm text-gray-600 whitespace-nowrap">{trade.trade.tradingPartner || "-"}</td>
-                        <td className="px-3 py-3 text-sm text-right text-gray-900 whitespace-nowrap">{formatPrice(trade.trade.tradeAmount)}</td>
+                        <td className="hidden md:table-cell px-3 py-3 text-sm text-right text-gray-900 whitespace-nowrap">{formatPrice(trade.trade.tradeAmount)}</td>
                         <td className="hidden md:table-cell px-3 py-3 text-sm text-right text-gray-600 whitespace-nowrap">{formatPrice(trade.trade.commission)}</td>
-                        <td className={`px-3 py-3 text-sm text-right whitespace-nowrap font-medium ${
+                        <td className={`hidden md:table-cell px-3 py-3 text-sm text-right whitespace-nowrap font-medium ${
                           trade.financials.netProfit !== null && trade.financials.netProfit > 0
                             ? "text-green-700"
                             : trade.financials.netProfit !== null && trade.financials.netProfit < 0

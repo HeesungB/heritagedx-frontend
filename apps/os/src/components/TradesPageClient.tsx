@@ -770,7 +770,7 @@ export default function TradesPageClient() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse min-w-[600px]">
+                <table className="w-full border-collapse min-w-[360px]">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
                       <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">상태</th>
@@ -779,7 +779,7 @@ export default function TradesPageClient() {
                       <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">회원권</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">고객명</th>
                       <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">연락처</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">제시가</th>
+                      <th className="hidden md:table-cell px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">제시가</th>
                       <th className="hidden md:table-cell px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">희망가</th>
                       <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">등록일</th>
                       <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">작성자</th>
@@ -799,7 +799,7 @@ export default function TradesPageClient() {
                             title={trade.isDone ? "완료 → 진행중" : "진행중 → 완료"}
                           />
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <span
                             className={`px-2 py-0.5 rounded text-xs font-medium ${
                               trade.isDone
@@ -816,7 +816,7 @@ export default function TradesPageClient() {
                         <td className={`hidden md:table-cell px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.membershipType}</td>
                         <td className={`px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>{trade.customerName}</td>
                         <td className={`hidden md:table-cell px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.contact}</td>
-                        <td className={`px-4 py-3 text-sm text-right whitespace-nowrap ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>
+                        <td className={`hidden md:table-cell px-4 py-3 text-sm text-right whitespace-nowrap ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>
                           {formatPrice(trade.offerPrice)}
                           {trade.offerPriceNote && (
                             <span className="text-xs text-gray-400 ml-1">({trade.offerPriceNote})</span>

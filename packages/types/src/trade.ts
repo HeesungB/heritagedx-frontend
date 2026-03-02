@@ -3,9 +3,8 @@ export interface TradeMemo {
   id: string;
   clubId: string | null;
   clubName: string;
-  membershipType: string;
   membershipId?: string | null;
-  membershipName?: string;
+  membershipName: string;
   isShared?: boolean;
   tradeType: string;
   customerName: string;

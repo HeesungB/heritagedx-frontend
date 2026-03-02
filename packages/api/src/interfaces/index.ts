@@ -3,6 +3,7 @@ export type {
   IScenarioRepository,
   IConsultationRepository,
   IMembershipTradeRepository,
+  IClaimRepository,
 } from "./general";
 
 export type {
@@ -25,6 +26,7 @@ import type {
   IScenarioRepository,
   IConsultationRepository,
   IMembershipTradeRepository,
+  IClaimRepository,
 } from "./general";
 
 import type {
@@ -47,6 +49,7 @@ export interface GeneralRepositories {
   scenarios: IScenarioRepository;
   consultations: IConsultationRepository;
   membershipTrades: IMembershipTradeRepository;
+  claims: IClaimRepository;
 }
 
 export interface AdminRepositories {

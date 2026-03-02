@@ -7,7 +7,7 @@ export function mapTradMemoDtoToEntity(dto: TradeMemo): TradeMemoEntity {
     id: dto.id,
     clubId: dto.clubId,
     clubName: dto.clubName,
-    membershipType: dto.membershipType,
+    membershipType: dto.membershipName,
     tradeType: dto.tradeType as "매수" | "매도",
     customerName: dto.customerName,
     contact: dto.contact,

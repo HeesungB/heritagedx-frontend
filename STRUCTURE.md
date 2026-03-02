@@ -114,7 +114,7 @@ heritage-dx/
 
 ### 4.1. `@heritage-dx/types`
 
-도메인 모델의 TypeScript 타입 정의. 8개 모듈로 구성.
+도메인 모델의 TypeScript 타입 정의. 9개 모듈로 구성.
 
 | 모듈 | 주요 타입 |
 |------|----------|
@@ -124,6 +124,7 @@ heritage-dx/
 | `document.ts` | `Document`, `ClubDocument`, `GlobalDocument`, `CustomerDocument`, `ClubScenarioDocument`, `DocumentsSummary` |
 | `scenario.ts` | `Scenario`, `ScenarioSide`, `ScenarioOwnerType`, `ScenarioConditions`, `ScenarioWithDocuments`, `AvailableFilters` |
 | `trade.ts` | `TradeMemo`, `TradeMemoInput`, `TradeRecord`, `TradeRecordInput` |
+| `claim.ts` | `Claim`, `ClaimInput` |
 | `user.ts` | `User`, `UserRole` (`SUPER_ADMIN` \| `ORG_ADMIN` \| `EDITOR`), `AdminUser`, `LoginResponse` |
 | `organization.ts` | `Organization` |
 
@@ -186,7 +187,7 @@ packages/api/
 │   │   └── normalize-list.ts             # 3가지 응답 포맷 통합 정규화
 │   ├── interfaces/
 │   │   ├── index.ts                      # GeneralRepositories, AdminRepositories 집합 타입
-│   │   ├── general/                      # 4개 공개 API 인터페이스
+│   │   ├── general/                      # 5개 공개 API 인터페이스
 │   │   └── admin/                        # 12개 관리자 API 인터페이스
 │   ├── repositories/
 │   │   ├── general/                      # ApiClient 기반 공개 API 구현
@@ -208,6 +209,7 @@ packages/api/
 | `IScenarioRepository` | `getByClub(clubCode)`, `match(conditions)`, `getDocuments(...)` |
 | `IConsultationRepository` | `getAll(params?)`, `create(data)`, `update(id, data)`, `delete(id)` |
 | `IMembershipTradeRepository` | `getAll(params?)`, `create(data)`, `update(id, data)`, `delete(id)` |
+| `IClaimRepository` | `create(data)` |
 
 **Admin Repository (관리자 API):** 12개 — clubs, scenarios, documents, club-documents, scenario-documents, club-scenario-documents, club-scenarios, global-documents, customer-documents, users, organizations, memberships
 
@@ -220,7 +222,7 @@ packages/api/
 
 **React Context:**
 - `RepositoryProvider` — general/admin 리포지토리 주입
-- `useClubRepository()`, `useScenarioRepository()`, `useConsultationRepository()`, `useMembershipTradeRepository()` — convenience hooks
+- `useClubRepository()`, `useScenarioRepository()`, `useConsultationRepository()`, `useMembershipTradeRepository()`, `useClaimRepository()` — convenience hooks
 - `useGeneralRepositories()`, `useAdminRepositories()` — 집합 hooks
 
 ### 4.5. `@heritage-dx/store`
@@ -373,10 +375,11 @@ info:       #3b82f6 / #dbeafe (light)
 │   ├── page.tsx                  # 골프장 디렉토리/검색
 │   └── loading.tsx               # 로딩 스켈레톤
 ├── trades/page.tsx               # 거래 메모 (상담 기록)
-└── membership-trades/page.tsx    # 거래 내역
+├── membership-trades/page.tsx    # 거래 내역
+└── claims/page.tsx               # 건의사항
 ```
 
-#### 컴포넌트 (38개)
+#### 컴포넌트 (39개)
 
 **코어:**
 `AuthGuard`, `ClientLayout`, `Header`, `MobileNavigation`
@@ -389,6 +392,9 @@ info:       #3b82f6 / #dbeafe (light)
 
 **회원권/거래:**
 `MembershipCalculator`, `MembershipInfoSheet`, `MembershipTradesClient`, `RequiredDocuments`, `TradesPageClient`, `TransactionTypeForm`, `TradeMemoSidebar`
+
+**건의사항:**
+`ClaimsPageClient`
 
 **모달/시트:**
 `PasswordChangeModal`, `TaxGuideModal`, `TaxSettingsModal`, `EstimateSheet`
@@ -415,7 +421,7 @@ getInitialData()    // 초기 데이터 프리로드
 
 #### 클라이언트 사이드 데이터 페칭
 
-`OsRepositoryProvider`에서 `@heritage-dx/api`의 General Repository를 주입. 클라이언트 컴포넌트에서 `useClubRepository()`, `useScenarioRepository()`, `useConsultationRepository()`, `useMembershipTradeRepository()` 훅으로 데이터 호출.
+`OsRepositoryProvider`에서 `@heritage-dx/api`의 General Repository를 주입. 클라이언트 컴포넌트에서 `useClubRepository()`, `useScenarioRepository()`, `useConsultationRepository()`, `useMembershipTradeRepository()`, `useClaimRepository()` 훅으로 데이터 호출.
 
 #### 주요 의존성
 

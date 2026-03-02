@@ -70,3 +70,7 @@ export function useConsultationRepository() {
 export function useMembershipTradeRepository() {
   return useGeneralRepositories().membershipTrades;
 }
+
+export function useClaimRepository() {
+  return useGeneralRepositories().claims;
+}

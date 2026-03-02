@@ -92,9 +92,11 @@ export default function NearbyClubPrices({
   if (nearbyClubs.length === 0) return null;
 
   return (
-    <div className="mt-4 print:hidden">
-      <h4 className="text-sm font-medium text-gray-700 mb-2">주변 골프장 시세</h4>
-      <div className="border border-gray-200 rounded-lg overflow-hidden">
+    <div className="print:hidden border-t border-gray-300">
+      <div className="bg-gray-50 border-b border-gray-300 px-3 py-2">
+        <span className="text-sm font-medium text-gray-700">주변 골프장 시세</span>
+      </div>
+      <div>
         {nearbyClubs.map(({ club, distance, price }, idx) => (
           <div
             key={club.code}

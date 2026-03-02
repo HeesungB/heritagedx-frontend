@@ -69,3 +69,5 @@ export type {
 } from "./user";
 
 export type { Organization } from "./organization";
+
+export type { Claim, ClaimInput } from "./claim";

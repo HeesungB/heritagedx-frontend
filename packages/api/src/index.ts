@@ -7,6 +7,7 @@ export type {
   IScenarioRepository,
   IConsultationRepository,
   IMembershipTradeRepository,
+  IClaimRepository,
   IClubAdminRepository,
   IScenarioAdminRepository,
   IDocumentAdminRepository,
@@ -37,6 +38,7 @@ export {
   useScenarioRepository,
   useConsultationRepository,
   useMembershipTradeRepository,
+  useClaimRepository,
 } from "./context/RepositoryContext";
 
 // Normalizers

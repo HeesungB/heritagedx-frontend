@@ -138,7 +138,7 @@ export default function TradeMemosPage() {
       }
     }
     if (selectedMembership) {
-      result = result.filter((m) => m.membershipType === selectedMembership);
+      result = result.filter((m) => m.membershipName === selectedMembership);
     }
     if (dateFrom) {
       result = result.filter((m) => m.registrationDate && m.registrationDate >= dateFrom);
@@ -388,7 +388,7 @@ export default function TradeMemosPage() {
       clubName: trade.clubName || "",
       membershipId: trade.membershipId || "",
       membershipName: trade.membershipName || "",
-      membershipType: trade.membershipType || "",
+      membershipType: trade.membershipName || "",
       tradeType: trade.tradeType || "매수",
       customerName: trade.customerName || "",
       contact: trade.contact || "",
@@ -423,7 +423,7 @@ export default function TradeMemosPage() {
     try {
       await consultationsRepo.update(memo.id, {
         club: memo.clubName,
-        membership: memo.membershipType,
+        membership: memo.membershipName,
         tradeType: memo.tradeType,
         customerName: memo.customerName,
         contact: memo.contact,
@@ -651,7 +651,7 @@ export default function TradeMemosPage() {
                         <Badge variant={trade.tradeType === "매수" ? "info" : "error"}>{trade.tradeType}</Badge>
                       </td>
                       <td className="py-2.5 pr-3 font-medium text-gray-800 whitespace-nowrap">{trade.clubName}</td>
-                      <td className="hidden md:table-cell py-2.5 pr-3 text-gray-600 whitespace-nowrap">{trade.membershipType}</td>
+                      <td className="hidden md:table-cell py-2.5 pr-3 text-gray-600 whitespace-nowrap">{trade.membershipName}</td>
                       <td className="py-2.5 pr-3 font-medium text-gray-900 whitespace-nowrap">{trade.customerName}</td>
                       <td className="hidden md:table-cell py-2.5 pr-3 text-gray-500 whitespace-nowrap">{trade.contact}</td>
                       <td className="py-2.5 pr-3 text-gray-800 whitespace-nowrap">{formatPrice(trade.offerPrice)}</td>
@@ -910,9 +910,9 @@ export default function TradeMemosPage() {
                   <span className="font-medium text-gray-900">
                     {selectedMemo.customerName}
                   </span>
-                  {selectedMemo.membershipType && (
+                  {selectedMemo.membershipName && (
                     <span className="text-sm text-gray-500">
-                      {selectedMemo.membershipType}
+                      {selectedMemo.membershipName}
                     </span>
                   )}
                 </div>
@@ -1028,9 +1028,9 @@ export default function TradeMemosPage() {
                           <span className="font-medium text-sm text-gray-900">
                             {related.customerName}
                           </span>
-                          {related.membershipType && (
+                          {related.membershipName && (
                             <span className="text-xs text-gray-500">
-                              {related.membershipType}
+                              {related.membershipName}
                             </span>
                           )}
                           {related.isDone && (

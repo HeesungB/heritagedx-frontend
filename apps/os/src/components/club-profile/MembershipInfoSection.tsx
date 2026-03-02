@@ -141,7 +141,7 @@ export default function MembershipInfoSection({
     <div className="space-y-3">
       {/* 회원권 기본정보 */}
       <CollapsibleSection
-        title="회원권 기본정보"
+        title="회원권 정보"
         isOpen={openSections.basic}
         onToggle={() => toggleSection("basic")}
       >
@@ -231,7 +231,7 @@ export default function MembershipInfoSection({
       {/* 시세 정보 */}
       {hasMarketInfo && (
         <CollapsibleSection
-          title="시세 정보"
+          title="회원권 정보"
           isOpen={openSections.market}
           onToggle={() => toggleSection("market")}
         >
@@ -254,7 +254,11 @@ export default function MembershipInfoSection({
                         colSpan={3}
                         className="border border-gray-300 px-3 py-2 text-sm"
                       >
-                        {membership?.estimatedSalePrice || membership?.recentMarketPrice}
+                        {(() => {
+                          const raw = membership?.estimatedSalePrice || membership?.recentMarketPrice || "";
+                          const num = parseInt(raw.replace(/[^0-9]/g, ""), 10);
+                          return isNaN(num) ? raw : `${num.toLocaleString()}원`;
+                        })()}
                       </td>
                     </tr>
                   )}
@@ -299,7 +303,7 @@ export default function MembershipInfoSection({
 
       {/* 이용 요금 */}
       <CollapsibleSection
-        title="이용 요금 (단위: 만원)"
+        title="그린피 정보 (단위: 만원)"
         isOpen={openSections.fee}
         onToggle={() => toggleSection("fee")}
       >
@@ -445,7 +449,7 @@ export default function MembershipInfoSection({
       {/* 명의개서 담당 */}
       {hasTransfer && (
         <CollapsibleSection
-          title="명의개서 담당"
+          title="구비서류"
           isOpen={openSections.transfer}
           onToggle={() => toggleSection("transfer")}
         >

@@ -36,6 +36,10 @@ export default function ClubBasicInfoTable({
   };
 
   return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <div className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-50">
+        <span className="text-sm font-semibold text-gray-800">골프장 정보</span>
+      </div>
     <table className="w-full border-collapse table-fixed">
       <colgroup>
         <col className="w-24" />
@@ -151,5 +155,6 @@ export default function ClubBasicInfoTable({
         )}
       </tbody>
     </table>
+    </div>
   );
 }

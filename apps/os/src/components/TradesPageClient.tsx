@@ -5,6 +5,7 @@ import Header from "@/components/Header";
 import { MembershipTrade, MembershipTradeForm, Club } from "@/types";
 import { useClubRepository, useConsultationRepository } from "@heritage-dx/api";
 import { ClubSearchSelect, Button, Loading } from "@heritage-dx/ui";
+import { mapTradMemoDtoToEntity } from "@heritage-dx/store";
 
 type TradeFilter = "전체" | "매수" | "매도";
 
@@ -148,7 +149,7 @@ export default function TradesPageClient() {
         search: searchQuery.trim() || undefined,
       });
       if (response.data) {
-        setRawTrades((response.data.trades || []) as unknown as MembershipTrade[]);
+        setRawTrades((response.data.trades || []).map(mapTradMemoDtoToEntity));
         if (response.data.pagination) {
           setTotalPages(response.data.pagination.totalPages);
         }

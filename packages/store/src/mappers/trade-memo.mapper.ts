@@ -27,12 +27,11 @@ export function mapTradMemoDtoToEntity(dto: TradeMemo): TradeMemoEntity {
 }
 
 export function mapTradeMemoEntityToInput(
-  entity: Partial<TradeMemoEntity> & { clubId?: string | null },
+  entity: Partial<TradeMemoEntity>,
 ): TradeMemoInput {
   return {
-    clubId: entity.clubId ?? "",
-    clubName: entity.clubName ?? "",
-    membershipType: entity.membershipType ?? "",
+    club: entity.clubName ?? "",
+    membership: entity.membershipType ?? "",
     tradeType: entity.tradeType ?? "매수",
     customerName: entity.customerName ?? "",
     contact: entity.contact ?? "",

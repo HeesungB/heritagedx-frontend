@@ -550,10 +550,10 @@ export default function DocumentsSection({
 
       {/* 회원권별 서류 — 헤더에서 선택한 회원권 기반 */}
       <section className="border border-gray-200 rounded-lg overflow-hidden">
-        <div className="bg-teal-50 px-4 py-3 border-b border-teal-200">
+        <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
           <div className="flex items-center gap-2">
             <svg
-              className="w-5 h-5 text-teal-600"
+              className="w-5 h-5 text-gray-700"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -565,14 +565,14 @@ export default function DocumentsSection({
                 d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
               />
             </svg>
-            <h3 className="font-semibold text-teal-800">
+            <h3 className="font-semibold text-gray-800">
               회원권별 서류
             </h3>
-            <span className="px-2 py-0.5 text-xs bg-teal-200 text-teal-700 rounded">
+            <span className="px-2 py-0.5 text-xs bg-gray-200 text-gray-700 rounded">
               {selectedMembership?.membershipName || selectedMembership?.membershipType || "회원권"}
             </span>
             {totalMembershipDocs > 0 && (
-              <span className="text-sm text-teal-600">
+              <span className="text-sm text-gray-600">
                 {totalMembershipDocs}건
               </span>
             )}
@@ -595,7 +595,7 @@ export default function DocumentsSection({
               return (
                 <div className="p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-teal-700 font-medium">
+                    <span className="text-sm text-gray-700 font-medium">
                       {docs.length}개 서류
                     </span>
                     <button
@@ -611,7 +611,7 @@ export default function DocumentsSection({
                         }
                         onSelectedDocIdsChange(next);
                       }}
-                      className="text-xs text-teal-700 hover:text-teal-900"
+                      className="text-xs text-gray-700 hover:text-gray-900"
                     >
                       {docs.every((d) => selectedDocIds.has(d.id))
                         ? "전체 해제"
@@ -624,7 +624,7 @@ export default function DocumentsSection({
                         key={doc.id}
                         className={`p-3 border rounded bg-white cursor-pointer transition-colors ${
                           selectedDocIds.has(doc.id)
-                            ? "border-teal-400 bg-teal-50"
+                            ? "border-gray-400 bg-gray-50"
                             : "border-gray-200 hover:border-gray-300"
                         }`}
                         onClick={() => toggleDocSelection(doc.id)}
@@ -633,7 +633,7 @@ export default function DocumentsSection({
                           <div
                             className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                               selectedDocIds.has(doc.id)
-                                ? "border-teal-500 bg-teal-500"
+                                ? "border-gray-700 bg-gray-700"
                                 : "border-gray-300"
                             }`}
                           >
@@ -664,7 +664,7 @@ export default function DocumentsSection({
                                     </p>
                                   )}
                               </div>
-                              <span className="text-xs text-teal-600">
+                              <span className="text-xs text-gray-600">
                                 {doc.fileName}
                               </span>
                             </div>

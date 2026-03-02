@@ -13,6 +13,7 @@ export function mapClubDtoToEntity(dto: Club): ClubEntity {
     contact: dto.contact ?? "",
     holes: dto.holes ?? undefined,
     operationTypes: dto.operationTypes ?? [],
+    recentMarketPrice: dto.recentMarketPrice ?? undefined,
   };
 }
 

@@ -115,9 +115,8 @@ export function createTradeMemoStore(repos: GeneralRepositories) {
 
       try {
         const response = await repos.consultations.update(id, {
-          clubId: item.clubId ?? "",
-          clubName: item.clubName,
-          membershipType: item.membershipType,
+          club: item.clubName,
+          membership: item.membershipType,
           tradeType: item.tradeType,
           customerName: item.customerName,
           contact: item.contact,

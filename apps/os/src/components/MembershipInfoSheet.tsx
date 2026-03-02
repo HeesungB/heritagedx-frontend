@@ -177,7 +177,7 @@ export default function MembershipInfoSheet({
             <div className="mb-3 flex justify-between items-center">
               <div>
                 <span className="text-emerald-600 text-lg align-middle">🔑</span>
-                <span className="font-semibold text-gray-700 ml-2">
+                <span className="font-semibold text-gray-800 ml-2">
                   골프장 정보
                 </span>
               </div>
@@ -223,7 +223,7 @@ export default function MembershipInfoSheet({
           <div className="mb-6">
             <div className="mb-3">
               <span className="text-emerald-600 text-lg align-middle">🔑</span>
-              <span className="font-semibold text-gray-700 ml-2">
+              <span className="font-semibold text-gray-800 ml-2">
                 회원권 정보
               </span>
             </div>
@@ -321,7 +321,7 @@ export default function MembershipInfoSheet({
           <div className="mt-8 mb-6">
             <div className="mb-3">
               <span className="text-emerald-600 text-lg align-middle">🔑</span>
-              <span className="font-semibold text-gray-700 ml-2">부가 비용</span>
+              <span className="font-semibold text-gray-800 ml-2">부가 비용</span>
             </div>
             <table className="w-full border-collapse border border-gray-300 table-fixed">
               <colgroup>
@@ -354,7 +354,7 @@ export default function MembershipInfoSheet({
         <div className="mt-8 mb-6">
           <div className="mb-3">
             <span className="text-emerald-600 text-lg align-middle">🔑</span>
-            <span className="font-semibold text-gray-700 ml-2">기타 사항</span>
+            <span className="font-semibold text-gray-800 ml-2">기타 사항</span>
           </div>
           <table className="w-full border-collapse border border-gray-300">
             <tbody>
@@ -374,7 +374,7 @@ export default function MembershipInfoSheet({
           <table className="w-full border-collapse">
             <tbody>
               <tr>
-                <td className="bg-emerald-600 text-white px-4 py-2 w-24 text-center font-semibold">
+                <td className="bg-emerald-700 text-white px-4 py-2 w-24 text-center font-semibold">
                   담 당 자
                 </td>
                 <td className="px-4 py-2">
@@ -394,10 +394,10 @@ export default function MembershipInfoSheet({
           <tbody>
             <tr>
               <td className="align-middle" style={{ width: "120px" }}>
-                <span className="inline-block w-8 h-8 bg-emerald-600 rounded-full text-white font-bold text-xs text-center leading-8 align-middle">
+                <span className="inline-block w-8 h-8 bg-emerald-700 rounded-full text-white font-bold text-xs text-center leading-8 align-middle">
                   참존
                 </span>
-                <span className="font-semibold text-emerald-600 ml-2">참존회원권</span>
+                <span className="font-semibold text-emerald-700 ml-2">참존회원권</span>
               </td>
               <td className="text-right align-top">
                 <p>서울 : 서울특별시 강남구 삼성로 531, 4층 &nbsp;&nbsp; T. 02) 6426 - 2000</p>

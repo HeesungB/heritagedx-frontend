@@ -56,5 +56,7 @@ EXPOSE 3000
 
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
+# Firebase Admin SDK (set via Cloud Run env vars)
+# ENV FIREBASE_SERVICE_ACCOUNT_KEY=
 
 CMD ["node", "apps/os/server.js"]

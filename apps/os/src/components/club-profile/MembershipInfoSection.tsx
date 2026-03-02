@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Club, Membership } from "@/types";
 import PriceChart from "./PriceChart";
 import NearbyClubPrices from "./NearbyClubPrices";
@@ -21,6 +22,38 @@ interface MembershipInfoSectionProps {
   onClubNavigate?: (clubCode: string) => void;
 }
 
+function CollapsibleSection({
+  title,
+  isOpen,
+  onToggle,
+  children,
+}: {
+  title: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 hover:bg-gray-100 transition-colors"
+      >
+        <span className="text-sm font-semibold text-gray-800">{title}</span>
+        <svg
+          className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? "rotate-180" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {isOpen && children}
+    </div>
+  );
+}
+
 export default function MembershipInfoSection({
   memberships,
   selectedIndex,
@@ -38,6 +71,17 @@ export default function MembershipInfoSection({
   onClubNavigate,
 }: MembershipInfoSectionProps) {
   const membership = memberships[selectedIndex];
+
+  const [openSections, setOpenSections] = useState({
+    basic: true,
+    market: true,
+    fee: true,
+    costs: true,
+    transfer: true,
+  });
+
+  const toggleSection = (key: keyof typeof openSections) =>
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
 
   // 그린피: 회원권 값 사용, 캐디피/카트피: 골프장(props) 값 사용
   const effectiveWeekdayFee = membership?.weekdayGreenFee;
@@ -89,239 +133,266 @@ export default function MembershipInfoSection({
   const displayTypeName = (type: string) =>
     type === "준회원" ? "가족(준)회원" : type;
 
+  const hasMarketInfo = !!(membership?.estimatedSalePrice || membership?.recentMarketPrice || membership?.avgMarketPrice3y || membership?.dealerPriceRange || membership?.estimatedPriceDate || membership?.id);
+  const hasCosts = !!(registrationFee || stampDuty || agencyFee || otherCosts);
+  const hasTransfer = !!(membership?.transferManagerName || membership?.transferManagerPhone || membership?.buyerDocuments || membership?.sellerDocuments);
+
   return (
-    <div>
-      <table className="w-full border-collapse table-fixed">
-        <colgroup>
-          <col className="w-24" />
-          <col />
-          <col className="w-24" />
-          <col />
-        </colgroup>
-        <tbody>
-          {/* 회원권명, 분양가 */}
-          <tr>
-            <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium whitespace-nowrap">
-              회원권명
-            </td>
-            <td className="border border-gray-300 px-3 py-2 text-sm">
-              {membership?.membershipName ||
-                membership?.membershipType ||
-                "-"}
-            </td>
-            <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium whitespace-nowrap">
-              분 양 가
-            </td>
-            <td className="border border-gray-300 px-3 py-2 text-sm">
-              {membership?.initialSalePrice || "-"}
-            </td>
-          </tr>
-          {/* 특이 사항 */}
-          <tr>
-            <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium align-top whitespace-nowrap">
-              특이 사항
-            </td>
-            <td
-              colSpan={3}
-              className="border border-gray-300 px-3 py-2 text-sm whitespace-pre-wrap"
-            >
-              {memo || "-"}
-            </td>
-          </tr>
-          {/* 예약 안내 */}
-          {reservationNotes && (
-            <tr>
-              <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium align-top whitespace-nowrap">
-                예약 안내
-              </td>
-              <td
-                colSpan={3}
-                className="border border-gray-300 px-3 py-2 text-sm whitespace-pre-wrap"
-              >
-                {reservationNotes}
-              </td>
-            </tr>
-          )}
-          {/* 특이사항 (회원권별) */}
-          {membership?.specialNotes && (
-            <tr>
-              <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium align-top whitespace-nowrap">
-                특이사항
-              </td>
-              <td
-                colSpan={3}
-                className="border border-gray-300 px-3 py-2 text-sm whitespace-pre-wrap"
-              >
-                {membership.specialNotes}
-              </td>
-            </tr>
-          )}
-          {/* 회원 혜택 */}
-          {membership?.memberBenefits && (
-            <tr>
-              <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium align-top whitespace-nowrap">
-                회원 혜택
-              </td>
-              <td
-                colSpan={3}
-                className="border border-gray-300 px-3 py-2 text-sm whitespace-pre-wrap"
-              >
-                {membership.memberBenefits}
-              </td>
-            </tr>
-          )}
-          {/* 시세/거래 섹션 */}
-          {(membership?.estimatedSalePrice || membership?.recentMarketPrice) && (
+    <div className="space-y-3">
+      {/* 회원권 기본정보 */}
+      <CollapsibleSection
+        title="회원권 기본정보"
+        isOpen={openSections.basic}
+        onToggle={() => toggleSection("basic")}
+      >
+        <table className="w-full border-collapse table-fixed">
+          <colgroup>
+            <col className="w-24" />
+            <col />
+            <col className="w-24" />
+            <col />
+          </colgroup>
+          <tbody>
+            {/* 회원권명, 분양가 */}
             <tr>
               <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium whitespace-nowrap">
-                현재 시세
+                회원권명
               </td>
-              <td
-                colSpan={3}
-                className="border border-gray-300 px-3 py-2 text-sm"
-              >
-                {membership?.estimatedSalePrice || membership?.recentMarketPrice}
+              <td className="border border-gray-300 px-3 py-2 text-sm">
+                {membership?.membershipName ||
+                  membership?.membershipType ||
+                  "-"}
+              </td>
+              <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium whitespace-nowrap">
+                분 양 가
+              </td>
+              <td className="border border-gray-300 px-3 py-2 text-sm">
+                {membership?.initialSalePrice || "-"}
               </td>
             </tr>
-          )}
-          {(membership?.avgMarketPrice3y || membership?.dealerPriceRange || membership?.estimatedPriceDate) && (
+            {/* 특이 사항 */}
             <tr>
               <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium align-top whitespace-nowrap">
-                시세 상세
+                특이 사항
               </td>
               <td
                 colSpan={3}
-                className="border border-gray-300 px-3 py-2 text-sm"
+                className="border border-gray-300 px-3 py-2 text-sm whitespace-pre-wrap"
               >
-                <div className="space-y-0.5">
-                  {membership?.avgMarketPrice3y && (
-                    <div><span className="text-gray-500">3년 평균:</span> {membership.avgMarketPrice3y}</div>
-                  )}
-                  {membership?.dealerPriceRange && (
-                    <div><span className="text-gray-500">딜러 시세:</span> {membership.dealerPriceRange}</div>
-                  )}
-                  {membership?.estimatedPriceDate && (
-                    <div><span className="text-gray-500">기준일:</span> {membership.estimatedPriceDate}</div>
-                  )}
-                </div>
+                {memo || "-"}
               </td>
             </tr>
-          )}
-          {/* 그린피 섹션 구분 */}
-          <tr>
-            <td
-              colSpan={4}
-              className="bg-gray-50 border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700"
-            >
-              그린피 (단위: 만원)
-            </td>
-          </tr>
-          {/* 그린피 테이블 */}
-          <tr>
-            <td colSpan={4} className="border border-gray-300 p-0">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr>
-                    <th className="bg-gray-100 border-b border-r border-gray-300 px-3 py-2 text-xs text-gray-600 font-medium w-16">
-                      구분
-                    </th>
-                    {greenFeeTypes.length > 0 ? (
-                      greenFeeTypes.map((type, idx) => (
-                        <th
-                          key={type}
-                          className={`bg-gray-100 border-b border-gray-300 px-3 py-2 text-xs text-gray-600 font-medium text-center ${idx < greenFeeTypes.length - 1 ? "border-r" : ""}`}
-                        >
-                          {displayTypeName(type)}
-                        </th>
-                      ))
-                    ) : (
-                      <th className="bg-gray-100 border-b border-gray-300 px-3 py-2 text-xs text-gray-600 font-medium text-center">
-                        회원
-                      </th>
-                    )}
-                  </tr>
-                </thead>
+            {/* 예약 안내 */}
+            {reservationNotes && (
+              <tr>
+                <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium align-top whitespace-nowrap">
+                  예약 안내
+                </td>
+                <td
+                  colSpan={3}
+                  className="border border-gray-300 px-3 py-2 text-sm whitespace-pre-wrap"
+                >
+                  {reservationNotes}
+                </td>
+              </tr>
+            )}
+            {/* 특이사항 (회원권별) */}
+            {membership?.specialNotes && (
+              <tr>
+                <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium align-top whitespace-nowrap">
+                  특이사항
+                </td>
+                <td
+                  colSpan={3}
+                  className="border border-gray-300 px-3 py-2 text-sm whitespace-pre-wrap"
+                >
+                  {membership.specialNotes}
+                </td>
+              </tr>
+            )}
+            {/* 회원 혜택 */}
+            {membership?.memberBenefits && (
+              <tr>
+                <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium align-top whitespace-nowrap">
+                  회원 혜택
+                </td>
+                <td
+                  colSpan={3}
+                  className="border border-gray-300 px-3 py-2 text-sm whitespace-pre-wrap"
+                >
+                  {membership.memberBenefits}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </CollapsibleSection>
+
+      {/* 시세 정보 */}
+      {hasMarketInfo && (
+        <CollapsibleSection
+          title="시세 정보"
+          isOpen={openSections.market}
+          onToggle={() => toggleSection("market")}
+        >
+          <div>
+            {(membership?.estimatedSalePrice || membership?.recentMarketPrice || membership?.avgMarketPrice3y || membership?.dealerPriceRange || membership?.estimatedPriceDate) && (
+              <table className="w-full border-collapse table-fixed">
+                <colgroup>
+                  <col className="w-24" />
+                  <col />
+                  <col className="w-24" />
+                  <col />
+                </colgroup>
                 <tbody>
-                  <tr>
-                    <td className="bg-gray-100 border-b border-r border-gray-300 px-3 py-2 text-xs text-gray-600 text-center font-medium">
-                      주중
-                    </td>
-                    {greenFeeTypes.length > 0 ? (
-                      greenFeeTypes.map((type, idx) => (
-                        <td
-                          key={type}
-                          className={`border-b border-gray-300 px-3 py-2 text-sm text-center ${idx < greenFeeTypes.length - 1 ? "border-r" : ""}`}
-                        >
-                          {getGreenFeeValue(effectiveWeekdayFee, type)}
-                        </td>
-                      ))
-                    ) : (
-                      <td className="border-b border-gray-300 px-3 py-2 text-sm text-center">
-                        {typeof effectiveWeekdayFee === "number"
-                          ? formatFeeInManwon(effectiveWeekdayFee)
-                          : "-"}
+                  {(membership?.estimatedSalePrice || membership?.recentMarketPrice) && (
+                    <tr>
+                      <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium whitespace-nowrap">
+                        현재 시세
                       </td>
-                    )}
-                  </tr>
-                  <tr>
-                    <td className="bg-gray-100 border-r border-gray-300 px-3 py-2 text-xs text-gray-600 text-center font-medium">
-                      주말
-                    </td>
-                    {greenFeeTypes.length > 0 ? (
-                      greenFeeTypes.map((type, idx) => (
-                        <td
-                          key={type}
-                          className={`px-3 py-2 text-sm text-center ${idx < greenFeeTypes.length - 1 ? "border-r border-gray-300" : ""}`}
-                        >
-                          {getGreenFeeValue(effectiveWeekendFee, type)}
-                        </td>
-                      ))
-                    ) : (
-                      <td className="px-3 py-2 text-sm text-center">
-                        {typeof effectiveWeekendFee === "number"
-                          ? formatFeeInManwon(effectiveWeekendFee)
-                          : "-"}
+                      <td
+                        colSpan={3}
+                        className="border border-gray-300 px-3 py-2 text-sm"
+                      >
+                        {membership?.estimatedSalePrice || membership?.recentMarketPrice}
                       </td>
-                    )}
-                  </tr>
+                    </tr>
+                  )}
+                  {(membership?.avgMarketPrice3y || membership?.dealerPriceRange || membership?.estimatedPriceDate) && (
+                    <tr>
+                      <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium align-top whitespace-nowrap">
+                        시세 상세
+                      </td>
+                      <td
+                        colSpan={3}
+                        className="border border-gray-300 px-3 py-2 text-sm"
+                      >
+                        <div className="space-y-0.5">
+                          {membership?.avgMarketPrice3y && (
+                            <div><span className="text-gray-500">3년 평균:</span> {membership.avgMarketPrice3y}</div>
+                          )}
+                          {membership?.dealerPriceRange && (
+                            <div><span className="text-gray-500">딜러 시세:</span> {membership.dealerPriceRange}</div>
+                          )}
+                          {membership?.estimatedPriceDate && (
+                            <div><span className="text-gray-500">기준일:</span> {membership.estimatedPriceDate}</div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
-            </td>
-          </tr>
+            )}
+            {membership?.id && <PriceChart membershipId={membership.id} />}
+            {currentClubAddress && clubs && clubs.length > 0 && (
+              <NearbyClubPrices
+                currentClubAddress={currentClubAddress}
+                currentClubName={currentClubName || ""}
+                clubs={clubs}
+                onClubClick={onClubNavigate}
+              />
+            )}
+          </div>
+        </CollapsibleSection>
+      )}
+
+      {/* 이용 요금 */}
+      <CollapsibleSection
+        title="이용 요금 (단위: 만원)"
+        isOpen={openSections.fee}
+        onToggle={() => toggleSection("fee")}
+      >
+        <div>
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                <th className="bg-gray-100 border-b border-r border-gray-300 px-3 py-2 text-xs text-gray-600 font-medium w-16">
+                  구분
+                </th>
+                {greenFeeTypes.length > 0 ? (
+                  greenFeeTypes.map((type, idx) => (
+                    <th
+                      key={type}
+                      className={`bg-gray-100 border-b border-gray-300 px-3 py-2 text-xs text-gray-600 font-medium text-center ${idx < greenFeeTypes.length - 1 ? "border-r" : ""}`}
+                    >
+                      {displayTypeName(type)}
+                    </th>
+                  ))
+                ) : (
+                  <th className="bg-gray-100 border-b border-gray-300 px-3 py-2 text-xs text-gray-600 font-medium text-center">
+                    회원
+                  </th>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="bg-gray-100 border-b border-r border-gray-300 px-3 py-2 text-xs text-gray-600 text-center font-medium">
+                  주중
+                </td>
+                {greenFeeTypes.length > 0 ? (
+                  greenFeeTypes.map((type, idx) => (
+                    <td
+                      key={type}
+                      className={`border-b border-gray-300 px-3 py-2 text-sm text-center ${idx < greenFeeTypes.length - 1 ? "border-r" : ""}`}
+                    >
+                      {getGreenFeeValue(effectiveWeekdayFee, type)}
+                    </td>
+                  ))
+                ) : (
+                  <td className="border-b border-gray-300 px-3 py-2 text-sm text-center">
+                    {typeof effectiveWeekdayFee === "number"
+                      ? formatFeeInManwon(effectiveWeekdayFee)
+                      : "-"}
+                  </td>
+                )}
+              </tr>
+              <tr>
+                <td className="bg-gray-100 border-r border-gray-300 px-3 py-2 text-xs text-gray-600 text-center font-medium">
+                  주말
+                </td>
+                {greenFeeTypes.length > 0 ? (
+                  greenFeeTypes.map((type, idx) => (
+                    <td
+                      key={type}
+                      className={`px-3 py-2 text-sm text-center ${idx < greenFeeTypes.length - 1 ? "border-r border-gray-300" : ""}`}
+                    >
+                      {getGreenFeeValue(effectiveWeekendFee, type)}
+                    </td>
+                  ))
+                ) : (
+                  <td className="px-3 py-2 text-sm text-center">
+                    {typeof effectiveWeekendFee === "number"
+                      ? formatFeeInManwon(effectiveWeekendFee)
+                      : "-"}
+                  </td>
+                )}
+              </tr>
+            </tbody>
+          </table>
           {/* 카트비/캐디피 */}
           {(effectiveCartFee || effectiveCaddyFee) && (
-            <tr>
-              <td
-                colSpan={4}
-                className="border border-gray-300 px-3 py-2 text-sm text-gray-600"
-              >
-                {effectiveCartFee && (
-                  <span className="mr-4">
-                    <span className="font-medium">카트비:</span>{" "}
-                    {(effectiveCartFee / 10000).toLocaleString()}만원
-                  </span>
-                )}
-                {effectiveCaddyFee && (
-                  <span>
-                    <span className="font-medium">캐디피:</span>{" "}
-                    {(effectiveCaddyFee / 10000).toLocaleString()}만원
-                  </span>
-                )}
-              </td>
-            </tr>
+            <div className="border-t border-gray-300 px-3 py-2 text-sm text-gray-600">
+              {effectiveCartFee && (
+                <span className="mr-4">
+                  <span className="font-medium">카트비:</span>{" "}
+                  {(effectiveCartFee / 10000).toLocaleString()}만원
+                </span>
+              )}
+              {effectiveCaddyFee && (
+                <span>
+                  <span className="font-medium">캐디피:</span>{" "}
+                  {(effectiveCaddyFee / 10000).toLocaleString()}만원
+                </span>
+              )}
+            </div>
           )}
-        </tbody>
-      </table>
-      {membership?.id && <PriceChart membershipId={membership.id} />}
-      {currentClubAddress && clubs && clubs.length > 0 && (
-        <NearbyClubPrices
-          currentClubAddress={currentClubAddress}
-          currentClubName={currentClubName || ""}
-          clubs={clubs}
-          onClubClick={onClubNavigate}
-        />
-      )}
-      {(registrationFee || stampDuty || agencyFee || otherCosts) && (() => {
+        </div>
+      </CollapsibleSection>
+
+      {/* 부가 비용 */}
+      {hasCosts && (() => {
         const costItems: { label: string; value: string }[] = [];
         if (registrationFee) costItems.push({ label: "명의개서료", value: registrationFee });
         if (stampDuty) costItems.push({ label: "인지대", value: stampDuty });
@@ -332,7 +403,53 @@ export default function MembershipInfoSection({
           rows.push(costItems.slice(i, i + 2));
         }
         return (
-          <table className="w-full border-collapse table-fixed mt-4">
+          <CollapsibleSection
+            title="부가 비용"
+            isOpen={openSections.costs}
+            onToggle={() => toggleSection("costs")}
+          >
+            <table className="w-full border-collapse table-fixed">
+              <colgroup>
+                <col className="w-24" />
+                <col />
+                <col className="w-24" />
+                <col />
+              </colgroup>
+              <tbody>
+                {rows.map((row, idx) => (
+                  <tr key={idx}>
+                    <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium whitespace-nowrap">
+                      {row[0].label}
+                    </td>
+                    <td colSpan={row.length === 1 ? 3 : 1} className="border border-gray-300 px-3 py-2 text-sm">
+                      {row[0].value}
+                    </td>
+                    {row[1] && (
+                      <>
+                        <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium whitespace-nowrap">
+                          {row[1].label}
+                        </td>
+                        <td className="border border-gray-300 px-3 py-2 text-sm">
+                          {row[1].value}
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CollapsibleSection>
+        );
+      })()}
+
+      {/* 명의개서 담당 */}
+      {hasTransfer && (
+        <CollapsibleSection
+          title="명의개서 담당"
+          isOpen={openSections.transfer}
+          onToggle={() => toggleSection("transfer")}
+        >
+          <table className="w-full border-collapse table-fixed">
             <colgroup>
               <col className="w-24" />
               <col />
@@ -340,100 +457,51 @@ export default function MembershipInfoSection({
               <col />
             </colgroup>
             <tbody>
-              <tr>
-                <td
-                  colSpan={4}
-                  className="bg-gray-50 border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700"
-                >
-                  부가 비용
-                </td>
-              </tr>
-              {rows.map((row, idx) => (
-                <tr key={idx}>
+              {(membership?.transferManagerName || membership?.transferManagerPhone) && (
+                <tr>
                   <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium whitespace-nowrap">
-                    {row[0].label}
+                    담당자
                   </td>
-                  <td colSpan={row.length === 1 ? 3 : 1} className="border border-gray-300 px-3 py-2 text-sm">
-                    {row[0].value}
+                  <td className="border border-gray-300 px-3 py-2 text-sm">
+                    {membership?.transferManagerName || "-"}
                   </td>
-                  {row[1] && (
-                    <>
-                      <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium whitespace-nowrap">
-                        {row[1].label}
-                      </td>
-                      <td className="border border-gray-300 px-3 py-2 text-sm">
-                        {row[1].value}
-                      </td>
-                    </>
-                  )}
+                  <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium whitespace-nowrap">
+                    연락처
+                  </td>
+                  <td className="border border-gray-300 px-3 py-2 text-sm">
+                    {membership?.transferManagerPhone || "-"}
+                  </td>
                 </tr>
-              ))}
+              )}
+              {membership?.buyerDocuments && (
+                <tr>
+                  <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium align-top whitespace-nowrap">
+                    매수 서류
+                  </td>
+                  <td
+                    colSpan={3}
+                    className="border border-gray-300 px-3 py-2 text-sm whitespace-pre-wrap"
+                  >
+                    {membership.buyerDocuments}
+                  </td>
+                </tr>
+              )}
+              {membership?.sellerDocuments && (
+                <tr>
+                  <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium align-top whitespace-nowrap">
+                    매도 서류
+                  </td>
+                  <td
+                    colSpan={3}
+                    className="border border-gray-300 px-3 py-2 text-sm whitespace-pre-wrap"
+                  >
+                    {membership.sellerDocuments}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
-        );
-      })()}
-      {/* 명의개서 담당 */}
-      {(membership?.transferManagerName || membership?.transferManagerPhone || membership?.buyerDocuments || membership?.sellerDocuments) && (
-        <table className="w-full border-collapse table-fixed mt-4">
-          <colgroup>
-            <col className="w-24" />
-            <col />
-            <col className="w-24" />
-            <col />
-          </colgroup>
-          <tbody>
-            <tr>
-              <td
-                colSpan={4}
-                className="bg-gray-50 border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700"
-              >
-                명의개서 담당
-              </td>
-            </tr>
-            {(membership?.transferManagerName || membership?.transferManagerPhone) && (
-              <tr>
-                <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium whitespace-nowrap">
-                  담당자
-                </td>
-                <td className="border border-gray-300 px-3 py-2 text-sm">
-                  {membership?.transferManagerName || "-"}
-                </td>
-                <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium whitespace-nowrap">
-                  연락처
-                </td>
-                <td className="border border-gray-300 px-3 py-2 text-sm">
-                  {membership?.transferManagerPhone || "-"}
-                </td>
-              </tr>
-            )}
-            {membership?.buyerDocuments && (
-              <tr>
-                <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium align-top whitespace-nowrap">
-                  매수 서류
-                </td>
-                <td
-                  colSpan={3}
-                  className="border border-gray-300 px-3 py-2 text-sm whitespace-pre-wrap"
-                >
-                  {membership.buyerDocuments}
-                </td>
-              </tr>
-            )}
-            {membership?.sellerDocuments && (
-              <tr>
-                <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium align-top whitespace-nowrap">
-                  매도 서류
-                </td>
-                <td
-                  colSpan={3}
-                  className="border border-gray-300 px-3 py-2 text-sm whitespace-pre-wrap"
-                >
-                  {membership.sellerDocuments}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+        </CollapsibleSection>
       )}
     </div>
   );

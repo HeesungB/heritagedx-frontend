@@ -3,8 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FolderOpen, LogOut, Users, MessageSquare, FileText, Building2, Home, Menu, X } from "lucide-react";
+import { FolderOpen, LogOut, Users, MessageSquare, FileText, Building2, Home, Menu, X, Bell } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNotifications } from "@/hooks/useNotifications";
 
 const roleLabels: Record<string, string> = {
   SUPER_ADMIN: "최고 관리자",
@@ -15,7 +16,9 @@ const roleLabels: Record<string, string> = {
 export default function Header() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const { unreadCount } = useNotifications();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const isNotificationsPage = pathname.startsWith("/notifications");
   const isHomePage = pathname === "/";
   const isClubsPage = pathname.startsWith("/clubs");
   const isCommonDocsPage = pathname.startsWith("/common-documents");
@@ -92,6 +95,18 @@ export default function Header() {
           {canManageUsers && <div className="hidden lg:block w-px h-5 bg-white/20" />}
           {user && (
             <div className="hidden lg:flex items-center gap-3">
+              <Link
+                href="/notifications"
+                className="relative p-2 text-indigo-100 hover:text-white hover:bg-white/10 rounded-full transition-all"
+              >
+                <Bell className="w-4 h-4" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center px-1 text-[10px] font-bold text-white bg-red-500 rounded-full">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+              </Link>
+              <div className="w-px h-5 bg-white/20" />
               <div className="text-sm">
                 <span className="font-medium text-white">{user.name}</span>
                 <span className="ml-2 px-2 py-0.5 text-[11px] font-medium bg-white/15 text-indigo-100 rounded-full">
@@ -142,6 +157,16 @@ export default function Header() {
             <Link href="/common-documents" className={mobileNavLinkClass(isCommonDocsPage)} onClick={() => setMobileMenuOpen(false)}>
               <FolderOpen className="w-4 h-4" />
               공통 서류함
+            </Link>
+            <div className="border-t border-white/10 my-1" />
+            <Link href="/notifications" className={mobileNavLinkClass(isNotificationsPage)} onClick={() => setMobileMenuOpen(false)}>
+              <Bell className="w-4 h-4" />
+              알림
+              {unreadCount > 0 && (
+                <span className="ml-auto min-w-[20px] h-5 flex items-center justify-center px-1.5 text-[11px] font-bold text-white bg-red-500 rounded-full">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
             </Link>
             {canManageUsers && (
               <>

@@ -35,11 +35,8 @@ export interface TradeMemosResponse {
 }
 
 export interface TradeMemoInput {
-  clubId: string;
-  clubName: string;
-  membershipType: string;
-  membershipId?: string | null;
-  membershipName?: string | null;
+  club: string;
+  membership: string;
   tradeType: string;
   customerName: string;
   contact: string;

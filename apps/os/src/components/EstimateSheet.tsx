@@ -93,7 +93,7 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
                 <td className={tdCls}>{recipient || ""}</td>
                 <td
                   rowSpan={5}
-                  className="bg-emerald-600 border border-gray-300 text-white text-sm font-bold text-center align-middle"
+                  className="bg-emerald-700 border border-gray-300 text-white text-sm font-bold text-center align-middle"
                   style={{ writingMode: "vertical-rl", letterSpacing: "0.2em" }}
                 >
                   공급자
@@ -152,7 +152,7 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
         </div>
 
         {/* 안내 문구 */}
-        <div className="text-center text-sm text-gray-700 py-3 bg-gray-50 border border-gray-300 rounded mb-6">
+        <div className="text-center text-sm text-emerald-800 py-3 bg-emerald-50 border border-emerald-200 rounded mb-6">
           의뢰하신 件에 대하여 아래와 같이 견적합니다.
         </div>
 
@@ -160,7 +160,7 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
         <div className="mb-6">
           <div className="mb-3">
             <span className="text-emerald-600 text-lg align-middle">🔑</span>
-            <span className="font-semibold text-gray-700 ml-2">견적 내역</span>
+            <span className="font-semibold text-gray-800 ml-2">견적 내역</span>
           </div>
           <table className="w-full border-collapse border border-gray-300">
             <colgroup>
@@ -226,7 +226,7 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
         <div className="mb-6">
           <div className="mb-3">
             <span className="text-emerald-600 text-lg align-middle">🔑</span>
-            <span className="font-semibold text-gray-700 ml-2">진행 사항</span>
+            <span className="font-semibold text-gray-800 ml-2">진행 사항</span>
           </div>
           <table className="w-full border-collapse border border-gray-300">
             <colgroup>
@@ -255,7 +255,7 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
         <div className="mb-6">
           <div className="mb-3">
             <span className="text-emerald-600 text-lg align-middle">🔑</span>
-            <span className="font-semibold text-gray-700 ml-2">매수시 구비서류</span>
+            <span className="font-semibold text-gray-800 ml-2">매수시 구비서류</span>
           </div>
           <table className="w-full border-collapse border border-gray-300">
             <tbody>
@@ -289,10 +289,10 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
                     />
                   ) : (
                     <>
-                      <span className="inline-block w-8 h-8 bg-emerald-600 rounded-full text-white font-bold text-xs text-center leading-8 align-middle">
+                      <span className="inline-block w-8 h-8 bg-emerald-700 rounded-full text-white font-bold text-xs text-center leading-8 align-middle">
                         참존
                       </span>
-                      <span className="font-semibold text-emerald-600 ml-2">
+                      <span className="font-semibold text-emerald-700 ml-2">
                         참존회원권
                       </span>
                     </>

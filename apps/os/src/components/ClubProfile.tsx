@@ -161,7 +161,7 @@ export default function ClubProfile({ detail, loading, clubs, onClubNavigate }: 
                       className={`px-3 py-1 text-xs font-medium rounded-full transition-colors border ${
                         selectedMembershipIndex === index
                           ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
-                          : "bg-white text-gray-600 border-gray-300 hover:border-emerald-500 hover:text-emerald-700"
+                          : "bg-white text-gray-600 border-gray-300 hover:border-emerald-400 hover:text-emerald-700"
                       }`}
                     >
                       {m.membershipName || m.membershipType || `회원권 ${index + 1}`}
@@ -174,7 +174,7 @@ export default function ClubProfile({ detail, loading, clubs, onClubNavigate }: 
                 {!isMapSidebarOpen && (
                   <button
                     onClick={() => { setIsMapSidebarOpen(true); setIsMemoSidebarOpen(false); }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white text-xs rounded-lg hover:bg-gray-800 transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 transition-colors"
                     title="골프장 지도"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -186,7 +186,7 @@ export default function ClubProfile({ detail, loading, clubs, onClubNavigate }: 
                 {!isMemoSidebarOpen && (
                   <button
                     onClick={() => { setIsMemoSidebarOpen(true); setIsMapSidebarOpen(false); }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white text-xs rounded-lg hover:bg-gray-800 transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 transition-colors"
                     title="거래 메모"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -213,8 +213,8 @@ export default function ClubProfile({ detail, loading, clubs, onClubNavigate }: 
                 onClick={() => setActiveTab(tab.id)}
                 className={`px-3 py-2 font-medium text-xs transition-colors border-b-2 ${
                   activeTab === tab.id
-                    ? "border-gray-900 text-gray-900"
-                    : "border-transparent text-gray-500 hover:text-gray-700"
+                    ? "border-emerald-600 text-emerald-700"
+                    : "border-transparent text-gray-500 hover:text-emerald-600"
                 }`}
               >
                 {tab.label}
@@ -346,6 +346,8 @@ export default function ClubProfile({ detail, loading, clubs, onClubNavigate }: 
           currentAddress={detail.address}
           clubName={detail.name}
           onClose={() => setIsMapSidebarOpen(false)}
+          clubs={clubs}
+          onClubSelect={onClubNavigate}
         />
       )}
 

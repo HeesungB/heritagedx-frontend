@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Club } from "@/types";
+import { normalizeName } from "@/utils/club-name";
 import cachedCoordinates from "@/constants/golfCourseCoordinates.json";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -13,12 +15,31 @@ interface MapSidebarProps {
   currentAddress: string;
   clubName: string;
   onClose: () => void;
+  clubs?: Club[];
+  onClubSelect?: (clubCode: string) => void;
 }
 
-export default function MapSidebar({ currentAddress, clubName, onClose }: MapSidebarProps) {
+export default function MapSidebar({ currentAddress, clubName, onClose, clubs, onClubSelect }: MapSidebarProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // name→Club 매핑 (useMemo로 clubs 변경 시만 재계산)
+  const clubLookup = useMemo(() => {
+    const map = new Map<string, Club>();
+    if (clubs) {
+      for (const club of clubs) {
+        map.set(normalizeName(club.name), club);
+      }
+    }
+    return map;
+  }, [clubs]);
+
+  // useRef로 래핑하여 useEffect 내 click handler에서 stale closure 방지
+  const clubLookupRef = useRef(clubLookup);
+  clubLookupRef.current = clubLookup;
+  const onClubSelectRef = useRef(onClubSelect);
+  onClubSelectRef.current = onClubSelect;
 
   useEffect(() => {
     let cancelled = false;
@@ -82,7 +103,7 @@ export default function MapSidebar({ currentAddress, clubName, onClose }: MapSid
                     <div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:5px solid #dc2626;"></div>
                     <div style="width:8px;height:8px;background:#dc2626;border:2px solid #fff;border-radius:50%;margin-top:-2px;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>
                   </div>`
-                : `<div style="display:flex;flex-direction:column;align-items:center;">
+                : `<div style="display:flex;flex-direction:column;align-items:center;cursor:pointer;">
                     <div style="padding:2px 6px;background:#fff;color:#374151;border:1px solid #d1d5db;border-radius:3px;font-size:10px;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,0.1);">${data.name}</div>
                     <div style="width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-top:4px solid #d1d5db;"></div>
                     <div style="width:6px;height:6px;background:#6b7280;border:1.5px solid #fff;border-radius:50%;margin-top:-1px;box-shadow:0 1px 2px rgba(0,0,0,0.2);"></div>
@@ -96,6 +117,8 @@ export default function MapSidebar({ currentAddress, clubName, onClose }: MapSid
           naver.maps.Event.addListener(marker, "click", () => {
             map.setCenter(marker.getPosition());
             map.setZoom(12);
+            const matched = clubLookupRef.current.get(normalizeName(data.name));
+            if (matched) onClubSelectRef.current?.(matched.code);
           });
         }
 

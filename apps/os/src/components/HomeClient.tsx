@@ -348,13 +348,13 @@ function ClubListSidebarWithData({
                 onClick={() => onClubSelect(club)}
                 className={`border-l-2 cursor-pointer transition-colors ${
                   isSelected
-                    ? "bg-emerald-50 border-l-emerald-600"
+                    ? "bg-gray-50 border-l-gray-900"
                     : "border-l-transparent hover:bg-gray-50"
                 }`}
               >
                 <div className="px-4 py-3">
                   <div className="flex items-center gap-1.5">
-                    <span className={`text-sm font-medium ${isSelected ? "text-emerald-900" : "text-gray-900"}`}>
+                    <span className={`text-sm font-medium ${isSelected ? "text-gray-900" : "text-gray-900"}`}>
                       {club.name}
                     </span>
                     {club.operationTypes?.map((type) => (
@@ -362,15 +362,15 @@ function ClubListSidebarWithData({
                         key={type}
                         className={`inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded ${
                           type === "MEMBERSHIP"
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-sky-100 text-sky-700"
+                            ? "bg-blue-100 text-blue-700"
+                            : "bg-green-100 text-green-700"
                         }`}
                       >
                         {type === "MEMBERSHIP" ? "회원제" : type === "PUBLIC" ? "퍼블릭" : type}
                       </span>
                     ))}
                   </div>
-                  <div className={`text-xs ${isSelected ? "text-emerald-600" : "text-gray-500"}`}>
+                  <div className={`text-xs ${isSelected ? "text-gray-500" : "text-gray-500"}`}>
                     {club.region}{club.holes ? ` · ${club.holes}` : ""}
                   </div>
                 </div>
@@ -573,13 +573,13 @@ function MobileClubList({
                 onClick={() => onClubSelect(club)}
                 className={`border-l-2 cursor-pointer transition-colors ${
                   isSelected
-                    ? "bg-emerald-50 border-l-emerald-600"
+                    ? "bg-gray-50 border-l-gray-900"
                     : "border-l-transparent hover:bg-gray-50"
                 }`}
               >
                 <div className="px-4 py-3">
                   <div className="flex items-center gap-1.5">
-                    <span className={`text-sm font-medium ${isSelected ? "text-emerald-900" : "text-gray-900"}`}>
+                    <span className={`text-sm font-medium ${isSelected ? "text-gray-900" : "text-gray-900"}`}>
                       {club.name}
                     </span>
                     {club.operationTypes?.map((type) => (
@@ -587,15 +587,15 @@ function MobileClubList({
                         key={type}
                         className={`inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded ${
                           type === "MEMBERSHIP"
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-sky-100 text-sky-700"
+                            ? "bg-blue-100 text-blue-700"
+                            : "bg-green-100 text-green-700"
                         }`}
                       >
                         {type === "MEMBERSHIP" ? "회원제" : type === "PUBLIC" ? "퍼블릭" : type}
                       </span>
                     ))}
                   </div>
-                  <div className={`text-xs ${isSelected ? "text-emerald-600" : "text-gray-500"}`}>
+                  <div className={`text-xs ${isSelected ? "text-gray-500" : "text-gray-500"}`}>
                     {club.region}{club.holes ? ` · ${club.holes}` : ""}
                   </div>
                 </div>

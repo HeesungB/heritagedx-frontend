@@ -200,26 +200,47 @@ export default function TradesPageClient() {
     setSubmitting(true);
     setErrorMessage(null);
     try {
-      const cleaned = {
-        ...form,
-        tradeDate: form.tradeDate || null,
-        registrationDate: form.registrationDate || null,
+      const input = {
+        club: form.clubName,
+        membership: form.membershipType,
+        tradeType: form.tradeType,
+        customerName: form.customerName,
+        contact: form.contact,
+        offerPrice: form.offerPrice || null,
         offerPriceNote: form.offerPriceNote || null,
+        desiredPrice: form.desiredPrice || null,
         desiredPriceNote: form.desiredPriceNote || null,
         notes: form.notes || null,
+        registrationDate: form.registrationDate || null,
+        tradeDate: form.tradeDate || null,
         remarks: form.remarks || null,
+        isDone: form.isDone,
       };
 
       let result;
       if (editingTrade) {
-        result = await consultationsRepo.update(editingTrade.id, cleaned);
+        result = await consultationsRepo.update(editingTrade.id, input);
       } else {
-        result = await consultationsRepo.create(cleaned);
+        result = await consultationsRepo.create(input);
       }
 
       if (!result.success) {
         setErrorMessage(result.error || "오류가 발생했습니다.");
         return;
+      }
+
+      // 신규 등록일 때만 Back Office에 푸시 알림 전송 (fire-and-forget)
+      if (!editingTrade) {
+        fetch("/api/notifications/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clubName: form.clubName,
+            tradeType: form.tradeType,
+            customerName: form.customerName,
+            membershipType: form.membershipType,
+          }),
+        }).catch(() => {});
       }
 
       setEditingTrade(null);
@@ -288,7 +309,14 @@ export default function TradesPageClient() {
 
   const handleToggleDone = async (trade: MembershipTrade) => {
     try {
-      const result = await consultationsRepo.update(trade.id, { clubId: trade.clubId ?? "", clubName: trade.clubName, isDone: !trade.isDone } as MembershipTradeForm);
+      const result = await consultationsRepo.update(trade.id, {
+        club: trade.clubName,
+        membership: trade.membershipType,
+        tradeType: trade.tradeType,
+        customerName: trade.customerName,
+        contact: trade.contact,
+        isDone: !trade.isDone,
+      });
       if (result.success) {
         await fetchTrades();
       }

@@ -7,6 +7,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { BackOfficeRepositoryProvider } from "@/contexts/RepositoryContext";
 import { DataProvider } from "@/contexts/DataContext";
 import { Building2, X } from "lucide-react";
+import { useFCMToken } from "@/hooks/useFCMToken";
+import { useFCMForeground } from "@/hooks/useFCMForeground";
 
 export default function DashboardLayout({
   children,
@@ -18,6 +20,10 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const showSidebar = pathname.startsWith("/clubs/");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  // FCM 푸시 알림 초기화
+  useFCMToken();
+  useFCMForeground();
 
   // 페이지 이동 시 모바일 사이드바 닫기
   useEffect(() => {

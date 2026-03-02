@@ -10,13 +10,14 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@heritage-dx/types": "workspace:*",
-    "@heritage-dx/utils": "workspace:*",
+    "@heritage-dx/api": "workspace:*",
     "@heritage-dx/api-client": "workspace:*",
     "@heritage-dx/auth": "workspace:*",
-    "@heritage-dx/ui": "workspace:*",
-    "@heritage-dx/api": "workspace:*",
     "@heritage-dx/store": "workspace:*",
+    "@heritage-dx/types": "workspace:*",
+    "@heritage-dx/ui": "workspace:*",
+    "@heritage-dx/utils": "workspace:*",
+    "firebase-admin": "^13.7.0",
     "html2canvas": "^1.4.1",
     "jszip": "^3.10.1",
     "lucide-react": "^0.468.0",
@@ -27,8 +28,8 @@
     "recharts": "^3.7.0"
   },
   "devDependencies": {
-    "@heritage-dx/typescript-config": "workspace:*",
     "@heritage-dx/tailwind-config": "workspace:*",
+    "@heritage-dx/typescript-config": "workspace:*",
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.2",

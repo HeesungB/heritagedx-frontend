@@ -27,6 +27,7 @@ export interface ClubEntity {
   contact: string;
   holes?: string;
   operationTypes: string[];
+  recentMarketPrice?: string;
 }
 
 /** 상세 엔티티 — 서브 객체 그룹핑 */

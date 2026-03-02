@@ -296,11 +296,11 @@ export default function MembershipTradesClient() {
       <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="px-4 py-6">
           {/* 페이지 헤더 */}
-          <div className="bg-white rounded-lg border border-gray-200 border-l-4 border-l-emerald-500 p-5 mb-6">
+          <div className="bg-white rounded-lg border border-gray-200 border-l-4 border-l-gray-400 p-5 mb-6">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-11 h-11 bg-emerald-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-11 h-11 bg-gray-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                   </svg>
                 </div>
@@ -322,7 +322,7 @@ export default function MembershipTradesClient() {
           </div>
 
           {/* 필터 바 */}
-          <div className="bg-white rounded-lg border border-gray-200 border-t-2 border-t-emerald-300 p-4 mb-4">
+          <div className="bg-white rounded-lg border border-gray-200 border-t-2 border-t-gray-300 p-4 mb-4">
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
                 {filters.map((f) => (

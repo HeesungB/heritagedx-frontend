@@ -159,8 +159,8 @@ export default function ClubSearchSelect({
                       key={type}
                       className={`inline-flex px-1 py-0.5 text-[10px] font-medium rounded ${
                         type === "MEMBERSHIP"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-sky-100 text-sky-700"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-green-100 text-green-700"
                       }`}
                     >
                       {type === "MEMBERSHIP" ? "회원제" : type === "PUBLIC" ? "퍼블릭" : type}

@@ -293,11 +293,8 @@ export default function TradeMemosPage() {
     setIsSaving(true);
     try {
       const response = await consultationsRepo.create({
-        clubId: form.clubId,
-        clubName: form.clubName,
-        membershipType: form.membershipType,
-        membershipId: form.membershipId || null,
-        membershipName: form.membershipName || null,
+        club: form.clubName,
+        membership: form.membershipType,
         tradeType: form.tradeType,
         customerName: form.customerName,
         contact: form.contact,
@@ -334,11 +331,8 @@ export default function TradeMemosPage() {
     setIsSaving(true);
     try {
       const response = await consultationsRepo.update(editingMemo.id, {
-        clubId: form.clubId || editingMemo.clubId || "",
-        clubName: form.clubName,
-        membershipType: form.membershipType,
-        membershipId: form.membershipId || null,
-        membershipName: form.membershipName || null,
+        club: form.clubName,
+        membership: form.membershipType,
         tradeType: form.tradeType,
         customerName: form.customerName,
         contact: form.contact,
@@ -424,9 +418,8 @@ export default function TradeMemosPage() {
     setRelatedMemos(prev => prev.map(m => m.id === memo.id ? { ...m, isDone: newIsDone } : m));
     try {
       await consultationsRepo.update(memo.id, {
-        clubId: memo.clubId || "",
-        clubName: memo.clubName,
-        membershipType: memo.membershipType,
+        club: memo.clubName,
+        membership: memo.membershipType,
         tradeType: memo.tradeType,
         customerName: memo.customerName,
         contact: memo.contact,

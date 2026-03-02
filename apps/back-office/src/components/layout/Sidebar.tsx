@@ -300,7 +300,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void } = {}) {
                 key={club.code}
                 className={`relative group flex items-center border-l-2 ${
                   selectedClubCode === club.code
-                    ? "bg-blue-50 border-l-primary"
+                    ? "bg-gray-50 border-l-gray-900"
                     : "border-l-transparent hover:bg-gray-50"
                 }`}
               >
@@ -312,7 +312,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void } = {}) {
                     <span
                       className={`text-sm font-medium ${
                         selectedClubCode === club.code
-                          ? "text-primary"
+                          ? "text-gray-900"
                           : "text-gray-900"
                       }`}
                     >

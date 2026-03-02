@@ -84,11 +84,28 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
         remarks: form.remarks || null,
       };
 
+      const input = {
+        club: clubDetail.name,
+        membership: cleaned.membershipType,
+        tradeType: cleaned.tradeType,
+        customerName: cleaned.customerName,
+        contact: cleaned.contact,
+        offerPrice: cleaned.offerPrice || null,
+        offerPriceNote: cleaned.offerPriceNote,
+        desiredPrice: cleaned.desiredPrice || null,
+        desiredPriceNote: cleaned.desiredPriceNote,
+        notes: cleaned.notes,
+        registrationDate: cleaned.registrationDate,
+        tradeDate: cleaned.tradeDate,
+        remarks: cleaned.remarks,
+        isDone: cleaned.isDone,
+      };
+
       let result;
       if (editingTrade) {
-        result = await consultationsRepo.update(editingTrade.id, { clubId: editingTrade.clubId ?? "", clubName: editingTrade.clubName, ...cleaned });
+        result = await consultationsRepo.update(editingTrade.id, input);
       } else {
-        result = await consultationsRepo.create({ clubId: clubDetail.id, clubName: clubDetail.name, ...cleaned });
+        result = await consultationsRepo.create(input);
       }
 
       if (!result.success) {
@@ -97,6 +114,21 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
       }
 
       const wasEditing = !!editingTrade;
+
+      // 신규 등록일 때만 Back Office에 푸시 알림 전송 (fire-and-forget)
+      if (!wasEditing) {
+        fetch("/api/notifications/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clubName: clubDetail.name,
+            tradeType: form.tradeType,
+            customerName: form.customerName,
+            membershipType: form.membershipType,
+          }),
+        }).catch(() => {});
+      }
+
       setEditingTrade(null);
       setForm(initialForm);
       setActiveTab("list");
@@ -176,7 +208,14 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
 
   const handleToggleDone = async (trade: MembershipTrade) => {
     try {
-      const result = await consultationsRepo.update(trade.id, { clubId: trade.clubId ?? "", clubName: trade.clubName, isDone: !trade.isDone } as MembershipTradeForm);
+      const result = await consultationsRepo.update(trade.id, {
+        club: trade.clubName,
+        membership: trade.membershipType,
+        tradeType: trade.tradeType,
+        customerName: trade.customerName,
+        contact: trade.contact,
+        isDone: !trade.isDone,
+      });
       if (result.success) {
         await fetchTrades();
       }
@@ -247,8 +286,8 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
         {activeTab === "list" && (
           <div className="p-3 space-y-1.5">
             {/* 검색 + 필터 */}
-            <div className="flex gap-1.5 mb-2">
-              <div className="relative flex-1">
+            <div className="flex items-center gap-1.5 mb-2">
+              <div className="relative flex-1 min-w-0">
                 <input
                   type="text"
                   placeholder="검색"
@@ -260,32 +299,38 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </div>
-              {(["", "매수", "매도"] as const).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setFilterType(type)}
-                  className={`px-2 py-1.5 text-xs rounded transition-colors whitespace-nowrap ${
-                    filterType === type
-                      ? "bg-gray-800 text-white"
-                      : "bg-gray-50 text-gray-500 hover:bg-gray-100"
-                  }`}
-                >
-                  {type || "전체"}
-                </button>
-              ))}
-            </div>
-
-            {/* 상태 필터 */}
-            <div className="mb-2">
-              <select
-                value={filterDone}
-                onChange={(e) => setFilterDone(e.target.value as "" | "done" | "progress")}
-                className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:border-gray-400"
-              >
-                <option value="">전체</option>
-                <option value="done">완료</option>
-                <option value="progress">진행중</option>
-              </select>
+              <div className="flex items-center gap-0.5 bg-gray-100 rounded p-0.5 shrink-0">
+                {(["", "매수", "매도"] as const).map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setFilterType(type)}
+                    className={`px-1.5 py-1 text-[11px] rounded transition-colors whitespace-nowrap ${
+                      filterType === type
+                        ? type === "매수" ? "bg-blue-50 text-blue-700"
+                          : type === "매도" ? "bg-red-50 text-red-700"
+                          : "bg-white text-gray-700 shadow-sm"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    {type || "전체"}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-0.5 bg-gray-100 rounded p-0.5 shrink-0">
+                {([{ value: "", label: "전체" }, { value: "progress", label: "진행중" }, { value: "done", label: "완료" }] as const).map((status) => (
+                  <button
+                    key={status.value}
+                    onClick={() => setFilterDone(status.value as "" | "done" | "progress")}
+                    className={`px-1.5 py-1 text-[11px] rounded transition-colors whitespace-nowrap ${
+                      filterDone === status.value
+                        ? "bg-white text-gray-700 shadow-sm"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    {status.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {loading ? (
@@ -304,97 +349,117 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
               filteredTrades.map((trade) => (
                 <div
                   key={trade.id}
-                  className={`group border rounded-lg px-3 py-2.5 transition-colors ${
+                  className={`border rounded-lg transition-colors ${
                     trade.isDone
-                      ? "border-green-100 bg-green-50/40 opacity-60"
-                      : "border-gray-100 hover:border-gray-200"
+                      ? "border-gray-200 bg-gray-50 opacity-60"
+                      : "border-gray-200 hover:border-gray-300"
                   }`}
                 >
-                  {/* 상단: 골프장 + 유형 + 액션 */}
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <input
-                      type="checkbox"
-                      checked={trade.isDone ?? false}
-                      onChange={() => handleToggleDone(trade)}
-                      className="w-3.5 h-3.5 rounded border-gray-300 text-green-600 focus:ring-green-500 shrink-0 cursor-pointer"
-                      title={trade.isDone ? "완료 → 진행중" : "진행중 → 완료"}
-                    />
-                    <span className={`inline-block w-1 h-1 rounded-full shrink-0 ${
-                      trade.tradeType === "매수" ? "bg-blue-400" : "bg-red-400"
-                    }`} />
-                    <span className={`text-xs font-medium truncate flex-1 ${trade.isDone ? "text-gray-400 line-through" : "text-gray-700"}`}>
-                      {trade.clubName}
-                    </span>
-                    <span className="text-[10px] text-gray-400">{trade.membershipType}</span>
-                    {/* 액션 버튼 (hover 시 표시) */}
-                    <div className="hidden group-hover:flex items-center gap-0.5 shrink-0">
-                      <button
-                        onClick={() => handleEdit(trade)}
-                        className="p-0.5 rounded text-gray-300 hover:text-gray-600"
-                        title="수정"
-                      >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </button>
-                      {deleteConfirmId === trade.id ? (
-                        <div className="flex items-center gap-0.5">
-                          <button
-                            onClick={() => handleDelete(trade.id)}
-                            className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] rounded"
-                          >
-                            삭제
-                          </button>
-                          <button
-                            onClick={() => setDeleteConfirmId(null)}
-                            className="px-1.5 py-0.5 text-[10px] text-gray-400 rounded hover:text-gray-600"
-                          >
-                            취소
-                          </button>
-                        </div>
-                      ) : (
+                  {/* 헤더: 뱃지 + 골프장명 + 회원권종류 */}
+                  <div className="px-3 py-2 border-b border-gray-100">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`px-1.5 py-0.5 rounded text-[11px] font-semibold shrink-0 ${
+                        trade.isDone
+                          ? "bg-gray-100 text-gray-400"
+                          : trade.tradeType === "매수"
+                            ? "bg-blue-50 text-blue-700"
+                            : "bg-red-50 text-red-700"
+                      }`}>
+                        {trade.tradeType}
+                      </span>
+                      <span className={`text-xs font-medium truncate ${trade.isDone ? "text-gray-400 line-through" : "text-gray-800"}`}>
+                        {trade.clubName}
+                      </span>
+                    </div>
+                    {trade.membershipType && (
+                      <div className={`text-[11px] mt-0.5 ml-9 ${trade.isDone ? "text-gray-400" : "text-gray-500"}`}>
+                        {trade.membershipType}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 본문 */}
+                  <div className="px-3 py-2 space-y-2">
+                    {/* 고객정보 */}
+                    <div className="flex items-baseline justify-between">
+                      <span className={`text-sm font-semibold ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>{trade.customerName}</span>
+                      <span className={`text-xs ${trade.isDone ? "text-gray-400" : "text-gray-500"}`}>{trade.contact}</span>
+                    </div>
+
+                    {/* 가격 그리드 */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-gray-50 rounded px-2 py-1.5">
+                        <div className="text-[11px] text-gray-400">제시가</div>
+                        <div className={`text-sm font-semibold ${trade.isDone ? "text-gray-400 line-through" : "text-gray-800"}`}>{formatPrice(trade.offerPrice)}</div>
+                        {trade.offerPriceNote && <div className={`text-[11px] ${trade.isDone ? "text-gray-400" : "text-gray-500"}`}>{trade.offerPriceNote}</div>}
+                      </div>
+                      <div className="bg-gray-50 rounded px-2 py-1.5">
+                        <div className="text-[11px] text-gray-400">희망가</div>
+                        <div className={`text-sm font-semibold ${trade.isDone ? "text-gray-400 line-through" : "text-gray-800"}`}>{formatPrice(trade.desiredPrice)}</div>
+                        {trade.desiredPriceNote && <div className={`text-[11px] ${trade.isDone ? "text-gray-400" : "text-gray-500"}`}>{trade.desiredPriceNote}</div>}
+                      </div>
+                    </div>
+
+                    {/* 메모 / 특이사항 */}
+                    {(trade.notes || trade.remarks) && (
+                      <div className={`border-l-2 pl-2 text-xs leading-relaxed ${trade.isDone ? "border-gray-200 text-gray-400" : "border-gray-300 text-gray-600"}`}>
+                        {trade.notes && <p>{trade.notes}</p>}
+                        {trade.remarks && <p className="italic">{trade.remarks}</p>}
+                      </div>
+                    )}
+
+                    {/* 푸터: 날짜 + 액션 */}
+                    <div className="flex items-center justify-between pt-1">
+                      <div className="flex items-center gap-1 text-[11px] text-gray-400">
+                        <span>{trade.registrationDate}</span>
+                        {trade.createdByName && <><span>·</span><span>{trade.createdByName}</span></>}
+                        {trade.tradeDate && <span className="ml-1">거래 {trade.tradeDate}</span>}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
                         <button
-                          onClick={() => setDeleteConfirmId(trade.id)}
-                          className="p-0.5 rounded text-gray-300 hover:text-red-400"
-                          title="삭제"
+                          onClick={() => handleEdit(trade)}
+                          className="p-0.5 rounded text-gray-300 hover:text-gray-600"
+                          title="수정"
                         >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                           </svg>
                         </button>
-                      )}
+                        {deleteConfirmId === trade.id ? (
+                          <div className="flex items-center gap-0.5">
+                            <button
+                              onClick={() => handleDelete(trade.id)}
+                              className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] rounded"
+                            >
+                              삭제
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirmId(null)}
+                              className="px-1.5 py-0.5 text-[10px] text-gray-400 rounded hover:text-gray-600"
+                            >
+                              취소
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setDeleteConfirmId(trade.id)}
+                            className="p-0.5 rounded text-gray-300 hover:text-red-400"
+                            title="삭제"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        )}
+                        <input
+                          type="checkbox"
+                          checked={trade.isDone ?? false}
+                          onChange={() => handleToggleDone(trade)}
+                          className="w-3.5 h-3.5 rounded border-gray-300 text-green-600 focus:ring-green-500 cursor-pointer ml-1"
+                          title={trade.isDone ? "완료 → 진행중" : "진행중 → 완료"}
+                        />
+                      </div>
                     </div>
-                  </div>
-
-                  {/* 고객 + 가격 */}
-                  <div className="flex items-baseline justify-between mb-1">
-                    <div className="flex items-baseline gap-1.5">
-                      <span className={`text-xs font-medium ${trade.isDone ? "text-gray-400 line-through" : "text-gray-800"}`}>{trade.customerName}</span>
-                      <span className="text-[10px] text-gray-400">{trade.contact}</span>
-                    </div>
-                  </div>
-                  <div className={`flex gap-3 text-[11px] ${trade.isDone ? "text-gray-400" : "text-gray-500"}`}>
-                    <span>제시 <span className={`font-medium ${trade.isDone ? "text-gray-400 line-through" : "text-gray-700"}`}>{formatPrice(trade.offerPrice)}</span>
-                      {trade.offerPriceNote && <span className="text-gray-300 ml-0.5">({trade.offerPriceNote})</span>}
-                    </span>
-                    <span>희망 <span className={`font-medium ${trade.isDone ? "text-gray-400 line-through" : "text-gray-700"}`}>{formatPrice(trade.desiredPrice)}</span>
-                      {trade.desiredPriceNote && <span className="text-gray-300 ml-0.5">({trade.desiredPriceNote})</span>}
-                    </span>
-                  </div>
-
-                  {/* 메모 / 특이사항 */}
-                  {(trade.notes || trade.remarks) && (
-                    <div className="mt-1.5 text-[11px] text-gray-400 leading-relaxed">
-                      {trade.notes && <p>{trade.notes}</p>}
-                      {trade.remarks && <p className="italic">{trade.remarks}</p>}
-                    </div>
-                  )}
-
-                  {/* 날짜 */}
-                  <div className="mt-1.5 flex items-center gap-2 text-[10px] text-gray-300">
-                    <span>{trade.registrationDate}</span>
-                    {trade.createdByName && <span>{trade.createdByName}</span>}
-                    {trade.tradeDate && <span className="ml-auto">거래 {trade.tradeDate}</span>}
                   </div>
                 </div>
               ))

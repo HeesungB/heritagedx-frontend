@@ -57,6 +57,7 @@ jobs:
           flags: --cpu=1 --memory=512Mi --min-instances=0 --max-instances=10 --allow-unauthenticated
           env_vars: |
             NAVER_CLIENT_SECRET=${{ secrets.NAVER_CLIENT_SECRET }}
+            FIREBASE_SERVICE_ACCOUNT_KEY=${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
 
   deploy-back-office:
     name: Deploy Back Office
@@ -92,6 +93,13 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/heritage-dx/back-office:${{ github.sha }}
             ${{ env.REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/heritage-dx/back-office:latest
+          build-args: |
+            NEXT_PUBLIC_FIREBASE_API_KEY=${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+            NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+            NEXT_PUBLIC_FIREBASE_PROJECT_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+            NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+            NEXT_PUBLIC_FIREBASE_APP_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
+            NEXT_PUBLIC_FIREBASE_VAPID_KEY=${{ secrets.NEXT_PUBLIC_FIREBASE_VAPID_KEY }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -102,3 +110,5 @@ jobs:
           region: ${{ env.REGION }}
           image: ${{ env.REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/heritage-dx/back-office:${{ github.sha }}
           flags: --cpu=1 --memory=512Mi --min-instances=0 --max-instances=5 --allow-unauthenticated
+          env_vars: |
+            FIREBASE_SERVICE_ACCOUNT_KEY=${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}

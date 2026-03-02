@@ -26,7 +26,7 @@ heritage-dx/
 │   │   │   ├── components/          # 38개 컴포넌트
 │   │   │   ├── contexts/            # AuthContext, RepositoryContext
 │   │   │   ├── hooks/               # useOrganization, useTaxSettings
-│   │   │   ├── lib/                 # server-repositories.ts, authApi.ts
+│   │   │   ├── lib/                 # server-repositories.ts, authApi.ts, firebase-admin.ts
 │   │   │   ├── types/               # 앱 전용 타입
 │   │   │   └── utils/               # distance, taxCalculator
 │   │   ├── next.config.ts
@@ -39,7 +39,8 @@ heritage-dx/
 │       │   │   ├── forms/           # ClubForm, DocumentForm, MembershipForm, ScenarioForm
 │       │   │   └── layout/          # Header, Sidebar, PageContainer
 │       │   ├── contexts/            # AuthContext, DataContext, RepositoryContext
-│       │   ├── lib/                 # authApi.ts
+│       │   ├── hooks/               # useFCMToken, useFCMForeground, useNotifications
+│       │   ├── lib/                 # authApi.ts, firebase.ts, firebase-admin.ts
 │       │   └── types/               # 프록시 re-export + 앱 전용 타입
 │       ├── next.config.ts
 │       ├── tailwind.config.ts
@@ -367,6 +368,7 @@ info:       #3b82f6 / #dbeafe (light)
 ├── global-error.tsx              # 글로벌 에러 핸들러
 ├── login/page.tsx                # 로그인
 ├── api/geocode/route.ts          # 지오코딩 API Route
+├── api/notifications/send/route.ts # FCM 푸시 알림 전송
 ├── clubs/
 │   ├── page.tsx                  # 골프장 디렉토리/검색
 │   └── loading.tsx               # 로딩 스켈레톤
@@ -421,6 +423,7 @@ getInitialData()    // 초기 데이터 프리로드
 - **html2canvas** + **pdf-lib** — 견적서 PDF 생성 (`EstimateSheet`)
 - **jszip** — 서류 ZIP 다운로드
 - **Naver Map API** — 골프장 지도 (`NaverMap`)
+- **firebase-admin** — FCM 푸시 알림 전송 + Firestore 토큰 관리
 
 ### 5.2. Back Office (관리자) — 포트 3001
 
@@ -430,8 +433,12 @@ getInitialData()    // 초기 데이터 프리로드
 
 ```
 /app
-├── layout.tsx                            # 루트 레이아웃
+├── layout.tsx                            # 루트 레이아웃 (+ Sonner Toaster)
 ├── login/page.tsx                        # 로그인
+├── api/fcm-tokens/route.ts              # FCM 토큰 CRUD API
+├── api/notifications/route.ts           # 알림 목록 GET API
+├── api/notifications/read/route.ts      # 알림 읽음 처리 POST API
+├── firebase-messaging-sw.js/route.ts    # Service Worker (동적)
 └── (dashboard)/                          # 대시보드 그룹
     ├── layout.tsx                        # 대시보드 레이아웃 (Header + Sidebar + PageContainer)
     ├── page.tsx                          # 대시보드 홈
@@ -445,6 +452,7 @@ getInitialData()    // 초기 데이터 프리로드
     │           └── [docCode]/page.tsx    # 서류 상세
     ├── common-documents/page.tsx         # 공용 서류 관리
     ├── my-organization/page.tsx          # 조직 설정
+    ├── notifications/page.tsx            # 알림 목록
     ├── trade-memos/page.tsx              # 상담 기록 (거래 메모)
     ├── trade-records/page.tsx            # 거래 내역
     └── users/page.tsx                    # 사용자 관리
@@ -658,7 +666,85 @@ OS Server Repository에서 `next: { revalidate: 300 }`으로 5분 단위 ISR 캐
 
 ---
 
-## 9. 배포 설정
+## 9. 알림 시스템 (FCM Push + Toast + 알림 이력)
+
+### 아키텍처
+
+```
+[OS 앱] 사용자가 거래 메모 등록
+    ↓ consultationsRepo.create() 성공
+    ↓ fire-and-forget
+[OS API Route] /api/notifications/send
+    ↓ Firebase Admin SDK
+    ↓ Firestore에서 BO 관리자 FCM 토큰 조회
+    ↓ sendEachForMulticast() + Firestore notifications 컬렉션에 이력 저장
+[Back Office] 관리자 브라우저
+    ├─ 앱 열림 → onForegroundMessage → Sonner Toast + unreadCount 갱신
+    ├─ 앱 닫힘 → Service Worker → OS 푸시 알림
+    └─ /notifications 페이지 → 알림 목록 조회 + 읽음 처리
+```
+
+### OS 앱 (알림 전송 측)
+
+| 파일 | 용도 |
+|------|------|
+| `apps/os/src/lib/firebase-admin.ts` | Firebase Admin 싱글턴 초기화 |
+| `apps/os/src/app/api/notifications/send/route.ts` | 푸시 전송 API |
+
+- 환경변수: `FIREBASE_SERVICE_ACCOUNT_KEY` (base64 인코딩된 서비스 계정 JSON)
+- `TradeMemoSidebar.tsx`, `TradesPageClient.tsx`에서 신규 메모 등록 시 `/api/notifications/send`로 fire-and-forget 요청
+- Firestore `fcm-tokens` 컬렉션에서 관리자 토큰 조회 후 `sendEachForMulticast()`로 전송
+- 전송 후 Firestore `notifications` 컬렉션에 알림 이력 저장 (fire-and-forget)
+- 만료된 토큰 자동 정리
+
+### Back Office 앱 (알림 수신 측)
+
+| 파일 | 용도 |
+|------|------|
+| `apps/back-office/src/lib/firebase.ts` | Firebase 클라이언트 초기화, FCM 토큰/메시지 |
+| `apps/back-office/src/app/firebase-messaging-sw.js/route.ts` | 백그라운드 Service Worker (동적 생성) |
+| `apps/back-office/src/app/api/fcm-tokens/route.ts` | 토큰 등록/삭제 API |
+| `apps/back-office/src/hooks/useFCMToken.ts` | 로그인 시 FCM 토큰 자동 등록 |
+| `apps/back-office/src/hooks/useFCMForeground.ts` | 포그라운드 Toast 알림 (Sonner) + 커스텀 이벤트 dispatch |
+| `apps/back-office/src/hooks/useNotifications.ts` | 알림 목록/읽음 상태 관리 훅 |
+| `apps/back-office/src/lib/firebase-admin.ts` | Firebase Admin 헬퍼 (getAuthUser, getFirestore) |
+| `apps/back-office/src/app/api/notifications/route.ts` | 알림 목록 GET API |
+| `apps/back-office/src/app/api/notifications/read/route.ts` | 알림 읽음 처리 POST API |
+| `apps/back-office/src/app/(dashboard)/notifications/page.tsx` | 알림 목록 페이지 |
+
+- 환경변수 (빌드타임): `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`, `NEXT_PUBLIC_FIREBASE_APP_ID`, `NEXT_PUBLIC_FIREBASE_VAPID_KEY`
+- 환경변수 (런타임): `FIREBASE_SERVICE_ACCOUNT_KEY`
+- Dashboard layout에서 `useFCMToken()` + `useFCMForeground()` 호출
+- Root layout에 `<Toaster position="top-right" richColors />` (Sonner)
+
+### Firestore 스키마
+
+**컬렉션: `fcm-tokens`**
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `token` | string | FCM 등록 토큰 |
+| `userId` | string | 관리자 ID |
+| `userName` | string | 관리자 이름 |
+| `createdAt` | string | 생성일 (ISO 8601) |
+| `updatedAt` | string | 갱신일 (ISO 8601) |
+
+**컬렉션: `notifications`**
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `title` | string | `"새 거래 메모: {clubName}"` |
+| `body` | string | `"[매수] 홍길동 - 개인정회원"` |
+| `clubName` | string | 골프장명 |
+| `tradeType` | string | 매수/매도 |
+| `customerName` | string | 고객명 |
+| `membershipType` | string | 회원권 종류 |
+| `createdAt` | string | ISO 8601 |
+| `readBy` | string[] | 읽은 유저 ID 배열 |
+
+---
+
+## 10. 배포 설정
 
 ### Docker + Cloud Run 배포
 
@@ -694,7 +780,7 @@ heritage-dx/
     "@heritage-dx/auth",
     "@heritage-dx/ui",
   ],
-  output: "standalone",                              // Docker/Vercel 최적 빌드
+  output: "standalone",                              // Docker 최적 빌드
   outputFileTracingRoot: path.join(__dirname, "../../"),  // 모노레포 루트 추적
   rewrites: [
     { source: "/api-proxy/:path*", destination: "https://api.heritage-dx.com/:path*" }
@@ -729,7 +815,7 @@ heritage-dx/
 
 ---
 
-## 10. 스크립트
+## 11. 스크립트
 
 ### `scripts/data-sync.mjs` — Data Sync CLI
 

@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { Club } from "@/types";
 import { haversineDistance } from "@/utils/distance";
+import { normalizeName } from "@/utils/club-name";
 import coordinates from "@/constants/golfCourseCoordinates.json";
 
 interface NearbyClubPricesProps {
@@ -20,14 +21,6 @@ interface NearbyClub {
 
 type CoordEntry = { name: string; lat: number; lng: number };
 const coordMap = coordinates as Record<string, CoordEntry>;
-
-// "XX골프장", "XXCC", "XXGC" 등 정규화
-function normalizeName(name: string): string {
-  return name
-    .replace(/\s+/g, "")
-    .replace(/(골프장|컨트리클럽|CC|GC|골프클럽|골프&리조트|골프리조트)$/i, "")
-    .toLowerCase();
-}
 
 // name으로 좌표 역조회 (캐시)
 let nameToCoordCache: Map<string, { lat: number; lng: number }> | null = null;
@@ -67,6 +60,12 @@ export default function NearbyClubPrices({
     const nameMap = getNameToCoordMap();
     const normalizedCurrent = normalizeName(currentClubName);
 
+    // DEBUG: 리스트 API 응답에 recentMarketPrice가 포함되는지 확인
+    if (process.env.NODE_ENV === "development" && clubs.length > 0) {
+      const sample = clubs.slice(0, 3);
+      console.log("[NearbyClubPrices] clubs sample (recentMarketPrice 확인):", sample.map(c => ({ name: c.name, recentMarketPrice: c.recentMarketPrice })));
+    }
+
     // 2. 각 골프장과 거리 계산
     const withDistance: NearbyClub[] = [];
     for (const club of clubs) {
@@ -80,7 +79,7 @@ export default function NearbyClubPrices({
       if (dist > 50) continue;
 
       // 시세 조회: clubs 배열의 recentMarketPrice 사용
-      const price = (club as Club & { recentMarketPrice?: string }).recentMarketPrice || null;
+      const price = club.recentMarketPrice || null;
 
       withDistance.push({ club, distance: dist, price });
     }

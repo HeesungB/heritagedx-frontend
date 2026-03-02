@@ -224,7 +224,7 @@ export default function BenefitsSheetSection({
               value={sheetRecipient}
               onChange={(e) => onSheetRecipientChange(e.target.value)}
               placeholder="예: 수산    (주)한아 귀중"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
             />
           </div>
 
@@ -237,7 +237,7 @@ export default function BenefitsSheetSection({
                 value={sheetBenefits}
                 onChange={(e) => onSheetBenefitsChange(e.target.value)}
                 placeholder="예: - 월 주중 8회 주말 7회 우선예약"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
                 rows={2}
               />
             </div>
@@ -253,7 +253,7 @@ export default function BenefitsSheetSection({
                 value={sheetMarketNote}
                 onChange={(e) => onSheetMarketNoteChange(e.target.value)}
                 placeholder="예: *현재 시장가: 3억 4,000만원"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               />
             </div>
           )}
@@ -269,7 +269,7 @@ export default function BenefitsSheetSection({
                   value={sheetManagerName}
                   onChange={(e) => onSheetManagerNameChange(e.target.value)}
                   placeholder="김민정"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 />
               </div>
               <div>
@@ -281,7 +281,7 @@ export default function BenefitsSheetSection({
                   value={sheetManagerTitle}
                   onChange={(e) => onSheetManagerTitleChange(e.target.value)}
                   placeholder="팀장"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 />
               </div>
               <div>
@@ -293,7 +293,7 @@ export default function BenefitsSheetSection({
                   value={sheetManagerPhone}
                   onChange={(e) => onSheetManagerPhoneChange(e.target.value)}
                   placeholder="연락처"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 />
               </div>
             </>
@@ -443,7 +443,7 @@ export default function BenefitsSheetSection({
       <div className="flex justify-center gap-4 print:hidden">
         <button
           onClick={() => window.print()}
-          className="flex items-center gap-2 px-6 py-2.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+          className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
         >
           <svg
             className="w-5 h-5"

@@ -246,7 +246,7 @@ export default function EstimateSection({
                 value={recipient}
                 onChange={(e) => onRecipientChange(e.target.value)}
                 placeholder="예: 홍길동 님"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               />
             </div>
 
@@ -259,7 +259,7 @@ export default function EstimateSection({
                 value={managerTitle}
                 onChange={(e) => onManagerTitleChange(e.target.value)}
                 placeholder="예: 과장"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               />
             </div>
 
@@ -273,7 +273,7 @@ export default function EstimateSection({
                   value={formatInputValue(price)}
                   onChange={(e) => handleNumberInput(e.target.value, onPriceChange)}
                   placeholder="0"
-                  className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent text-right"
+                  className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-right"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">원</span>
               </div>
@@ -291,7 +291,7 @@ export default function EstimateSection({
                     handleNumberInput(e.target.value, onCommissionChange)
                   }
                   placeholder="0"
-                  className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent text-right"
+                  className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-right"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">원</span>
               </div>
@@ -314,7 +314,7 @@ export default function EstimateSection({
                     handleNumberInput(e.target.value, handleAcqTaxChange)
                   }
                   placeholder="0"
-                  className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent text-right"
+                  className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-right"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">원</span>
               </div>
@@ -341,7 +341,7 @@ export default function EstimateSection({
                     handleNumberInput(e.target.value, onStampDutyChange)
                   }
                   placeholder="0"
-                  className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent text-right"
+                  className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-right"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">원</span>
               </div>
@@ -364,7 +364,7 @@ export default function EstimateSection({
                     handleNumberInput(e.target.value, handleDepositChange)
                   }
                   placeholder="0"
-                  className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent text-right"
+                  className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-right"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">원</span>
               </div>
@@ -410,7 +410,7 @@ export default function EstimateSection({
       <div className="flex justify-center gap-4 print:hidden">
         <button
           onClick={() => window.print()}
-          className="flex items-center gap-2 px-6 py-2.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+          className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
         >
           <svg
             className="w-5 h-5"

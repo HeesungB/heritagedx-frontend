@@ -230,15 +230,18 @@ export default function TradesPageClient() {
       }
 
       // 신규 등록일 때만 Back Office에 푸시 알림 전송 (fire-and-forget)
-      if (!editingTrade) {
+      if (!editingTrade && result.data) {
         fetch("/api/notifications/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            tradeId: result.data.id,
             clubName: form.clubName,
             tradeType: form.tradeType,
             customerName: form.customerName,
             membershipType: form.membershipType,
+            offerPrice: form.offerPrice || null,
+            desiredPrice: form.desiredPrice || null,
           }),
         }).catch(() => {});
       }

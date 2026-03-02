@@ -44,11 +44,15 @@ export default function NotificationsPage() {
     fetchNotifications(1);
   }, [fetchNotifications]);
 
-  const handleNotificationClick = async (id: string, isRead: boolean) => {
+  const handleNotificationClick = async (
+    id: string,
+    isRead: boolean,
+    tradeId?: string | null
+  ) => {
     if (!isRead) {
       await markAsRead(id);
     }
-    router.push("/trade-memos");
+    router.push(tradeId ? `/trade-memos?memoId=${tradeId}` : "/trade-memos");
   };
 
   const handlePageChange = (page: number) => {
@@ -107,7 +111,7 @@ export default function NotificationsPage() {
           {notifications.map((notification) => (
             <button
               key={notification.id}
-              onClick={() => handleNotificationClick(notification.id, notification.isRead)}
+              onClick={() => handleNotificationClick(notification.id, notification.isRead, notification.tradeId)}
               className={`w-full text-left p-4 rounded-xl border transition-colors ${
                 notification.isRead
                   ? "bg-white border-gray-200 hover:bg-gray-50"
@@ -133,7 +137,7 @@ export default function NotificationsPage() {
                   >
                     {notification.title}
                   </p>
-                  <p className="text-sm text-gray-500 mt-0.5 truncate">
+                  <p className="text-sm text-gray-500 mt-0.5 whitespace-pre-line">
                     {notification.body}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">

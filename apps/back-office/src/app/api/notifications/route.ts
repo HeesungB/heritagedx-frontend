@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
         id: doc.id,
         title: data.title,
         body: data.body,
+        tradeId: data.tradeId || null,
         clubName: data.clubName,
         tradeType: data.tradeType,
         customerName: data.customerName,

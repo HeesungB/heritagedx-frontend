@@ -116,15 +116,18 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
       const wasEditing = !!editingTrade;
 
       // 신규 등록일 때만 Back Office에 푸시 알림 전송 (fire-and-forget)
-      if (!wasEditing) {
+      if (!wasEditing && result.data) {
         fetch("/api/notifications/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            tradeId: result.data.id,
             clubName: clubDetail.name,
             tradeType: form.tradeType,
             customerName: form.customerName,
             membershipType: form.membershipType,
+            offerPrice: form.offerPrice || null,
+            desiredPrice: form.desiredPrice || null,
           }),
         }).catch(() => {});
       }

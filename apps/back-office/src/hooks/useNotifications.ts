@@ -6,6 +6,7 @@ interface NotificationItem {
   id: string;
   title: string;
   body: string;
+  tradeId?: string | null;
   clubName: string;
   tradeType: string;
   customerName: string;

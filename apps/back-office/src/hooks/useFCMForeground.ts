@@ -21,7 +21,10 @@ export function useFCMForeground() {
       const p = payload as FCMPayload;
       const title = p.notification?.title || "새 알림";
       const body = p.notification?.body || "";
-      const url = p.data?.url || "/trade-memos";
+      const tradeId = p.data?.tradeId;
+      const url = tradeId
+        ? `/trade-memos?memoId=${tradeId}`
+        : (p.data?.url || "/trade-memos");
 
       toast(title, {
         description: body,

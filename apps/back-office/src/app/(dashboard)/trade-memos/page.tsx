@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Plus,
   Search,
@@ -46,7 +47,10 @@ export default function TradeMemosPage() {
   const consultationsRepo = useConsultationRepository();
   const clubsRepo = useClubRepository();
   const { preloadedMemos, clearPreloadedMemos, clubs } = useData();
+  const searchParams = useSearchParams();
+  const memoIdParam = searchParams.get("memoId");
   const usedPreloadRef = useRef(false);
+  const autoOpenedRef = useRef(false);
 
   const [rawMemos, setRawMemos] = useState<TradeMemo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -485,6 +489,21 @@ export default function TradeMemosPage() {
     }
     return filtered;
   }, [relatedMemos, relatedSort, relatedFilterDone]);
+
+  // URL 쿼리 파라미터로 사이드바 자동 열기
+  const handleRowClickRef = useRef(handleRowClick);
+  handleRowClickRef.current = handleRowClick;
+
+  useEffect(() => {
+    if (!memoIdParam || autoOpenedRef.current || isLoading || rawMemos.length === 0) return;
+
+    const targetMemo = rawMemos.find((m) => m.id === memoIdParam);
+    if (targetMemo) {
+      autoOpenedRef.current = true;
+      handleRowClickRef.current(targetMemo);
+      window.history.replaceState(null, "", "/trade-memos");
+    }
+  }, [memoIdParam, rawMemos, isLoading]);
 
   if (isLoading && rawMemos.length === 0) {
     return <PageLoading />;

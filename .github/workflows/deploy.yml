@@ -5,8 +5,8 @@ on:
     branches: [main]
 
 env:
-  REGION: asia-northeast3
-  REGISTRY: asia-northeast3-docker.pkg.dev
+  REGION: asia-northeast1
+  REGISTRY: asia-northeast1-docker.pkg.dev
 
 jobs:
   deploy-os:

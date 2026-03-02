@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { firestore, messaging } from "@/lib/firebase-admin";
+
+export const dynamic = "force-dynamic";
+
+// lazy import to avoid build-time initialization
+async function getFirebaseAdmin() {
+  const { firestore, messaging } = await import("@/lib/firebase-admin");
+  return { firestore, messaging };
+}
 
 interface SendNotificationBody {
   clubName: string;
@@ -19,6 +26,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const { firestore, messaging } = await getFirebaseAdmin();
 
     // Firestore에서 모든 FCM 토큰 조회
     const tokensSnapshot = await firestore.collection("fcm-tokens").get();

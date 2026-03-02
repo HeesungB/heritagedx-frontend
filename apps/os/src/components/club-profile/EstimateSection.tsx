@@ -7,6 +7,7 @@ import { ClubDetail } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/hooks/useOrganization";
 import EstimateSheet from "../EstimateSheet";
+import { trackEvent } from "@/lib/gtag";
 
 interface EstimateSectionProps {
   detail: ClubDetail;
@@ -186,6 +187,7 @@ export default function EstimateSection({
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
       }
+      trackEvent("estimate_generate", { club_name: detail.name });
     } catch (error) {
       console.error("JPEG 다운로드 에러:", error);
       alert("JPEG 다운로드에 실패했습니다.");

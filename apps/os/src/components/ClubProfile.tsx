@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Club, ClubDetail } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loading } from "@heritage-dx/ui";
@@ -13,6 +13,7 @@ import BenefitsSheetSection from "./club-profile/BenefitsSheetSection";
 import CostCalculatorSection from "./club-profile/CostCalculatorSection";
 import DocumentsSection from "./club-profile/DocumentsSection";
 import EstimateSection from "./club-profile/EstimateSection";
+import { trackEvent } from "@/lib/gtag";
 
 interface ClubProfileProps {
   detail: ClubDetail | null;
@@ -32,6 +33,7 @@ export default function ClubProfile({ detail, loading, clubs, onClubNavigate }: 
 
   // 통합 회원권 선택 인덱스 (헤더에서 관리)
   const [selectedMembershipIndex, setSelectedMembershipIndex] = useState(0);
+  const prevDetailCode = useRef<string | null>(null);
 
   // 견적서 입력 필드 상태
   const [estimateRecipient, setEstimateRecipient] = useState("");
@@ -100,6 +102,14 @@ export default function ClubProfile({ detail, loading, clubs, onClubNavigate }: 
       JSON.stringify([...hiddenSheetItems])
     );
   }, [hiddenSheetItems]);
+
+  // GA4: 골프장 상세 조회 이벤트
+  useEffect(() => {
+    if (detail && !loading && detail.code !== prevDetailCode.current) {
+      prevDetailCode.current = detail.code;
+      trackEvent("club_view", { club_name: detail.name });
+    }
+  }, [detail, loading]);
 
   if (loading) {
     return (

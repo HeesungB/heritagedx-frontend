@@ -4,6 +4,7 @@ import { useState } from "react";
 import Header from "@/components/Header";
 import { useClaimRepository } from "@heritage-dx/api";
 import { Button } from "@heritage-dx/ui";
+import { trackEvent } from "@/lib/gtag";
 
 const CATEGORIES = [
   "골프장 정보 오류",
@@ -62,6 +63,7 @@ export default function ClaimsPageClient() {
         setCategory("");
         setContent("");
         setManualCategoryInput(false);
+        trackEvent("claim_submit", { category: category.trim() });
       } else {
         setErrorMessage("건의사항 접수에 실패했습니다. 다시 시도해주세요.");
       }

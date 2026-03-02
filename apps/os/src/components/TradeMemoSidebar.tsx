@@ -5,6 +5,7 @@ import { MembershipTrade, MembershipTradeForm, ClubDetail } from "@/types";
 import { useConsultationRepository } from "@heritage-dx/api";
 import { Button, Loading } from "@heritage-dx/ui";
 import { mapTradMemoDtoToEntity } from "@heritage-dx/store";
+import { trackEvent } from "@/lib/gtag";
 
 interface TradeMemoSidebarProps {
   clubDetail: ClubDetail;
@@ -139,6 +140,9 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
       setSuccessMessage(wasEditing ? "수정 완료" : "등록 완료");
       setTimeout(() => setSuccessMessage(null), 2500);
       await fetchTrades();
+      if (!wasEditing) {
+        trackEvent("trade_memo_create", { club_name: clubDetail.name, trade_type: form.tradeType });
+      }
     } catch (err) {
       console.error("메모 저장 실패:", err);
       setErrorMessage("네트워크 오류가 발생했습니다.");

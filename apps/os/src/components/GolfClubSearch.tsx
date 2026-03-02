@@ -9,6 +9,7 @@ import { Club, ClubDetail } from "@/types";
 import { useAppStores } from "@/stores";
 import { useClubs, useClubDetail } from "@heritage-dx/store";
 import { Loading } from "@heritage-dx/ui";
+import { trackEvent } from "@/lib/gtag";
 
 interface GolfClubSearchProps {
   onClubConfirm: (club: Club, detail: ClubDetail) => void;
@@ -40,6 +41,7 @@ export default function GolfClubSearch({ onClubConfirm, onReset }: GolfClubSearc
   const handleSelect = (club: Club) => {
     setSelectedClub(club);
     setSelectedCode(club.code);
+    trackEvent("club_search", { club_name: club.name });
     // 디테일 섹션으로 스크롤 이동
     setTimeout(() => {
       detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });

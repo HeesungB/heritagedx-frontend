@@ -9,6 +9,7 @@ import {
 } from "@/types";
 import { useClubRepository, useMembershipTradeRepository } from "@heritage-dx/api";
 import { mapTradeRecordDtoToEntity } from "@heritage-dx/store";
+import { trackEvent } from "@/lib/gtag";
 import { ClubSearchSelect, Button, Loading } from "@heritage-dx/ui";
 
 type TradeFilter = "전체" | "매수" | "매도";
@@ -210,6 +211,9 @@ export default function MembershipTradesClient() {
       setForm(emptyForm);
       setShowForm(false);
       await fetchTrades();
+      if (!editingTrade) {
+        trackEvent("membership_trade_create", { club_name: form.clubName, trade_type: form.tradeType });
+      }
     } catch (err) {
       console.error("거래 저장 실패:", err);
       setErrorMessage("네트워크 오류가 발생했습니다.");

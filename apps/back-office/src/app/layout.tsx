@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { Toaster } from "sonner";
+import GoogleAnalytics from "@/components/GoogleAnalytics";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -21,6 +23,9 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className="antialiased">
+        <Suspense fallback={null}>
+          <GoogleAnalytics />
+        </Suspense>
         <AuthProvider>{children}</AuthProvider>
         <Toaster position="top-right" richColors />
       </body>

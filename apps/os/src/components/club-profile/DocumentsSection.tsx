@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { PDFDocument } from "pdf-lib";
 import { ClubDetail, Document, GlobalDocument } from "@/types";
+import { trackEvent } from "@/lib/gtag";
 
 interface DocumentsSectionProps {
   detail: ClubDetail;
@@ -116,6 +117,7 @@ export default function DocumentsSection({
         link.click();
         document.body.removeChild(link);
         window.URL.revokeObjectURL(blobUrl);
+        trackEvent("document_download", { document_name: doc.name });
       } catch (error) {
         console.error("다운로드 에러:", error);
         window.open(doc.downloadUrl, "_blank");

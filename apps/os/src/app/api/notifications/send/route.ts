@@ -53,11 +53,11 @@ export async function POST(request: NextRequest) {
         tradeType,
         customerName,
         membershipType,
-        url: "/dashboard/trade-memos",
+        url: "/trade-memos",
       },
       webpush: {
         fcmOptions: {
-          link: "/dashboard/trade-memos",
+          link: "/trade-memos",
         },
       },
     });

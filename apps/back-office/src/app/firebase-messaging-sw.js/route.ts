@@ -23,14 +23,14 @@ messaging.onBackgroundMessage(function(payload) {
     body: body,
     icon: "/favicon.ico",
     data: {
-      url: (payload.data && payload.data.url) || "/dashboard/trade-memos",
+      url: (payload.data && payload.data.url) || "/trade-memos",
     },
   });
 });
 
 self.addEventListener("notificationclick", function(event) {
   event.notification.close();
-  var url = (event.notification.data && event.notification.data.url) || "/dashboard/trade-memos";
+  var url = (event.notification.data && event.notification.data.url) || "/trade-memos";
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then(function(windowClients) {
       for (var i = 0; i < windowClients.length; i++) {

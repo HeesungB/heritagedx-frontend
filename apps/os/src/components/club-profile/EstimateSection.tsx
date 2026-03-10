@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import html2canvas from "html2canvas";
-import JSZip from "jszip";
+import { captureSheetAsJpeg, printSheetFitToPage } from "@/utils/sheet-print";
 import { ClubDetail } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/hooks/useOrganization";
@@ -26,6 +25,8 @@ interface EstimateSectionProps {
   onDepositChange: (value: string) => void;
   managerTitle: string;
   onManagerTitleChange: (value: string) => void;
+  tradeType: "매수" | "매도";
+  onTradeTypeChange: (value: "매수" | "매도") => void;
 }
 
 export default function EstimateSection({
@@ -45,6 +46,8 @@ export default function EstimateSection({
   onDepositChange,
   managerTitle,
   onManagerTitleChange,
+  tradeType,
+  onTradeTypeChange,
 }: EstimateSectionProps) {
   const { user } = useAuth();
   const { organization } = useOrganization();
@@ -63,8 +66,19 @@ export default function EstimateSection({
   const stampDutyNum = parseInt(stampDuty.replace(/[^0-9]/g, ""), 10) || 0;
   const depositNum = parseInt(deposit.replace(/[^0-9]/g, ""), 10) || 0;
 
+  // 매도 시 취득세 강제 0
+  useEffect(() => {
+    if (tradeType === "매도") {
+      onAcqTaxChange("0");
+    } else if (acqTaxAuto && priceNum > 0) {
+      const autoAcqTax = Math.round(priceNum * 0.022);
+      onAcqTaxChange(autoAcqTax.toString());
+    }
+  }, [tradeType]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // 취득세 자동계산: 매수금액 변경 시
   useEffect(() => {
+    if (tradeType === "매도") return;
     if (acqTaxAuto && priceNum > 0) {
       const autoAcqTax = Math.round(priceNum * 0.022);
       onAcqTaxChange(autoAcqTax.toString());
@@ -75,13 +89,14 @@ export default function EstimateSection({
   useEffect(() => {
     if (depositAuto) {
       const tfWon = parseTransferFeeToWon(detail.costs.registrationFee);
-      const grandTotal = priceNum + tfWon + commissionNum + acqTaxNum + stampDutyNum;
+      const effectiveAcqTax = tradeType === "매도" ? 0 : acqTaxNum;
+      const grandTotal = priceNum + tfWon + commissionNum + effectiveAcqTax + stampDutyNum;
       const autoDeposit = Math.round(grandTotal * 0.1);
       if (autoDeposit > 0) {
         onDepositChange(autoDeposit.toString());
       }
     }
-  }, [priceNum, commissionNum, acqTaxNum, stampDutyNum, depositAuto, detail.costs.registrationFee]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [priceNum, commissionNum, acqTaxNum, stampDutyNum, depositAuto, detail.costs.registrationFee, tradeType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAcqTaxChange = (value: string) => {
     setAcqTaxAuto(false);
@@ -112,81 +127,15 @@ export default function EstimateSection({
     setJpegDownloading(true);
 
     try {
-      const canvas = await html2canvas(sheetRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-      });
-
-      const PAGE_WIDTH = 1050;
-      const PAGE_HEIGHT = 1480;
-      const fullWidth = canvas.width;
-      const fullHeight = canvas.height;
-
-      const scale = PAGE_WIDTH / fullWidth;
-      const scaledHeight = Math.round(fullHeight * scale);
-      const pageCount = Math.ceil(scaledHeight / PAGE_HEIGHT);
-
-      const pages: Blob[] = [];
-
-      for (let i = 0; i < pageCount; i++) {
-        const pageCanvas = document.createElement("canvas");
-        pageCanvas.width = PAGE_WIDTH;
-        pageCanvas.height = PAGE_HEIGHT;
-        const ctx = pageCanvas.getContext("2d");
-        if (!ctx) continue;
-
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT);
-
-        const srcY = Math.round((i * PAGE_HEIGHT) / scale);
-        const srcH = Math.round(PAGE_HEIGHT / scale);
-
-        ctx.drawImage(
-          canvas,
-          0,
-          srcY,
-          fullWidth,
-          Math.min(srcH, fullHeight - srcY),
-          0,
-          0,
-          PAGE_WIDTH,
-          Math.min(
-            PAGE_HEIGHT,
-            Math.round(Math.min(srcH, fullHeight - srcY) * scale),
-          ),
-        );
-
-        const blob = await new Promise<Blob>((resolve) => {
-          pageCanvas.toBlob((b) => resolve(b!), "image/jpeg", 0.92);
-        });
-        pages.push(blob);
-      }
-
-      if (pages.length === 1) {
-        const url = URL.createObjectURL(pages[0]);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `${detail.name}_견적서.jpg`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      } else {
-        const zip = new JSZip();
-        pages.forEach((blob, idx) => {
-          zip.file(`${detail.name}_견적서_${idx + 1}.jpg`, blob);
-        });
-        const zipBlob = await zip.generateAsync({ type: "blob" });
-        const url = URL.createObjectURL(zipBlob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `${detail.name}_견적서.zip`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      }
+      const blob = await captureSheetAsJpeg(sheetRef.current);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${detail.name}_견적서.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
       trackEvent("estimate_generate", { club_name: detail.name });
     } catch (error) {
       console.error("JPEG 다운로드 에러:", error);
@@ -238,7 +187,26 @@ export default function EstimateSection({
           </svg>
         </button>
         {isInputSectionOpen && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 px-4 pb-4">
+          <div className="px-4 pb-4 space-y-4">
+            {/* 매수/매도 토글 */}
+            <div className="flex gap-0 rounded-lg overflow-hidden border border-gray-300 w-fit">
+              {(["매수", "매도"] as const).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => onTradeTypeChange(type)}
+                  className={`px-5 py-1.5 text-sm font-medium transition-colors ${
+                    tradeType === type
+                      ? "bg-emerald-600 text-white"
+                      : "bg-white text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 수신자
@@ -267,7 +235,7 @@ export default function EstimateSection({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                매수금액
+                {tradeType === "매도" ? "매도금액" : "매수금액"}
               </label>
               <div className="relative">
                 <input
@@ -299,6 +267,7 @@ export default function EstimateSection({
               </div>
             </div>
 
+            {tradeType === "매수" && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 취득세
@@ -330,6 +299,7 @@ export default function EstimateSection({
                 </button>
               )}
             </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -381,6 +351,8 @@ export default function EstimateSection({
               )}
             </div>
           </div>
+
+          </div>
         )}
       </div>
 
@@ -399,19 +371,20 @@ export default function EstimateSection({
           recipient={recipient || undefined}
           price={priceNum}
           commission={commissionNum}
-          acqTax={acqTaxNum}
+          acqTax={tradeType === "매도" ? 0 : acqTaxNum}
           stampDuty={stampDutyNum}
           deposit={depositNum}
           organization={organization}
           userName={user?.name}
           managerTitle={managerTitle || undefined}
+          tradeType={tradeType}
         />
       </div>
 
       {/* 인쇄 / JPEG 다운로드 버튼 */}
       <div className="flex justify-center gap-4 print:hidden">
         <button
-          onClick={() => window.print()}
+          onClick={() => printSheetFitToPage(sheetRef.current!)}
           className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
         >
           <svg

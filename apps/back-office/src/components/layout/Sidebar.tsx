@@ -318,18 +318,6 @@ export default function Sidebar({ onClose }: { onClose?: () => void } = {}) {
                     >
                       {club.name}
                     </span>
-                    {club.operationTypes?.map((type) => (
-                      <span
-                        key={type}
-                        className={`inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded ${
-                          type === "MEMBERSHIP"
-                            ? "bg-blue-100 text-blue-700"
-                            : "bg-green-100 text-green-700"
-                        }`}
-                      >
-                        {type === "MEMBERSHIP" ? "회원제" : "퍼블릭"}
-                      </span>
-                    ))}
                   </div>
                   <div className="text-xs text-gray-500">
                     {club.region || ""}

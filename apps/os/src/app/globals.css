@@ -178,4 +178,10 @@
     margin: 0 !important;
     padding: 0 !important;
   }
+
+  /* zoom 속성이 인쇄 시 올바르게 작동하도록 보장 */
+  [style*="zoom"] {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
 }

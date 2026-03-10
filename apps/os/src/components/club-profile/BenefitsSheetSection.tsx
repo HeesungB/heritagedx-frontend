@@ -1,10 +1,22 @@
 "use client";
 
 import { useState, useRef } from "react";
-import html2canvas from "html2canvas";
-import JSZip from "jszip";
+import { captureSheetAsJpeg, printSheetFitToPage } from "@/utils/sheet-print";
 import { ClubDetail } from "@/types";
 import MembershipInfoSheet from "../MembershipInfoSheet";
+
+interface SheetCustomItem {
+  id: string;
+  label: string;
+  value: string;
+}
+
+type SheetCustomItemsMap = {
+  clubInfo: SheetCustomItem[];
+  membershipInfo: SheetCustomItem[];
+  costs: SheetCustomItem[];
+  memo: SheetCustomItem[];
+};
 
 interface BenefitsSheetSectionProps {
   detail: ClubDetail;
@@ -23,6 +35,10 @@ interface BenefitsSheetSectionProps {
   onSheetManagerPhoneChange: (value: string) => void;
   hiddenSheetItems: Set<string>;
   onHiddenSheetItemsChange: (items: Set<string>) => void;
+  customItems: SheetCustomItemsMap;
+  onCustomItemsChange: (items: SheetCustomItemsMap) => void;
+  customTemplates: string[];
+  onCustomTemplatesChange: (templates: string[]) => void;
 }
 
 export default function BenefitsSheetSection({
@@ -42,6 +58,10 @@ export default function BenefitsSheetSection({
   onSheetManagerPhoneChange,
   hiddenSheetItems,
   onHiddenSheetItemsChange,
+  customItems,
+  onCustomItemsChange,
+  customTemplates,
+  onCustomTemplatesChange,
 }: BenefitsSheetSectionProps) {
   const [isInputSectionOpen, setIsInputSectionOpen] = useState(false);
   const [isPrintSectionOpen, setIsPrintSectionOpen] = useState(false);
@@ -53,81 +73,15 @@ export default function BenefitsSheetSection({
     setJpegDownloading(true);
 
     try {
-      const canvas = await html2canvas(sheetRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-      });
-
-      const PAGE_WIDTH = 1050;
-      const PAGE_HEIGHT = 1480;
-      const fullWidth = canvas.width;
-      const fullHeight = canvas.height;
-
-      const scale = PAGE_WIDTH / fullWidth;
-      const scaledHeight = Math.round(fullHeight * scale);
-      const pageCount = Math.ceil(scaledHeight / PAGE_HEIGHT);
-
-      const pages: Blob[] = [];
-
-      for (let i = 0; i < pageCount; i++) {
-        const pageCanvas = document.createElement("canvas");
-        pageCanvas.width = PAGE_WIDTH;
-        pageCanvas.height = PAGE_HEIGHT;
-        const ctx = pageCanvas.getContext("2d");
-        if (!ctx) continue;
-
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT);
-
-        const srcY = Math.round((i * PAGE_HEIGHT) / scale);
-        const srcH = Math.round(PAGE_HEIGHT / scale);
-
-        ctx.drawImage(
-          canvas,
-          0,
-          srcY,
-          fullWidth,
-          Math.min(srcH, fullHeight - srcY),
-          0,
-          0,
-          PAGE_WIDTH,
-          Math.min(
-            PAGE_HEIGHT,
-            Math.round(Math.min(srcH, fullHeight - srcY) * scale)
-          )
-        );
-
-        const blob = await new Promise<Blob>((resolve) => {
-          pageCanvas.toBlob((b) => resolve(b!), "image/jpeg", 0.92);
-        });
-        pages.push(blob);
-      }
-
-      if (pages.length === 1) {
-        const url = URL.createObjectURL(pages[0]);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `${detail.name}_혜택지.jpg`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      } else {
-        const zip = new JSZip();
-        pages.forEach((blob, idx) => {
-          zip.file(`${detail.name}_혜택지_${idx + 1}.jpg`, blob);
-        });
-        const zipBlob = await zip.generateAsync({ type: "blob" });
-        const url = URL.createObjectURL(zipBlob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `${detail.name}_혜택지.zip`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      }
+      const blob = await captureSheetAsJpeg(sheetRef.current);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${detail.name}_혜택지.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     } catch (error) {
       console.error("JPEG 다운로드 에러:", error);
       alert("JPEG 다운로드에 실패했습니다.");
@@ -214,7 +168,8 @@ export default function BenefitsSheetSection({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </button>
-        {isInputSectionOpen && <div className="grid grid-cols-1 md:grid-cols-2 gap-4 px-4 pb-4">
+        {isInputSectionOpen && <div className="px-4 pb-4 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               수신자 (귀중)
@@ -298,6 +253,121 @@ export default function BenefitsSheetSection({
               </div>
             </>
           )}
+          </div>
+
+          {/* 섹션별 추가 항목 */}
+          <div className="border-t border-gray-200 pt-4">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-medium text-gray-700">섹션별 추가 항목</h4>
+              {customTemplates.length > 0 && (
+                <div className="relative group">
+                  <button
+                    type="button"
+                    className="text-xs text-gray-400 hover:text-gray-600"
+                  >
+                    저장된 항목명 관리
+                  </button>
+                  <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10 min-w-[160px] hidden group-hover:block">
+                    {customTemplates.map((tmpl) => (
+                      <div key={tmpl} className="flex items-center justify-between px-3 py-1.5 text-xs hover:bg-gray-50">
+                        <span className="text-gray-700">{tmpl}</span>
+                        <button
+                          type="button"
+                          onClick={() => onCustomTemplatesChange(customTemplates.filter((t) => t !== tmpl))}
+                          className="text-gray-400 hover:text-red-500 ml-2"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <datalist id="sheet-custom-templates">
+              {customTemplates.map((tmpl) => (
+                <option key={tmpl} value={tmpl} />
+              ))}
+            </datalist>
+            {(["clubInfo", "membershipInfo", "costs", "memo"] as const).map((sectionKey) => {
+              const sectionLabels: Record<string, string> = {
+                clubInfo: "골프장 정보",
+                membershipInfo: "회원권 정보",
+                costs: "부가 비용",
+                memo: "기타 사항",
+              };
+              const items = customItems[sectionKey];
+              return (
+                <div key={sectionKey} className="mb-4">
+                  <div className="text-xs font-semibold text-gray-500 mb-2">{sectionLabels[sectionKey]}</div>
+                  <div className="space-y-2">
+                    {items.map((item) => (
+                      <div key={item.id} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          list="sheet-custom-templates"
+                          value={item.label}
+                          onChange={(e) => {
+                            const updated = items.map((ci) =>
+                              ci.id === item.id ? { ...ci, label: e.target.value } : ci
+                            );
+                            onCustomItemsChange({ ...customItems, [sectionKey]: updated });
+                          }}
+                          onBlur={(e) => {
+                            const label = e.target.value.trim();
+                            if (label && !customTemplates.includes(label)) {
+                              onCustomTemplatesChange([...customTemplates, label]);
+                            }
+                          }}
+                          placeholder="항목명"
+                          className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                        />
+                        <input
+                          type="text"
+                          value={item.value}
+                          onChange={(e) => {
+                            const updated = items.map((ci) =>
+                              ci.id === item.id ? { ...ci, value: e.target.value } : ci
+                            );
+                            onCustomItemsChange({ ...customItems, [sectionKey]: updated });
+                          }}
+                          placeholder="값"
+                          className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = items.filter((ci) => ci.id !== item.id);
+                            onCustomItemsChange({ ...customItems, [sectionKey]: updated });
+                          }}
+                          className="text-gray-400 hover:text-red-500 p-1"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onCustomItemsChange({
+                          ...customItems,
+                          [sectionKey]: [
+                            ...items,
+                            { id: crypto.randomUUID(), label: "", value: "" },
+                          ],
+                        });
+                      }}
+                      className="text-xs text-emerald-600 hover:text-emerald-700 font-medium"
+                    >
+                      + 항목 추가
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>}
       </div>
 
@@ -436,13 +506,14 @@ export default function BenefitsSheetSection({
           selectedMembershipIndex={selectedMembershipIndex}
           onMembershipChange={() => {}}
           hiddenItems={hiddenSheetItems}
+          customItems={customItems}
         />
       </div>
 
       {/* 인쇄 / JPEG 다운로드 버튼 */}
       <div className="flex justify-center gap-4 print:hidden">
         <button
-          onClick={() => window.print()}
+          onClick={() => printSheetFitToPage(sheetRef.current!)}
           className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
         >
           <svg

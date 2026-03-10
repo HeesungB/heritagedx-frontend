@@ -43,6 +43,30 @@ export default function ClubProfile({ detail, loading, clubs, onClubNavigate }: 
   const [estimateStampDuty, setEstimateStampDuty] = useState("");
   const [estimateDeposit, setEstimateDeposit] = useState("");
   const [estimateManagerTitle, setEstimateManagerTitle] = useState("");
+  const [estimateTradeType, setEstimateTradeType] = useState<"매수" | "매도">("매수");
+
+  // 혜택지 커스텀 항목 상태
+  const [sheetCustomItems, setSheetCustomItems] = useState<{
+    clubInfo: Array<{ id: string; label: string; value: string }>;
+    membershipInfo: Array<{ id: string; label: string; value: string }>;
+    costs: Array<{ id: string; label: string; value: string }>;
+    memo: Array<{ id: string; label: string; value: string }>;
+  }>({
+    clubInfo: [],
+    membershipInfo: [],
+    costs: [],
+    memo: [],
+  });
+
+  const [sheetCustomTemplates, setSheetCustomTemplates] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const saved = localStorage.getItem("sheetCustomTemplates");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
 
   // 혜택지 입력 필드 상태
   const [sheetRecipient, setSheetRecipient] = useState("");
@@ -80,6 +104,7 @@ export default function ClubProfile({ detail, loading, clubs, onClubNavigate }: 
     );
     setSelectedScenarioCode(hasPS_BASIC ? "PS_BASIC" : null);
     setSelectedMembershipIndex(0);
+    setSheetCustomItems({ clubInfo: [], membershipInfo: [], costs: [], memo: [] });
     // 첫 번째 회원권의 memberBenefits로 혜택지 자동 채움
     const firstBenefits = detail?.memberships?.[0]?.memberBenefits;
     if (firstBenefits) {
@@ -102,6 +127,14 @@ export default function ClubProfile({ detail, loading, clubs, onClubNavigate }: 
       JSON.stringify([...hiddenSheetItems])
     );
   }, [hiddenSheetItems]);
+
+  // sheetCustomTemplates 변경 시 localStorage에 저장
+  useEffect(() => {
+    localStorage.setItem(
+      "sheetCustomTemplates",
+      JSON.stringify(sheetCustomTemplates)
+    );
+  }, [sheetCustomTemplates]);
 
   // GA4: 골프장 상세 조회 이벤트
   useEffect(() => {
@@ -297,6 +330,10 @@ export default function ClubProfile({ detail, loading, clubs, onClubNavigate }: 
               onSheetManagerPhoneChange={setSheetManagerPhone}
               hiddenSheetItems={hiddenSheetItems}
               onHiddenSheetItemsChange={setHiddenSheetItems}
+              customItems={sheetCustomItems}
+              onCustomItemsChange={setSheetCustomItems}
+              customTemplates={sheetCustomTemplates}
+              onCustomTemplatesChange={setSheetCustomTemplates}
             />
           )}
 
@@ -318,6 +355,8 @@ export default function ClubProfile({ detail, loading, clubs, onClubNavigate }: 
               onDepositChange={setEstimateDeposit}
               managerTitle={estimateManagerTitle}
               onManagerTitleChange={setEstimateManagerTitle}
+              tradeType={estimateTradeType}
+              onTradeTypeChange={setEstimateTradeType}
             />
           )}
 

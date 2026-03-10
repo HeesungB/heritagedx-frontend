@@ -17,7 +17,7 @@ export class ClubServerRepository implements IClubRepository {
 
     while (true) {
       const res = await fetch(
-        `${this.config.baseUrl}/clubs?limit=${params?.limit || 100}&page=${page}`,
+        `${this.config.baseUrl}/clubs?limit=${params?.limit || 100}&page=${page}&operationType=MEMBERSHIP`,
         { next: { revalidate: this.config.revalidate } },
       );
 

@@ -17,6 +17,7 @@ interface EstimateSheetProps {
   organization: Organization | null;
   userName?: string;
   managerTitle?: string;
+  tradeType?: "매수" | "매도";
 }
 
 const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
@@ -33,16 +34,19 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
       organization,
       userName,
       managerTitle,
+      tradeType = "매수",
     },
     ref,
   ) {
+    const isSell = tradeType === "매도";
     const membership = detail.memberships?.[selectedMembershipIndex];
     const membershipName =
       membership?.membershipName || membership?.membershipType || "";
     const clubName = detail.name || "";
 
     const transferFeeWon = parseTransferFee(detail.costs.registrationFee) * 10000;
-    const totalExtra = transferFeeWon + commission + acqTax + stampDuty;
+    const effectiveAcqTax = isSell ? 0 : acqTax;
+    const totalExtra = transferFeeWon + commission + effectiveAcqTax + stampDuty;
     const grandTotal = price + totalExtra;
     const balance = grandTotal - deposit;
 
@@ -68,7 +72,7 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
         {/* 제목 영역 */}
         <div className="border-t-4 border-emerald-600 mb-6">
           <h1 className="text-center text-xl font-bold py-4 text-gray-800">
-            {clubName} 회원권 매수 견적서
+            {clubName} 회원권 {tradeType} 견적서
           </h1>
         </div>
 
@@ -178,11 +182,11 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
                   회원권명
                 </th>
                 <th className={thAccent} rowSpan={2}>
-                  매수금액
+                  {tradeType}금액
                   <br />
                   <span className="text-xs font-normal text-gray-500">(VAT포함)</span>
                 </th>
-                <th className={thAccent} colSpan={4}>
+                <th className={thAccent} colSpan={isSell ? 3 : 4}>
                   부대비용
                 </th>
                 <th className={thAccent} rowSpan={2}>
@@ -192,7 +196,7 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
               <tr>
                 <th className={thAccent}>명의개서료</th>
                 <th className={thAccent}>중개수수료</th>
-                <th className={thAccent}>취득세</th>
+                {!isSell && <th className={thAccent}>취득세</th>}
                 <th className={thAccent}>인지세</th>
               </tr>
             </thead>
@@ -212,7 +216,7 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
                 <td className={`${tdCls} text-right tabular-nums`}>{fmt(price)}</td>
                 <td className={`${tdCls} text-right tabular-nums`}>{fmt(transferFeeWon)}</td>
                 <td className={`${tdCls} text-right tabular-nums`}>{fmt(commission)}</td>
-                <td className={`${tdCls} text-right tabular-nums`}>{fmt(acqTax)}</td>
+                {!isSell && <td className={`${tdCls} text-right tabular-nums`}>{fmt(acqTax)}</td>}
                 <td className={`${tdCls} text-right tabular-nums`}>{fmt(stampDuty)}</td>
                 <td className={`${tdCls} text-right tabular-nums font-semibold`}>
                   {fmt(grandTotal)}
@@ -236,7 +240,7 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
             </colgroup>
             <thead>
               <tr>
-                <th className={thAccent}>합계 (매수+부대/취득세)</th>
+                <th className={thAccent}>{isSell ? "합계 (매도+부대비용)" : "합계 (매수+부대/취득세)"}</th>
                 <th className={thAccent}>계약금</th>
                 <th className={thAccent}>잔금 (합계-계약금)</th>
               </tr>
@@ -251,17 +255,19 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
           </table>
         </div>
 
-        {/* 매수시 구비서류 */}
+        {/* 구비서류 */}
         <div className="mb-6">
           <div className="mb-3">
             <span className="text-emerald-600 text-lg align-middle">🔑</span>
-            <span className="font-semibold text-gray-800 ml-2">매수시 구비서류</span>
+            <span className="font-semibold text-gray-800 ml-2">{isSell ? "매도시 구비서류" : "매수시 구비서류"}</span>
           </div>
           <table className="w-full border-collapse border border-gray-300">
             <tbody>
               <tr>
                 <td className={`${tdCls} whitespace-pre-wrap`} style={{ minHeight: 80 }}>
-                  {membership?.buyerDocuments || "\u00A0"}
+                  {isSell
+                    ? (membership?.sellerDocuments || "\u00A0")
+                    : (membership?.buyerDocuments || "\u00A0")}
                 </td>
               </tr>
             </tbody>
@@ -271,7 +277,7 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
         {/* 안내 문구 */}
         <div className="text-xs text-gray-500 space-y-1 mb-8 pl-1">
           <p>* 상기 견적 금액은 시장 상황에 따라 변동될 수 있습니다.</p>
-          <p>* 취득세는 매수금액 기준 2.2% (농어촌특별세 포함)로 산출되었습니다.</p>
+          {!isSell && <p>* 취득세는 매수금액 기준 2.2% (농어촌특별세 포함)로 산출되었습니다.</p>}
           <p>* 계약금 입금 후 잔금은 명의개서일 전일까지 입금 부탁드립니다.</p>
         </div>
 

@@ -140,7 +140,7 @@ export class ApiClient {
       if (params.search) searchParams.append("search", params.search);
       const queryString = searchParams.toString();
       if (queryString) {
-        url += `?${queryString}`;
+        url += (url.includes("?") ? "&" : "?") + queryString;
       }
     }
     return this.request<T>(url, { method: "GET" });

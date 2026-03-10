@@ -262,18 +262,6 @@ export default function ClubDirectory({ clubs, totalCount, onClubSelect }: ClubD
                   <h3 className="text-base font-semibold text-gray-900 group-hover:text-gray-700 transition-colors">
                     {club.name}
                   </h3>
-                  {club.operationTypes?.map((type) => (
-                    <span
-                      key={type}
-                      className={`inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded ${
-                        type === "MEMBERSHIP"
-                          ? "bg-blue-100 text-blue-700"
-                          : "bg-green-100 text-green-700"
-                      }`}
-                    >
-                      {type === "MEMBERSHIP" ? "회원제" : type === "PUBLIC" ? "퍼블릭" : type}
-                    </span>
-                  ))}
                 </div>
                 <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
                   {club.region && (

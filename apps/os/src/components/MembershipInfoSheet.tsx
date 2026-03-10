@@ -3,6 +3,19 @@
 import { useState } from "react";
 import { ClubDetail } from "@/types";
 
+interface SheetCustomItem {
+  id: string;
+  label: string;
+  value: string;
+}
+
+type SheetCustomItemsMap = {
+  clubInfo: SheetCustomItem[];
+  membershipInfo: SheetCustomItem[];
+  costs: SheetCustomItem[];
+  memo: SheetCustomItem[];
+};
+
 interface MembershipInfoSheetProps {
   detail: ClubDetail;
   recipient?: string;
@@ -14,6 +27,7 @@ interface MembershipInfoSheetProps {
   selectedMembershipIndex?: number;
   onMembershipChange?: (index: number) => void;
   hiddenItems?: Set<string>;
+  customItems?: SheetCustomItemsMap;
 }
 
 export default function MembershipInfoSheet({
@@ -27,6 +41,7 @@ export default function MembershipInfoSheet({
   selectedMembershipIndex: externalIndex,
   onMembershipChange,
   hiddenItems,
+  customItems,
 }: MembershipInfoSheetProps) {
   const [internalIndex, setInternalIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -90,6 +105,29 @@ export default function MembershipInfoSheet({
     );
   };
 
+  // 커스텀 항목 쌍 렌더 헬퍼 (4열 테이블용)
+  const renderCustomPairRows = (items: SheetCustomItem[] | undefined) => {
+    if (!items) return null;
+    const valid = items.filter((i) => i.label.trim() && i.value.trim());
+    if (valid.length === 0) return null;
+    const rows: SheetCustomItem[][] = [];
+    for (let i = 0; i < valid.length; i += 2) {
+      rows.push(valid.slice(i, i + 2));
+    }
+    return rows.map((row, idx) => (
+      <tr key={`custom-${idx}`}>
+        <td className={thCls}>{row[0].label}</td>
+        <td colSpan={row.length === 1 ? 3 : 1} className={tdCls}>{row[0].value}</td>
+        {row[1] && (
+          <>
+            <td className={thCls}>{row[1].label}</td>
+            <td className={tdCls}>{row[1].value}</td>
+          </>
+        )}
+      </tr>
+    ));
+  };
+
   // 골프장 정보 표시 여부
   const hasClubInfoItems =
     (v("clubName") && detail.name) ||
@@ -101,7 +139,8 @@ export default function MembershipInfoSheet({
     (v("openingDate") && detail.basicInfo.openingDate) ||
     (v("totalLength") && detail.basicInfo.totalLength) ||
     (v("courseNames") && detail.basicInfo.courseNames && detail.basicInfo.courseNames.length > 0) ||
-    (v("facilities") && detail.basicInfo.facilities);
+    (v("facilities") && detail.basicInfo.facilities) ||
+    (customItems?.clubInfo?.some((i) => i.label.trim() && i.value.trim()));
 
   // 회원권 정보 표시 여부
   const hasMarketPriceData =
@@ -120,7 +159,8 @@ export default function MembershipInfoSheet({
     (v("benefits")) ||
     (v("reservation") && (membership?.reservationNotes || detail.registration.reservationNotes)) ||
     (v("marketPrice") && hasMarketPriceData) ||
-    (v("priceDetail") && hasPriceDetailData);
+    (v("priceDetail") && hasPriceDetailData) ||
+    (customItems?.membershipInfo?.some((i) => i.label.trim() && i.value.trim()));
 
   return (
     <div className="bg-white p-8 max-w-4xl mx-auto font-sans text-sm print:p-4 print:max-w-none print:m-0">
@@ -212,7 +252,7 @@ export default function MembershipInfoSheet({
                   detail.basicInfo.courseNames && detail.basicInfo.courseNames.length > 0 ? detail.basicInfo.courseNames.join(", ") : null,
                   "facilities", "부대시설", detail.basicInfo.facilities,
                 )}
-
+                {renderCustomPairRows(customItems?.clubInfo)}
               </tbody>
             </table>
           </div>
@@ -298,6 +338,7 @@ export default function MembershipInfoSheet({
                     </td>
                   </tr>
                 )}
+                {renderCustomPairRows(customItems?.membershipInfo)}
               </tbody>
             </table>
           </div>
@@ -312,6 +353,12 @@ export default function MembershipInfoSheet({
         if (v("stampDuty") && detail.costs.stampDuty) costItems.push({ label: "인지대", value: detail.costs.stampDuty });
         if (v("agencyFee") && detail.costs.agencyFee) costItems.push({ label: "대행수수료", value: detail.costs.agencyFee });
         if (v("otherCosts") && detail.costs.otherCosts) costItems.push({ label: "부가비용", value: detail.costs.otherCosts });
+        // 커스텀 항목 추가
+        if (customItems?.costs) {
+          customItems.costs
+            .filter((i) => i.label.trim() && i.value.trim())
+            .forEach((i) => costItems.push({ label: i.label, value: i.value }));
+        }
         if (costItems.length === 0) return null;
         const rows: { label: string; value: string }[][] = [];
         for (let i = 0; i < costItems.length; i += 2) {
@@ -350,7 +397,7 @@ export default function MembershipInfoSheet({
       })()}
 
       {/* ===== 기타 사항 섹션 ===== */}
-      {v("memo") && detail.memo && (
+      {v("memo") && (detail.memo || customItems?.memo?.some((i) => i.label.trim() && i.value.trim())) && (
         <div className="mt-8 mb-6">
           <div className="mb-3">
             <span className="text-emerald-600 text-lg align-middle">🔑</span>
@@ -358,11 +405,23 @@ export default function MembershipInfoSheet({
           </div>
           <table className="w-full border-collapse border border-gray-300">
             <tbody>
-              <tr>
-                <td className="border border-gray-300 px-3 py-2 whitespace-pre-wrap">
-                  {detail.memo}
-                </td>
-              </tr>
+              {detail.memo && (
+                <tr>
+                  <td className="border border-gray-300 px-3 py-2 whitespace-pre-wrap">
+                    {detail.memo}
+                  </td>
+                </tr>
+              )}
+              {customItems?.memo
+                ?.filter((i) => i.label.trim() && i.value.trim())
+                .map((item) => (
+                  <tr key={item.id}>
+                    <td className="border border-gray-300 px-3 py-2">
+                      <span className="font-medium text-gray-600">{item.label}:</span>{" "}
+                      {item.value}
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>

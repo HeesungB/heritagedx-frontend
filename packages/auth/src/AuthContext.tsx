@@ -93,6 +93,26 @@ export function AuthProvider({
     return () => clearInterval(interval);
   }, [user, router, authApi, loginPath]);
 
+  // 탭 복귀 시 토큰 refresh (브라우저 백그라운드 throttle 대응)
+  useEffect(() => {
+    if (!user) return;
+
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === "visible") {
+        const refreshed = await authApi.refresh();
+        if (!refreshed) {
+          setUser(null);
+          router.replace(loginPath);
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [user, router, authApi, loginPath]);
+
   const login = useCallback(
     async (email: string, password: string): Promise<string | null> => {
       const loginResult = await authApi.login(email, password);

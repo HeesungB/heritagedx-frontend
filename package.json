@@ -6,6 +6,7 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",
+    "test": "turbo run test",
     "data-sync": "node scripts/data-sync.mjs",
     "data-sync:fetch": "node scripts/data-sync.mjs fetch",
     "data-sync:validate": "node scripts/data-sync.mjs validate",

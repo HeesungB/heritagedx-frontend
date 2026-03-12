@@ -21,7 +21,7 @@ interface EstimateSheetProps {
   recipient?: string;
   price: number;
   commission: number;
-  acqTax: number;
+
   stampDuty: number;
   otherCosts: number;
   deposit: number;
@@ -35,13 +35,13 @@ interface EstimateSheetProps {
   onTradeTypeChange?: (value: "매수" | "매도") => void;
   onPriceChange?: (raw: string) => void;
   onCommissionChange?: (raw: string) => void;
-  onAcqTaxChange?: (raw: string) => void;
+
   onStampDutyChange?: (raw: string) => void;
   onOtherCostsChange?: (raw: string) => void;
   onDepositChange?: (raw: string) => void;
-  acqTaxAuto?: boolean;
+
   depositAuto?: boolean;
-  onAcqTaxAutoReset?: () => void;
+
   onDepositAutoReset?: () => void;
   // Data field overrides
   fieldOverrides?: Record<string, string>;
@@ -56,7 +56,7 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
       recipient,
       price,
       commission,
-      acqTax,
+
       stampDuty,
       otherCosts,
       deposit,
@@ -69,13 +69,13 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
       onTradeTypeChange,
       onPriceChange,
       onCommissionChange,
-      onAcqTaxChange,
+
       onStampDutyChange,
       onOtherCostsChange,
       onDepositChange,
-      acqTaxAuto,
+
       depositAuto,
-      onAcqTaxAutoReset,
+
       onDepositAutoReset,
       fieldOverrides,
       onFieldOverrideChange,
@@ -96,8 +96,7 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
     const membershipName = resolveField("membershipName", membershipNameOriginal);
 
     const transferFeeWon = parseTransferFee(detail.costs.registrationFee) * 10000;
-    const effectiveAcqTax = isSell ? 0 : acqTax;
-    const totalExtra = transferFeeWon + commission + effectiveAcqTax + stampDuty + otherCosts;
+    const totalExtra = transferFeeWon + commission + stampDuty + otherCosts;
     const grandTotal = price + totalExtra;
     const balance = grandTotal - deposit;
 
@@ -185,7 +184,7 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
     );
 
     // Number of "부대비용" sub-columns
-    const extraCols = isSell ? 4 : 5;
+    const extraCols = 4;
 
     return (
       <div
@@ -396,7 +395,6 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
               <col />
               <col />
               <col />
-              {!isSell && <col />}
               <col />
               <col />
             </colgroup>
@@ -407,8 +405,6 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
                 </th>
                 <th className={thAccent} rowSpan={2}>
                   {editableLabel("priceCol", `${tradeType}금액`)}
-                  <br />
-                  <span className="text-xs font-normal text-gray-500">(VAT포함)</span>
                 </th>
                 <th className={thAccent} colSpan={extraCols}>
                   {editableLabel("extraCostsCol", "부대비용")}
@@ -417,7 +413,7 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
               <tr>
                 <th className={thAccent}>{editableLabel("transferFeeCol", "명의개서료")}</th>
                 <th className={thAccent}>{editableLabel("commissionCol", "중개수수료")}</th>
-                {!isSell && <th className={thAccent}>{editableLabel("acqTaxCol", "취득세")}</th>}
+
                 <th className={thAccent}>{editableLabel("stampDutyCol", "인지세")}</th>
                 <th className={thAccent}>{editableLabel("otherCostsCol", "기타비용")}</th>
               </tr>
@@ -460,24 +456,19 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
                 {renderNumCell(price, onPriceChange)}
                 <td className={`${tdCls} text-right tabular-nums whitespace-nowrap`}>{fmt(transferFeeWon)}</td>
                 {renderNumCell(commission, onCommissionChange)}
-                {!isSell &&
-                  renderNumCell(acqTax, onAcqTaxChange, {
-                    auto: acqTaxAuto,
-                    onAutoReset: onAcqTaxAutoReset,
-                    autoLabel: "자동(2.2%)",
-                  })}
+
                 {renderNumCell(stampDuty, onStampDutyChange)}
                 {renderNumCell(otherCosts, onOtherCostsChange)}
               </tr>
               {/* 합계 / 계약금 / 잔금 요약 행 (가로) */}
               <tr>
-                <th colSpan={isSell ? 3 : 3} className={thAccent}>{editableLabel("totalCol", "합계")}</th>
-                <th colSpan={isSell ? 2 : 3} className={thAccent}>{editableLabel("depositCol", "계약금")}</th>
-                <th colSpan={isSell ? 2 : 1} className={thAccent}>{editableLabel("balanceCol", "잔금")}</th>
+                <th colSpan={2} className={thAccent}>{editableLabel("totalCol", "합계")}</th>
+                <th colSpan={2} className={thAccent}>{editableLabel("depositCol", "계약금")}</th>
+                <th colSpan={2} className={thAccent}>{editableLabel("balanceCol", "잔금")}</th>
               </tr>
               <tr>
-                <td colSpan={isSell ? 3 : 3} className={`${tdCls} text-right tabular-nums font-semibold`}>{fmt(grandTotal)}</td>
-                <td colSpan={isSell ? 2 : 3} className={`${tdCls} text-right tabular-nums font-medium`}>
+                <td colSpan={2} className={`${tdCls} text-right tabular-nums font-semibold`}>{fmt(grandTotal)}</td>
+                <td colSpan={2} className={`${tdCls} text-right tabular-nums font-medium`}>
                   {onDepositChange ? (
                     <div>
                       <div className="flex items-center gap-0.5">
@@ -504,7 +495,7 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
                     fmt(deposit)
                   )}
                 </td>
-                <td colSpan={isSell ? 2 : 1} className={`${tdCls} text-right tabular-nums font-semibold`}>{fmt(balance)}</td>
+                <td colSpan={2} className={`${tdCls} text-right tabular-nums font-semibold`}>{fmt(balance)}</td>
               </tr>
             </tbody>
           </table>
@@ -557,7 +548,6 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
                 "disclaimerNotes",
                 [
                   "* 상기 견적 금액은 시장 상황에 따라 변동될 수 있습니다.",
-                  ...(!isSell ? ["* 취득세는 매수금액 기준 2.2% (농어촌특별세 포함)로 산출되었습니다."] : []),
                   "* 계약금 입금 후 잔금은 명의개서일 전일까지 입금 부탁드립니다.",
                 ].join("\n"),
               )}
@@ -569,7 +559,6 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
           ) : (
             <>
               <p>* 상기 견적 금액은 시장 상황에 따라 변동될 수 있습니다.</p>
-              {!isSell && <p>* 취득세는 매수금액 기준 2.2% (농어촌특별세 포함)로 산출되었습니다.</p>}
               <p>* 계약금 입금 후 잔금은 명의개서일 전일까지 입금 부탁드립니다.</p>
             </>
           )}

@@ -26,15 +26,12 @@ export default function EstimateSection({
   const sheetRef = useRef<HTMLDivElement>(null);
   const [jpegDownloading, setJpegDownloading] = useState(false);
 
-  // 취득세 자동계산 여부 추적
-  const [acqTaxAuto, setAcqTaxAuto] = useState(true);
   // 계약금 자동계산 여부 추적
   const [depositAuto, setDepositAuto] = useState(true);
 
   const recipient = fieldOverrides.recipient || "";
   const price = fieldOverrides.price || "";
   const commission = fieldOverrides.commission || "";
-  const acqTax = fieldOverrides.acqTax || "";
   const stampDuty = fieldOverrides.stampDuty || "";
   const otherCosts = fieldOverrides.otherCosts || "";
   const deposit = fieldOverrides.deposit || "";
@@ -43,47 +40,21 @@ export default function EstimateSection({
 
   const priceNum = parseInt(price.replace(/[^0-9]/g, ""), 10) || 0;
   const commissionNum = parseInt(commission.replace(/[^0-9]/g, ""), 10) || 0;
-  const acqTaxNum = parseInt(acqTax.replace(/[^0-9]/g, ""), 10) || 0;
   const stampDutyNum = parseInt(stampDuty.replace(/[^0-9]/g, ""), 10) || 0;
   const otherCostsNum = parseInt(otherCosts.replace(/[^0-9]/g, ""), 10) || 0;
   const depositNum = parseInt(deposit.replace(/[^0-9]/g, ""), 10) || 0;
-
-  // 매도 시 취득세 강제 0
-  useEffect(() => {
-    if (tradeType === "매도") {
-      onFieldOverrideChange("acqTax", "0");
-    } else if (acqTaxAuto && priceNum > 0) {
-      const autoAcqTax = Math.round(priceNum * 0.022);
-      onFieldOverrideChange("acqTax", autoAcqTax.toString());
-    }
-  }, [tradeType]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // 취득세 자동계산: 매수금액 변경 시
-  useEffect(() => {
-    if (tradeType === "매도") return;
-    if (acqTaxAuto && priceNum > 0) {
-      const autoAcqTax = Math.round(priceNum * 0.022);
-      onFieldOverrideChange("acqTax", autoAcqTax.toString());
-    }
-  }, [priceNum, acqTaxAuto]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 계약금 자동계산: 합계 변경 시
   useEffect(() => {
     if (depositAuto) {
       const tfWon = parseTransferFeeToWon(detail.costs.registrationFee);
-      const effectiveAcqTax = tradeType === "매도" ? 0 : acqTaxNum;
-      const grandTotal = priceNum + tfWon + commissionNum + effectiveAcqTax + stampDutyNum + otherCostsNum;
+      const grandTotal = priceNum + tfWon + commissionNum + stampDutyNum + otherCostsNum;
       const autoDeposit = Math.round(grandTotal * 0.1);
       if (autoDeposit > 0) {
         onFieldOverrideChange("deposit", autoDeposit.toString());
       }
     }
-  }, [priceNum, commissionNum, acqTaxNum, stampDutyNum, otherCostsNum, depositAuto, detail.costs.registrationFee, tradeType]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleAcqTaxChange = (value: string) => {
-    setAcqTaxAuto(false);
-    onFieldOverrideChange("acqTax", value);
-  };
+  }, [priceNum, commissionNum, stampDutyNum, otherCostsNum, depositAuto, detail.costs.registrationFee, tradeType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDepositChange = (value: string) => {
     setDepositAuto(false);
@@ -123,7 +94,6 @@ export default function EstimateSection({
         recipient={recipient || undefined}
         price={priceNum}
         commission={commissionNum}
-        acqTax={tradeType === "매도" ? 0 : acqTaxNum}
         stampDuty={stampDutyNum}
         otherCosts={otherCostsNum}
         deposit={depositNum}
@@ -136,13 +106,10 @@ export default function EstimateSection({
         onTradeTypeChange={(v) => onFieldOverrideChange("tradeType", v)}
         onPriceChange={(v) => onFieldOverrideChange("price", v)}
         onCommissionChange={(v) => onFieldOverrideChange("commission", v)}
-        onAcqTaxChange={handleAcqTaxChange}
         onStampDutyChange={(v) => onFieldOverrideChange("stampDuty", v)}
         onOtherCostsChange={(v) => onFieldOverrideChange("otherCosts", v)}
         onDepositChange={handleDepositChange}
-        acqTaxAuto={acqTaxAuto}
         depositAuto={depositAuto}
-        onAcqTaxAutoReset={() => setAcqTaxAuto(true)}
         onDepositAutoReset={() => setDepositAuto(true)}
         fieldOverrides={fieldOverrides}
         onFieldOverrideChange={onFieldOverrideChange}

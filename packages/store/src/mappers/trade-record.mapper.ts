@@ -52,13 +52,14 @@ export function mapTradeRecordDtoToEntity(dto: TradeRecord): TradeRecordEntity {
 }
 
 export function mapTradeRecordEntityToInput(
-  entity: Partial<TradeRecordEntity>,
+  entity: Partial<TradeRecordEntity> & { clubId?: string; membershipId?: string },
 ): TradeRecordInput {
   return {
+    clubId: entity.clubId ?? "",
+    membershipId: entity.membershipId ?? "",
     customerName: entity.customer?.name ?? "",
     contact: entity.customer?.contact ?? "",
     tradeType: entity.tradeType ?? "매수",
-    membershipName: entity.trade?.membershipName ?? "",
     contractDate: entity.trade?.contractDate,
     amount: entity.trade?.amount,
     tradingPartner: entity.trade?.tradingPartner,

@@ -138,6 +138,39 @@ export default function TradeRecordsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // 폼 전용 골프장/회원권 state
+  const [formClubCode, setFormClubCode] = useState("");
+  const [formClubId, setFormClubId] = useState("");
+  const [formMemberships, setFormMemberships] = useState<{ id: string; name: string }[]>([]);
+
+  // 폼용 회원권 목록 fetch
+  useEffect(() => {
+    if (!formClubCode) {
+      setFormMemberships([]);
+      setFormClubId("");
+      return;
+    }
+    let cancelled = false;
+    clubsRepo.getOne(formClubCode)
+      .then((res) => {
+        if (cancelled) return;
+        if (res.data) {
+          setFormClubId(res.data.id);
+          setFormMemberships(
+            (res.data.memberships ?? []).map((m) => ({
+              id: m.id,
+              name: m.membershipName || m.membershipType,
+            }))
+          );
+        } else {
+          setFormClubId("");
+          setFormMemberships([]);
+        }
+      })
+      .catch(() => { if (!cancelled) { setFormClubId(""); setFormMemberships([]); } });
+    return () => { cancelled = true; };
+  }, [formClubCode]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [form, setForm] = useState({
     tradeType: "매수" as string,
     membershipName: "",
@@ -164,6 +197,9 @@ export default function TradeRecordsPage() {
   });
 
   const resetForm = () => {
+    setFormClubCode("");
+    setFormClubId("");
+    setFormMemberships([]);
     setForm({
       tradeType: "매수",
       membershipName: "",
@@ -235,15 +271,25 @@ export default function TradeRecordsPage() {
   }, [loadRecords]);
 
   const handleAdd = async () => {
-    if (!form.customerName.trim() || !form.membershipName.trim()) {
-      alert("회원권명과 고객명은 필수입니다.");
+    if (!formClubId) {
+      alert("골프장을 선택해주세요.");
+      return;
+    }
+    const membershipObj = formMemberships.find((m) => m.name === form.membershipName);
+    if (!membershipObj) {
+      alert("회원권을 선택해주세요.");
+      return;
+    }
+    if (!form.customerName.trim()) {
+      alert("고객명은 필수입니다.");
       return;
     }
     setIsSaving(true);
     try {
       const response = await membershipTradesRepo.create({
+        clubId: formClubId,
+        membershipId: membershipObj.id,
         tradeType: form.tradeType,
-        membershipName: form.membershipName,
         customerName: form.customerName,
         contact: form.contact,
         tradingPartner: form.tradingPartner || null,
@@ -281,15 +327,25 @@ export default function TradeRecordsPage() {
 
   const handleUpdate = async () => {
     if (!editingRecord?.id) return;
-    if (!form.customerName.trim() || !form.membershipName.trim()) {
-      alert("회원권명과 고객명은 필수입니다.");
+    if (!formClubId) {
+      alert("골프장을 선택해주세요.");
+      return;
+    }
+    const membershipObj = formMemberships.find((m) => m.name === form.membershipName);
+    if (!membershipObj) {
+      alert("회원권을 선택해주세요.");
+      return;
+    }
+    if (!form.customerName.trim()) {
+      alert("고객명은 필수입니다.");
       return;
     }
     setIsSaving(true);
     try {
       const response = await membershipTradesRepo.update(editingRecord.id, {
+        clubId: formClubId,
+        membershipId: membershipObj.id,
         tradeType: form.tradeType,
-        membershipName: form.membershipName,
         customerName: form.customerName,
         contact: form.contact,
         tradingPartner: form.tradingPartner || null,
@@ -344,6 +400,8 @@ export default function TradeRecordsPage() {
 
   const handleEdit = (record: TradeRecord) => {
     setEditingRecord(record);
+    const matchedClub = clubsRef.current.find((c) => c.name === record.clubName);
+    setFormClubCode(matchedClub?.code || "");
     setForm({
       tradeType: record.tradeType || "매수",
       membershipName: record.membershipName || "",
@@ -584,8 +642,35 @@ export default function TradeRecordsPage() {
             </div>
           </div>
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">골프장 <span className="text-red-500">*</span></label>
+            <ClubSearchSelect
+              clubs={clubs}
+              selectedClubCode={formClubCode}
+              onChange={(code) => {
+                setFormClubCode(code);
+                setFormClubId("");
+                setFormMemberships([]);
+                setForm((f) => ({ ...f, membershipName: "" }));
+              }}
+              placeholder="골프장 선택"
+            />
+          </div>
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">회원권명 <span className="text-red-500">*</span></label>
-            <Input value={form.membershipName} onChange={(e) => setForm((f) => ({ ...f, membershipName: e.target.value }))} placeholder="예: 개인정회원" />
+            {formMemberships.length > 0 ? (
+              <select
+                value={form.membershipName}
+                onChange={(e) => setForm((f) => ({ ...f, membershipName: e.target.value }))}
+                className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              >
+                <option value="">회원권 선택</option>
+                {formMemberships.map((m) => (
+                  <option key={m.id} value={m.name}>{m.name}</option>
+                ))}
+              </select>
+            ) : (
+              <Input value={form.membershipName} onChange={(e) => setForm((f) => ({ ...f, membershipName: e.target.value }))} placeholder={formClubCode ? "회원권 로딩 중..." : "골프장을 먼저 선택해주세요"} disabled={!formClubCode} />
+            )}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><label className="block text-sm font-medium text-gray-700 mb-1">고객명 <span className="text-red-500">*</span></label><Input value={form.customerName} onChange={(e) => setForm((f) => ({ ...f, customerName: e.target.value }))} placeholder="홍길동" /></div>

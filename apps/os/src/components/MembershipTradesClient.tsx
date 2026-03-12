@@ -12,6 +12,7 @@ import { mapTradeRecordDtoToEntity } from "@heritage-dx/store";
 import { trackEvent } from "@/lib/gtag";
 import { ClubSearchSelect, Button, Loading } from "@heritage-dx/ui";
 
+type FormMembershipOption = { id: string; name: string };
 type TradeFilter = "전체" | "매수" | "매도";
 type SortField = "contractDate" | "createdAt" | "membershipName" | "amount" | "tradeAmount";
 
@@ -77,6 +78,12 @@ export default function MembershipTradesClient() {
   const [dateTo, setDateTo] = useState<string>("");
   const clubsRef = useRef<Club[]>([]);
 
+  // 폼 전용 state (필터와 분리)
+  const [formClubCode, setFormClubCode] = useState<string>("");
+  const [formClubId, setFormClubId] = useState<string>("");
+  const [formMemberships, setFormMemberships] = useState<FormMembershipOption[]>([]);
+  const [formManualMembership, setFormManualMembership] = useState(false);
+
   // 골프장 목록 fetch
   useEffect(() => {
     clubsRepo.getAll({ limit: 100 })
@@ -107,6 +114,38 @@ export default function MembershipTradesClient() {
       })
       .catch(console.error);
   }, [selectedClubCode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 폼용 회원권 목록 fetch (폼에서 골프장 선택 시)
+  useEffect(() => {
+    if (!formClubCode) {
+      setFormMemberships([]);
+      setFormClubId("");
+      return;
+    }
+    clubsRepo.getOne(formClubCode)
+      .then((response) => {
+        if (response.data) {
+          setFormClubId(response.data.id);
+          setFormMemberships(
+            (response.data.memberships ?? []).map((m) => ({
+              id: m.id,
+              name: m.membershipName || m.membershipType,
+            }))
+          );
+        } else {
+          setFormClubId("");
+          setFormMemberships([]);
+        }
+      })
+      .catch(() => { setFormClubId(""); setFormMemberships([]); });
+  }, [formClubCode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 수정 모드에서 직접 입력 판단
+  useEffect(() => {
+    if (!editingTrade || formMemberships.length === 0) return;
+    const currentName = form.membershipName;
+    setFormManualMembership(currentName !== "" && !formMemberships.some((m) => m.name === currentName));
+  }, [formMemberships, editingTrade]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 검색 디바운스 (300ms)
   useEffect(() => {
@@ -171,13 +210,40 @@ export default function MembershipTradesClient() {
     return clubs.filter((c) => tradeClubNames.has(c.name));
   }, [rawTrades, clubs]);
 
+  const handleFormClubChange = (code: string) => {
+    setFormClubCode(code);
+    setFormClubId("");
+    const club = clubsRef.current.find((c) => c.code === code);
+    setForm((f) => ({ ...f, clubName: club?.name || "", membershipName: "" }));
+    setFormManualMembership(false);
+    setFormMemberships([]);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     setErrorMessage(null);
+    if (!form.clubName.trim() || !formClubId) {
+      setErrorMessage("골프장을 선택해주세요.");
+      setSubmitting(false);
+      return;
+    }
+    // 선택된 회원권의 ID 찾기
+    const selectedMembershipObj = formMemberships.find(
+      (m) => m.name === form.membershipName
+    );
+    if (!selectedMembershipObj) {
+      setErrorMessage("회원권을 선택해주세요.");
+      setSubmitting(false);
+      return;
+    }
     try {
       const cleaned = {
-        ...form,
+        clubId: formClubId,
+        membershipId: selectedMembershipObj.id,
+        customerName: form.customerName,
+        contact: form.contact,
+        tradeType: form.tradeType,
         contractDate: form.contractDate || null,
         amount: form.amount || null,
         tradingPartner: form.tradingPartner || null,
@@ -188,7 +254,10 @@ export default function MembershipTradesClient() {
         description: form.description || null,
         contractFee: form.contractFee || null,
         balanceDate: form.balanceDate || null,
+        balanceCompleted: form.balanceCompleted,
         manager: form.manager || null,
+        taxTransfer: form.taxTransfer,
+        taxAcquisition: form.taxAcquisition,
         invoiceSales: form.invoiceSales || null,
         invoicePurchase: form.invoicePurchase || null,
         remarks: form.remarks || null,
@@ -225,6 +294,9 @@ export default function MembershipTradesClient() {
   const handleEdit = (trade: MembershipTradeRecord) => {
     setEditingTrade(trade);
     setErrorMessage(null);
+    const matchedClub = clubsRef.current.find((c) => c.name === trade.clubName);
+    setFormClubCode(matchedClub?.code || "");
+    setFormManualMembership(false);
     setForm({
       clubName: trade.clubName || "",
       customerName: trade.customer.name || "",
@@ -274,6 +346,10 @@ export default function MembershipTradesClient() {
     setEditingTrade(null);
     setForm(emptyForm);
     setErrorMessage(null);
+    setFormClubCode("");
+    setFormClubId("");
+    setFormMemberships([]);
+    setFormManualMembership(false);
   };
 
   const formatPrice = (price: number | null) => {
@@ -315,7 +391,7 @@ export default function MembershipTradesClient() {
               </div>
               <Button
                 className="flex-shrink-0"
-                onClick={() => { setShowForm(true); setEditingTrade(null); setForm(emptyForm); setErrorMessage(null); }}
+                onClick={() => { setShowForm(true); setEditingTrade(null); setForm(emptyForm); setErrorMessage(null); setFormClubCode(""); setFormClubId(""); setFormMemberships([]); setFormManualMembership(false); }}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -479,25 +555,54 @@ export default function MembershipTradesClient() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">골프장명 <span className="text-red-500">*</span></label>
-                    <input
-                      type="text"
-                      value={form.clubName}
-                      onChange={(e) => setForm((f) => ({ ...f, clubName: e.target.value }))}
-                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
-                      placeholder="골든비치CC"
-                      required
+                    <ClubSearchSelect
+                      clubs={clubs}
+                      selectedClubCode={formClubCode}
+                      onChange={handleFormClubChange}
+                      placeholder="골프장 선택"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">회원권명 <span className="text-red-500">*</span></label>
-                    <input
-                      type="text"
-                      value={form.membershipName}
-                      onChange={(e) => setForm((f) => ({ ...f, membershipName: e.target.value }))}
-                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
-                      placeholder="개인정회원"
-                      required
-                    />
+                    {formMemberships.length > 0 && !formManualMembership ? (
+                      <select
+                        value={form.membershipName}
+                        onChange={(e) => {
+                          if (e.target.value === "__manual__") {
+                            setFormManualMembership(true);
+                            setForm((f) => ({ ...f, membershipName: "" }));
+                          } else {
+                            setForm((f) => ({ ...f, membershipName: e.target.value }));
+                          }
+                        }}
+                        className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
+                      >
+                        <option value="">회원권 선택</option>
+                        {formMemberships.map((m) => (
+                          <option key={m.id} value={m.name}>{m.name}</option>
+                        ))}
+                        <option value="__manual__">직접 입력</option>
+                      </select>
+                    ) : (
+                      <div className="flex gap-1">
+                        <input
+                          type="text"
+                          value={form.membershipName}
+                          onChange={(e) => setForm((f) => ({ ...f, membershipName: e.target.value }))}
+                          className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
+                          placeholder="회원권명 입력"
+                        />
+                        {formMemberships.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => { setFormManualMembership(false); setForm((f) => ({ ...f, membershipName: "" })); }}
+                            className="px-2 py-1 text-xs border border-gray-300 rounded text-gray-600 hover:bg-gray-50 whitespace-nowrap"
+                          >
+                            목록선택
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">고객명 <span className="text-red-500">*</span></label>
@@ -745,7 +850,7 @@ export default function MembershipTradesClient() {
               <div className="py-20 text-center">
                 <p className="text-gray-400 mb-3">등록된 거래 내역이 없습니다</p>
                 <button
-                  onClick={() => { setShowForm(true); setEditingTrade(null); setForm(emptyForm); }}
+                  onClick={() => { setShowForm(true); setEditingTrade(null); setForm(emptyForm); setFormClubCode(""); setFormClubId(""); setFormMemberships([]); setFormManualMembership(false); }}
                   className="text-sm text-gray-600 underline hover:text-gray-900"
                 >
                   새 거래 등록하기

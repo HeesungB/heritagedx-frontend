@@ -94,10 +94,11 @@ export interface TradeRecordsResponse {
 }
 
 export interface TradeRecordInput {
+  clubId: string;
+  membershipId: string;
   customerName: string;
   contact: string;
   tradeType: string;
-  membershipName: string;
   contractDate?: string | null;
   amount?: number | null;
   tradingPartner?: string | null;

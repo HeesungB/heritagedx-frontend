@@ -140,6 +140,7 @@ export interface ClubDetailResponse {
   submissionMethods?: string[];
   processingTime?: string;
   externalUrl?: string;
+  website?: string;
   scenariosCount?: number;
   scenarioOptions?: _ClubScenarioOptions;
   scenarios?: _ScenarioWithDocuments[];

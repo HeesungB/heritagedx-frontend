@@ -11,47 +11,18 @@ import { trackEvent } from "@/lib/gtag";
 interface EstimateSectionProps {
   detail: ClubDetail;
   selectedMembershipIndex: number;
-  recipient: string;
-  onRecipientChange: (value: string) => void;
-  price: string;
-  onPriceChange: (value: string) => void;
-  commission: string;
-  onCommissionChange: (value: string) => void;
-  acqTax: string;
-  onAcqTaxChange: (value: string) => void;
-  stampDuty: string;
-  onStampDutyChange: (value: string) => void;
-  deposit: string;
-  onDepositChange: (value: string) => void;
-  managerTitle: string;
-  onManagerTitleChange: (value: string) => void;
-  tradeType: "매수" | "매도";
-  onTradeTypeChange: (value: "매수" | "매도") => void;
+  fieldOverrides: Record<string, string>;
+  onFieldOverrideChange: (key: string, value: string) => void;
 }
 
 export default function EstimateSection({
   detail,
   selectedMembershipIndex,
-  recipient,
-  onRecipientChange,
-  price,
-  onPriceChange,
-  commission,
-  onCommissionChange,
-  acqTax,
-  onAcqTaxChange,
-  stampDuty,
-  onStampDutyChange,
-  deposit,
-  onDepositChange,
-  managerTitle,
-  onManagerTitleChange,
-  tradeType,
-  onTradeTypeChange,
+  fieldOverrides,
+  onFieldOverrideChange,
 }: EstimateSectionProps) {
   const { user } = useAuth();
   const { organization } = useOrganization();
-  const [isInputSectionOpen, setIsInputSectionOpen] = useState(true);
   const sheetRef = useRef<HTMLDivElement>(null);
   const [jpegDownloading, setJpegDownloading] = useState(false);
 
@@ -60,19 +31,30 @@ export default function EstimateSection({
   // 계약금 자동계산 여부 추적
   const [depositAuto, setDepositAuto] = useState(true);
 
+  const recipient = fieldOverrides.recipient || "";
+  const price = fieldOverrides.price || "";
+  const commission = fieldOverrides.commission || "";
+  const acqTax = fieldOverrides.acqTax || "";
+  const stampDuty = fieldOverrides.stampDuty || "";
+  const otherCosts = fieldOverrides.otherCosts || "";
+  const deposit = fieldOverrides.deposit || "";
+  const managerTitle = fieldOverrides.managerTitle || "";
+  const tradeType = (fieldOverrides.tradeType as "매수" | "매도") || "매수";
+
   const priceNum = parseInt(price.replace(/[^0-9]/g, ""), 10) || 0;
   const commissionNum = parseInt(commission.replace(/[^0-9]/g, ""), 10) || 0;
   const acqTaxNum = parseInt(acqTax.replace(/[^0-9]/g, ""), 10) || 0;
   const stampDutyNum = parseInt(stampDuty.replace(/[^0-9]/g, ""), 10) || 0;
+  const otherCostsNum = parseInt(otherCosts.replace(/[^0-9]/g, ""), 10) || 0;
   const depositNum = parseInt(deposit.replace(/[^0-9]/g, ""), 10) || 0;
 
   // 매도 시 취득세 강제 0
   useEffect(() => {
     if (tradeType === "매도") {
-      onAcqTaxChange("0");
+      onFieldOverrideChange("acqTax", "0");
     } else if (acqTaxAuto && priceNum > 0) {
       const autoAcqTax = Math.round(priceNum * 0.022);
-      onAcqTaxChange(autoAcqTax.toString());
+      onFieldOverrideChange("acqTax", autoAcqTax.toString());
     }
   }, [tradeType]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -81,7 +63,7 @@ export default function EstimateSection({
     if (tradeType === "매도") return;
     if (acqTaxAuto && priceNum > 0) {
       const autoAcqTax = Math.round(priceNum * 0.022);
-      onAcqTaxChange(autoAcqTax.toString());
+      onFieldOverrideChange("acqTax", autoAcqTax.toString());
     }
   }, [priceNum, acqTaxAuto]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -90,36 +72,22 @@ export default function EstimateSection({
     if (depositAuto) {
       const tfWon = parseTransferFeeToWon(detail.costs.registrationFee);
       const effectiveAcqTax = tradeType === "매도" ? 0 : acqTaxNum;
-      const grandTotal = priceNum + tfWon + commissionNum + effectiveAcqTax + stampDutyNum;
+      const grandTotal = priceNum + tfWon + commissionNum + effectiveAcqTax + stampDutyNum + otherCostsNum;
       const autoDeposit = Math.round(grandTotal * 0.1);
       if (autoDeposit > 0) {
-        onDepositChange(autoDeposit.toString());
+        onFieldOverrideChange("deposit", autoDeposit.toString());
       }
     }
-  }, [priceNum, commissionNum, acqTaxNum, stampDutyNum, depositAuto, detail.costs.registrationFee, tradeType]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [priceNum, commissionNum, acqTaxNum, stampDutyNum, otherCostsNum, depositAuto, detail.costs.registrationFee, tradeType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAcqTaxChange = (value: string) => {
     setAcqTaxAuto(false);
-    onAcqTaxChange(value);
+    onFieldOverrideChange("acqTax", value);
   };
 
   const handleDepositChange = (value: string) => {
     setDepositAuto(false);
-    onDepositChange(value);
-  };
-
-  const formatInputValue = (value: string) => {
-    const num = parseInt(value.replace(/[^0-9]/g, ""), 10);
-    if (isNaN(num) || num === 0) return "";
-    return num.toLocaleString();
-  };
-
-  const handleNumberInput = (
-    value: string,
-    onChange: (v: string) => void,
-  ) => {
-    const raw = value.replace(/[^0-9]/g, "");
-    onChange(raw);
+    onFieldOverrideChange("deposit", value);
   };
 
   const handleJpegDownload = async () => {
@@ -147,241 +115,40 @@ export default function EstimateSection({
 
   return (
     <div className="space-y-6">
-      {/* 입력 필드 섹션 */}
-      <div className="bg-gray-50 rounded-lg border border-gray-200 print:hidden">
-        <button
-          type="button"
-          onClick={() => setIsInputSectionOpen((v) => !v)}
-          className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-gray-100 rounded-lg transition-colors"
-        >
-          <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-            <svg
-              className="w-5 h-5 text-gray-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-              />
-            </svg>
-            견적 정보 입력
-          </h3>
-          <svg
-            className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${
-              isInputSectionOpen ? "rotate-180" : ""
-            }`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M19 9l-7 7-7-7"
-            />
-          </svg>
-        </button>
-        {isInputSectionOpen && (
-          <div className="px-4 pb-4 space-y-4">
-            {/* 매수/매도 토글 */}
-            <div className="flex gap-0 rounded-lg overflow-hidden border border-gray-300 w-fit">
-              {(["매수", "매도"] as const).map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => onTradeTypeChange(type)}
-                  className={`px-5 py-1.5 text-sm font-medium transition-colors ${
-                    tradeType === type
-                      ? "bg-emerald-600 text-white"
-                      : "bg-white text-gray-600 hover:bg-gray-50"
-                  }`}
-                >
-                  {type}
-                </button>
-              ))}
-            </div>
+      {/* Sheet (inline editing) */}
+      <EstimateSheet
+        ref={sheetRef}
+        detail={detail}
+        selectedMembershipIndex={selectedMembershipIndex}
+        recipient={recipient || undefined}
+        price={priceNum}
+        commission={commissionNum}
+        acqTax={tradeType === "매도" ? 0 : acqTaxNum}
+        stampDuty={stampDutyNum}
+        otherCosts={otherCostsNum}
+        deposit={depositNum}
+        organization={organization}
+        userName={user?.name}
+        managerTitle={managerTitle || undefined}
+        tradeType={tradeType}
+        onRecipientChange={(v) => onFieldOverrideChange("recipient", v)}
+        onManagerTitleChange={(v) => onFieldOverrideChange("managerTitle", v)}
+        onTradeTypeChange={(v) => onFieldOverrideChange("tradeType", v)}
+        onPriceChange={(v) => onFieldOverrideChange("price", v)}
+        onCommissionChange={(v) => onFieldOverrideChange("commission", v)}
+        onAcqTaxChange={handleAcqTaxChange}
+        onStampDutyChange={(v) => onFieldOverrideChange("stampDuty", v)}
+        onOtherCostsChange={(v) => onFieldOverrideChange("otherCosts", v)}
+        onDepositChange={handleDepositChange}
+        acqTaxAuto={acqTaxAuto}
+        depositAuto={depositAuto}
+        onAcqTaxAutoReset={() => setAcqTaxAuto(true)}
+        onDepositAutoReset={() => setDepositAuto(true)}
+        fieldOverrides={fieldOverrides}
+        onFieldOverrideChange={onFieldOverrideChange}
+      />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                수신자
-              </label>
-              <input
-                type="text"
-                value={recipient}
-                onChange={(e) => onRecipientChange(e.target.value)}
-                placeholder="예: 홍길동 님"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                담당자 직책
-              </label>
-              <input
-                type="text"
-                value={managerTitle}
-                onChange={(e) => onManagerTitleChange(e.target.value)}
-                placeholder="예: 과장"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {tradeType === "매도" ? "매도금액" : "매수금액"}
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={formatInputValue(price)}
-                  onChange={(e) => handleNumberInput(e.target.value, onPriceChange)}
-                  placeholder="0"
-                  className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-right"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">원</span>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                중개수수료
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={formatInputValue(commission)}
-                  onChange={(e) =>
-                    handleNumberInput(e.target.value, onCommissionChange)
-                  }
-                  placeholder="0"
-                  className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-right"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">원</span>
-              </div>
-            </div>
-
-            {tradeType === "매수" && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                취득세
-                {acqTaxAuto && (
-                  <span className="text-xs text-gray-400 ml-1">
-                    (매수금액 x 2.2% 자동)
-                  </span>
-                )}
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={formatInputValue(acqTax)}
-                  onChange={(e) =>
-                    handleNumberInput(e.target.value, handleAcqTaxChange)
-                  }
-                  placeholder="0"
-                  className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-right"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">원</span>
-              </div>
-              {!acqTaxAuto && (
-                <button
-                  type="button"
-                  onClick={() => setAcqTaxAuto(true)}
-                  className="text-xs text-gray-500 hover:text-gray-700 mt-1 underline"
-                >
-                  자동계산으로 되돌리기
-                </button>
-              )}
-            </div>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                인지세
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={formatInputValue(stampDuty)}
-                  onChange={(e) =>
-                    handleNumberInput(e.target.value, onStampDutyChange)
-                  }
-                  placeholder="0"
-                  className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-right"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">원</span>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                계약금
-                {depositAuto && (
-                  <span className="text-xs text-gray-400 ml-1">
-                    (합계 x 10% 자동)
-                  </span>
-                )}
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={formatInputValue(deposit)}
-                  onChange={(e) =>
-                    handleNumberInput(e.target.value, handleDepositChange)
-                  }
-                  placeholder="0"
-                  className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-right"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">원</span>
-              </div>
-              {!depositAuto && (
-                <button
-                  type="button"
-                  onClick={() => setDepositAuto(true)}
-                  className="text-xs text-gray-500 hover:text-gray-700 mt-1 underline"
-                >
-                  자동계산으로 되돌리기
-                </button>
-              )}
-            </div>
-          </div>
-
-          </div>
-        )}
-      </div>
-
-      {/* 미리보기 구분선 */}
-      <div className="flex items-center gap-4 print:hidden">
-        <div className="flex-1 border-t border-gray-300"></div>
-        <span className="text-sm text-gray-500 font-medium">미리보기</span>
-        <div className="flex-1 border-t border-gray-300"></div>
-      </div>
-
-      {/* 견적서 시트 */}
-      <div ref={sheetRef}>
-        <EstimateSheet
-          detail={detail}
-          selectedMembershipIndex={selectedMembershipIndex}
-          recipient={recipient || undefined}
-          price={priceNum}
-          commission={commissionNum}
-          acqTax={tradeType === "매도" ? 0 : acqTaxNum}
-          stampDuty={stampDutyNum}
-          deposit={depositNum}
-          organization={organization}
-          userName={user?.name}
-          managerTitle={managerTitle || undefined}
-          tradeType={tradeType}
-        />
-      </div>
-
-      {/* 인쇄 / JPEG 다운로드 버튼 */}
+      {/* Actions */}
       <div className="flex justify-center gap-4 print:hidden">
         <button
           onClick={() => printSheetFitToPage(sheetRef.current!)}
@@ -447,7 +214,6 @@ function parseTransferFeeToWon(feeStr: string | null | undefined): number {
   if (match) {
     const won = parseInt(match[1].replace(/,/g, ""), 10);
     if (!isNaN(won)) {
-      // 원 단위가 충분히 크면 그대로, 아니면 만원 단위로 간주
       return won >= 10000 ? won : won * 10000;
     }
   }

@@ -353,7 +353,7 @@ export default function MembershipForm({
             )}
           </div>
           <Input
-            label="회원권 명칭"
+            label="회원권명"
             placeholder="예: 정회원, 주중회원"
             {...register("membershipName")}
           />
@@ -364,7 +364,7 @@ export default function MembershipForm({
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>비용 정보</CardTitle>
+            <CardTitle>그린피 정보</CardTitle>
             <button
               type="button"
               onClick={addGreenFeeRow}
@@ -380,9 +380,9 @@ export default function MembershipForm({
             <table className="w-full border-collapse">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-2 px-3 text-sm font-medium text-gray-700 w-32">회원 유형</th>
-                  <th className="text-left py-2 px-3 text-sm font-medium text-gray-700">주중 그린피</th>
-                  <th className="text-left py-2 px-3 text-sm font-medium text-gray-700">주말 그린피</th>
+                  <th className="text-left py-2 px-3 text-sm font-medium text-gray-700 w-32">구분</th>
+                  <th className="text-left py-2 px-3 text-sm font-medium text-gray-700">주중</th>
+                  <th className="text-left py-2 px-3 text-sm font-medium text-gray-700">주말</th>
                   <th className="w-10"></th>
                 </tr>
               </thead>
@@ -469,7 +469,7 @@ export default function MembershipForm({
         <CardContent className="space-y-4">
           <div className="grid grid-cols-3 gap-4">
             <Input
-              label="최초 분양가"
+              label="분양가"
               placeholder="1억원"
               {...register("initialSalePrice")}
             />
@@ -496,7 +496,7 @@ export default function MembershipForm({
         </CardHeader>
         <CardContent className="space-y-4">
           <Textarea
-            label="예약 유의사항"
+            label="예약 안내"
             minRows={3}
             placeholder="예약 시 참고사항"
             {...register("reservationNotes")}
@@ -538,12 +538,12 @@ export default function MembershipForm({
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <Input
-              label="담당자 이름"
+              label="담당자"
               placeholder="홍길동"
               {...register("transferManagerName")}
             />
             <Input
-              label="담당자 전화번호"
+              label="연락처"
               placeholder="010-1234-5678"
               {...register("transferManagerPhone")}
             />

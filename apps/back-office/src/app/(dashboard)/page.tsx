@@ -38,8 +38,8 @@ export default function DashboardPage() {
       icon: <FileText className="w-6 h-6" />,
     },
     {
-      title: "거래 메모",
-      description: "상담 및 거래 메모 관리",
+      title: "상담일지",
+      description: "상담일지 관리",
       href: "/trade-memos",
       icon: <MessageSquare className="w-6 h-6" />,
     },

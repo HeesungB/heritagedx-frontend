@@ -57,7 +57,7 @@ export default function TradeMemosPage() {
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"" | "매수" | "매도">("");
-  const [filterDone, setFilterDone] = useState<"" | "done" | "notDone">("");
+  const [filterDone, setFilterDone] = useState<"" | "done" | "notDone">("notDone");
 
   // 골프장/회원권/기간 필터
   const [selectedClubCode, setSelectedClubCode] = useState("");
@@ -85,7 +85,7 @@ export default function TradeMemosPage() {
   const [relatedMemos, setRelatedMemos] = useState<TradeMemo[]>([]);
   const [isLoadingRelated, setIsLoadingRelated] = useState(false);
   const [relatedSort, setRelatedSort] = useState<"date" | "price">("date");
-  const [relatedFilterDone, setRelatedFilterDone] = useState<"" | "done" | "notDone">("");
+  const [relatedFilterDone, setRelatedFilterDone] = useState<"" | "done" | "notDone">("notDone");
 
   // 디바운스: searchInput → searchQuery (300ms)
   useEffect(() => {
@@ -146,14 +146,8 @@ export default function TradeMemosPage() {
     if (dateTo) {
       result = result.filter((m) => m.registrationDate && m.registrationDate <= dateTo);
     }
-    if (filterDone === "done") {
-      result = result.filter((m) => m.isDone);
-    }
-    if (filterDone === "notDone") {
-      result = result.filter((m) => !m.isDone);
-    }
     return result;
-  }, [rawMemos, selectedClubCode, selectedMembership, dateFrom, dateTo, filterDone]);
+  }, [rawMemos, selectedClubCode, selectedMembership, dateFrom, dateTo]);
 
   // 폼용 골프장/회원권 상태
   const [formClubCode, setFormClubCode] = useState("");
@@ -252,7 +246,8 @@ export default function TradeMemosPage() {
       preloadedMemos &&
       page === 1 &&
       !searchQuery &&
-      !filterType
+      !filterType &&
+      !filterDone
     ) {
       usedPreloadRef.current = true;
       setRawMemos(preloadedMemos.trades);
@@ -271,6 +266,7 @@ export default function TradeMemosPage() {
         tradeType: filterType || undefined,
         sort: "registrationDate",
         order: "DESC",
+        isDone: filterDone === "done" ? true : filterDone === "notDone" ? false : undefined,
       });
       if (response.success && response.data) {
         setRawMemos(response.data.trades || []);
@@ -283,7 +279,7 @@ export default function TradeMemosPage() {
       setRawMemos([]);
     }
     setIsLoading(false);
-  }, [page, searchQuery, filterType, preloadedMemos, clearPreloadedMemos]);
+  }, [page, searchQuery, filterType, filterDone, preloadedMemos, clearPreloadedMemos]);
 
   useEffect(() => {
     loadMemos();
@@ -313,7 +309,7 @@ export default function TradeMemosPage() {
         isDone: false,
       });
       if (response.success) {
-        alert("거래 메모가 등록되었습니다.");
+        alert("상담일지가 등록되었습니다.");
         setShowAddDrawer(false);
         resetForm();
         loadMemos();
@@ -351,7 +347,7 @@ export default function TradeMemosPage() {
         isDone: form.isDone,
       });
       if (response.success) {
-        alert("거래 메모가 수정되었습니다.");
+        alert("상담일지가 수정되었습니다.");
         setEditingMemo(null);
         resetForm();
         loadMemos();
@@ -514,12 +510,12 @@ export default function TradeMemosPage() {
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-1">
           <MessageSquare className="w-6 h-6 text-primary" />
-          <h1 className="text-xl font-bold text-gray-900">거래 메모</h1>
+          <h1 className="text-xl font-bold text-gray-900">상담일지</h1>
           {pagination && (
             <Badge variant="default">총 {pagination.totalItems}건</Badge>
           )}
         </div>
-        <p className="text-sm text-gray-500">모든 거래 메모를 관리합니다.</p>
+        <p className="text-sm text-gray-500">모든 상담일지를 관리합니다.</p>
       </div>
 
       <Card>
@@ -622,7 +618,7 @@ export default function TradeMemosPage() {
                 <MessageSquare className="w-8 h-8 text-gray-400" />
               </div>
               <p className="text-gray-500 mb-2">
-                {searchInput || filterType || selectedClubCode || filterDone ? "검색 결과가 없습니다" : "등록된 거래 메모가 없습니다"}
+                {searchInput || filterType || selectedClubCode || filterDone ? "검색 결과가 없습니다" : "등록된 상담일지가 없습니다"}
               </p>
             </div>
           ) : (
@@ -690,7 +686,7 @@ export default function TradeMemosPage() {
       <Drawer
         isOpen={showAddDrawer || !!editingMemo}
         onClose={() => { setShowAddDrawer(false); setEditingMemo(null); resetForm(); }}
-        title={editingMemo ? "거래 메모 수정" : "거래 메모 추가"}
+        title={editingMemo ? "상담일지 수정" : "상담일지 추가"}
         width="lg"
       >
         <div className="space-y-4">
@@ -1087,8 +1083,8 @@ export default function TradeMemosPage() {
         isOpen={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
-        title="거래 메모 삭제"
-        message={`"${deleteTarget?.customerName}" 고객의 거래 메모를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`}
+        title="상담일지 삭제"
+        message={`"${deleteTarget?.customerName}" 고객의 상담일지를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`}
         confirmText="삭제"
         variant="danger"
         isLoading={isDeleting}

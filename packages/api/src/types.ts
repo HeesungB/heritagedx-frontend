@@ -11,6 +11,7 @@ export interface TradeListParams extends ListParams {
   clubId?: string;
   sort?: string;
   order?: "ASC" | "DESC";
+  isDone?: boolean;
 }
 
 export interface PaginatedList<T> {

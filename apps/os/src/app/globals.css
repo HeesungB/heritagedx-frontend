@@ -179,6 +179,14 @@
     padding: 0 !important;
   }
 
+  /* 시트 내부 flex 레이아웃 유지 (flex→block 변환이 높이를 변경시켜 zoom 계산과 불일치 방지) */
+  .max-w-4xl .flex {
+    display: flex !important;
+  }
+  .max-w-4xl .inline-flex {
+    display: inline-flex !important;
+  }
+
   /* zoom 속성이 인쇄 시 올바르게 작동하도록 보장 */
   [style*="zoom"] {
     -webkit-print-color-adjust: exact !important;

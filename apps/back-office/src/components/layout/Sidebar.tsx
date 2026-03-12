@@ -22,6 +22,8 @@ import {
   normalizeInitial,
   getRegionGroup,
   REGION_GROUPS,
+  extractRegionFromAddress,
+  getEffectiveRegion,
 } from "@heritage-dx/utils";
 import { useData } from "@/contexts/DataContext";
 
@@ -60,8 +62,9 @@ export default function Sidebar({ onClose }: { onClose?: () => void } = {}) {
   const availableRegionGroups = useMemo(() => {
     const set = new Set<string>();
     clubs.forEach((club) => {
-      if (club.region) {
-        const group = getRegionGroup(club.region);
+      const effective = getEffectiveRegion(club.region || "", club.address || "");
+      if (effective) {
+        const group = getRegionGroup(effective);
         if (group) set.add(group);
       }
     });
@@ -94,7 +97,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void } = {}) {
     // 지역 필터
     if (filterMode === "region" && activeRegion) {
       result = result.filter(
-        (club) => club.region && getRegionGroup(club.region) === activeRegion
+        (club) => getRegionGroup(getEffectiveRegion(club.region || "", club.address || "")) === activeRegion
       );
     }
 
@@ -105,7 +108,8 @@ export default function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         (club) =>
           club.name.toLowerCase().includes(term) ||
           club.code.toLowerCase().includes(term) ||
-          (club.region && club.region.toLowerCase().includes(term))
+          (club.region && club.region.toLowerCase().includes(term)) ||
+          (club.address && club.address.toLowerCase().includes(term))
       );
     }
 
@@ -318,9 +322,21 @@ export default function Sidebar({ onClose }: { onClose?: () => void } = {}) {
                     >
                       {club.name}
                     </span>
+                    {club.operationTypes?.map((type) => (
+                      <span
+                        key={type}
+                        className={`inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded ${
+                          type === "MEMBERSHIP"
+                            ? "bg-blue-100 text-blue-700"
+                            : "bg-green-100 text-green-700"
+                        }`}
+                      >
+                        {type === "MEMBERSHIP" ? "회원제" : "퍼블릭"}
+                      </span>
+                    ))}
                   </div>
                   <div className="text-xs text-gray-500">
-                    {club.region || ""}
+                    {club.region || (club.address ? extractRegionFromAddress(club.address) : "")}
                   </div>
                 </button>
                 {/* 더보기 메뉴 */}

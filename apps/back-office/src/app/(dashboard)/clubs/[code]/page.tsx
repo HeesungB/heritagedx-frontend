@@ -108,12 +108,14 @@ const clubInfoSchema = z.object({
   cityAccessibility: z.string().optional(),
   memo: z.string().optional(),
   dealerMemo: z.string().optional(),
+  membershipInfo: z.string().optional(),
   introduction: z.string().optional(),
   facilities: z.string().optional(),
   registrationFee: z.string().optional(),
   stampDuty: z.string().optional(),
   agencyFee: z.string().optional(),
   otherCosts: z.string().optional(),
+  website: z.string().optional(),
   caddyFee: optionalNumber,
   cartFee: optionalNumber,
 });
@@ -220,12 +222,14 @@ export default function ClubDetailPage({ params }: PageProps) {
         cityAccessibility: club.cityAccessibility || "",
         memo: club.memo || "",
         dealerMemo: club.dealerMemo || "",
+        membershipInfo: club.membershipInfo || "",
         introduction: club.introduction || "",
         facilities: club.facilities || "",
         registrationFee: club.registrationFee || "",
         stampDuty: club.stampDuty || "",
         agencyFee: club.agencyFee || "",
         otherCosts: club.otherCosts || "",
+        website: club.website || "",
         caddyFee: club.caddyFee,
         cartFee: club.cartFee,
       });
@@ -781,6 +785,11 @@ export default function ClubDetailPage({ params }: PageProps) {
             placeholder="경기도 용인시..."
             {...registerClubInfo("address")}
           />
+          <Input
+            label="홈페이지"
+            placeholder="https://www.example.com"
+            {...registerClubInfo("website")}
+          />
         </CardContent>
       </Card>
 
@@ -803,6 +812,14 @@ export default function ClubDetailPage({ params }: PageProps) {
               {...registerClubInfo("facilities")}
             />
           </div>
+          <div className="mt-4">
+            <Textarea
+              label="회원구성"
+              minRows={3}
+              placeholder="회원 구성 정보를 입력하세요"
+              {...registerClubInfo("membershipInfo")}
+            />
+          </div>
         </CardContent>
       </Card>
 
@@ -819,12 +836,12 @@ export default function ClubDetailPage({ params }: PageProps) {
               {...registerClubInfo("openingDate")}
             />
             <Input
-              label="홀 구성"
+              label="코스규모"
               placeholder="36홀"
               {...registerClubInfo("holes")}
             />
             <Input
-              label="회원 수"
+              label="회원수"
               placeholder="1,979명"
               {...registerClubInfo("memberCount")}
             />
@@ -834,17 +851,6 @@ export default function ClubDetailPage({ params }: PageProps) {
             placeholder="서울에서 40분"
             {...registerClubInfo("cityAccessibility")}
           />
-          {/* 코스명 표시 (읽기 전용) */}
-          {club.courseNames && club.courseNames.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">코스명</label>
-              <div className="flex flex-wrap gap-2">
-                {club.courseNames.map((name, i) => (
-                  <span key={i} className="px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700">{name}</span>
-                ))}
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -953,7 +959,7 @@ export default function ClubDetailPage({ params }: PageProps) {
               {...registerClubInfo("caddyFee")}
             />
             <Input
-              label="카트피"
+              label="카트비"
               type="number"
               placeholder="100000"
               {...registerClubInfo("cartFee")}

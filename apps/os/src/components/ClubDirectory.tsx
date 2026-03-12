@@ -33,9 +33,20 @@ export function normalizeInitial(initial: string): string {
   return map[initial] || initial;
 }
 
-// "충남 아산시" → "충남"
+// 정식명 → 약칭 매핑
+const PROVINCE_NORMALIZE: Record<string, string> = {
+  경기도: "경기", 강원도: "강원", 충청북도: "충북", 충청남도: "충남",
+  전라북도: "전북", 전라남도: "전남", 경상북도: "경북", 경상남도: "경남",
+  제주도: "제주", 제주특별자치도: "제주",
+  서울특별시: "서울", 부산광역시: "부산", 대구광역시: "대구",
+  인천광역시: "인천", 광주광역시: "광주", 대전광역시: "대전",
+  울산광역시: "울산", 세종특별자치시: "세종",
+};
+
+// "경기도 용인시" → "경기"
 export function getProvince(region: string): string {
-  return region.split(" ")[0] || region;
+  const first = region.split(" ")[0] || region;
+  return PROVINCE_NORMALIZE[first] ?? first;
 }
 
 // 권역 그룹 정의 (표시 순서대로)
@@ -56,6 +67,20 @@ export function getRegionGroup(region: string): string | undefined {
   return PROVINCE_TO_GROUP[province];
 }
 
+/** address에서 "도 시" 부분 추출 (예: "경기도 용인시 처인구 ..." → "경기도 용인시") */
+export function extractRegionFromAddress(address: string): string {
+  const parts = address.trim().split(/\s+/);
+  if (parts.length >= 2) return `${parts[0]} ${parts[1]}`;
+  return parts[0] || "";
+}
+
+/** club의 region이 비어있으면 address에서 추출 */
+function getEffectiveRegion(region: string, address: string): string {
+  if (region) return region;
+  if (address) return extractRegionFromAddress(address);
+  return "";
+}
+
 export default function ClubDirectory({ clubs, totalCount, onClubSelect }: ClubDirectoryProps) {
   const [searchQuery, setSearchQuery] = useState("");
   // 필터 모드: null(없음), "initial"(가나다), "region"(지역) — 배타적
@@ -67,8 +92,9 @@ export default function ClubDirectory({ clubs, totalCount, onClubSelect }: ClubD
   const regionGroups = useMemo(() => {
     const groupSet = new Set<string>();
     for (const club of clubs) {
-      if (club.region) {
-        const group = getRegionGroup(club.region);
+      const effective = getEffectiveRegion(club.region, club.address);
+      if (effective) {
+        const group = getRegionGroup(effective);
         if (group) groupSet.add(group);
       }
     }
@@ -94,7 +120,8 @@ export default function ClubDirectory({ clubs, totalCount, onClubSelect }: ClubD
         (club) =>
           club.name?.toLowerCase().includes(query) ||
           club.code?.toLowerCase().includes(query) ||
-          club.region?.toLowerCase().includes(query)
+          club.region?.toLowerCase().includes(query) ||
+          club.address?.toLowerCase().includes(query)
       );
     }
 
@@ -106,7 +133,7 @@ export default function ClubDirectory({ clubs, totalCount, onClubSelect }: ClubD
     }
 
     if (filterMode === "region" && selectedRegion) {
-      result = result.filter((club) => getRegionGroup(club.region) === selectedRegion);
+      result = result.filter((club) => getRegionGroup(getEffectiveRegion(club.region, club.address)) === selectedRegion);
     }
 
     return result.sort((a, b) => a.name.localeCompare(b.name, "ko"));
@@ -262,15 +289,27 @@ export default function ClubDirectory({ clubs, totalCount, onClubSelect }: ClubD
                   <h3 className="text-base font-semibold text-gray-900 group-hover:text-gray-700 transition-colors">
                     {club.name}
                   </h3>
+                  {club.operationTypes?.map((type) => (
+                    <span
+                      key={type}
+                      className={`inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded ${
+                        type === "MEMBERSHIP"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-green-100 text-green-700"
+                      }`}
+                    >
+                      {type === "MEMBERSHIP" ? "회원제" : type === "PUBLIC" ? "퍼블릭" : type}
+                    </span>
+                  ))}
                 </div>
                 <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
-                  {club.region && (
+                  {(club.region || club.address) && (
                     <span className="flex items-center gap-1">
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
                         <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
                       </svg>
-                      {club.region}
+                      {club.region || extractRegionFromAddress(club.address)}
                     </span>
                   )}
                   {club.holes && (

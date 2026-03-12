@@ -50,7 +50,7 @@ export default function TradesPageClient() {
   const [selectedClubCode, setSelectedClubCode] = useState<string>("");
   const [memberships, setMemberships] = useState<string[]>([]);
   const [selectedMembership, setSelectedMembership] = useState<string>("");
-  const [filterDone, setFilterDone] = useState<"전체" | "완료" | "진행중">("전체");
+  const [filterDone, setFilterDone] = useState<"전체" | "완료" | "진행중">("진행중");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const clubsRef = useRef<Club[]>([]);
@@ -148,6 +148,7 @@ export default function TradesPageClient() {
         order: sortOrder,
         tradeType: filter !== "전체" ? filter : undefined,
         search: searchQuery.trim() || undefined,
+        isDone: filterDone === "완료" ? true : filterDone === "진행중" ? false : undefined,
       });
       if (response.data) {
         setRawTrades((response.data.trades || []).map(mapTradMemoDtoToEntity));
@@ -160,7 +161,7 @@ export default function TradesPageClient() {
     } finally {
       setLoading(false);
     }
-  }, [page, filter, searchQuery, sortField, sortOrder]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [page, filter, searchQuery, sortField, sortOrder, filterDone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchTrades();
@@ -182,13 +183,8 @@ export default function TradesPageClient() {
     if (dateTo) {
       filtered = filtered.filter((t) => (t.registrationDate || "") <= dateTo);
     }
-    if (filterDone === "완료") {
-      filtered = filtered.filter((t) => t.isDone);
-    } else if (filterDone === "진행중") {
-      filtered = filtered.filter((t) => !t.isDone);
-    }
     return filtered;
-  }, [rawTrades, selectedClubCode, selectedMembership, dateFrom, dateTo, filterDone]);
+  }, [rawTrades, selectedClubCode, selectedMembership, dateFrom, dateTo]);
 
   // 거래 데이터에 있는 골프장만 필터 드롭다운에 표시
   const availableClubs = useMemo(() => {
@@ -376,8 +372,8 @@ export default function TradesPageClient() {
                   </svg>
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-xl font-bold text-gray-900">거래 메모</h2>
-                  <p className="text-sm text-gray-500 mt-0.5">전체 골프장의 회원권 거래 메모를 관리합니다</p>
+                  <h2 className="text-xl font-bold text-gray-900">상담일지</h2>
+                  <p className="text-sm text-gray-500 mt-0.5">전체 골프장의 회원권 상담일지를 관리합니다</p>
                 </div>
               </div>
               <Button
@@ -796,7 +792,7 @@ export default function TradesPageClient() {
               <div className="py-20 flex justify-center"><Loading text="로딩 중..." /></div>
             ) : trades.length === 0 ? (
               <div className="py-20 text-center">
-                <p className="text-gray-400 mb-3">등록된 거래 메모가 없습니다</p>
+                <p className="text-gray-400 mb-3">등록된 상담일지가 없습니다</p>
                 <button
                   onClick={() => { setShowForm(true); setEditingTrade(null); setForm(emptyForm); setFormClubCode(""); setFormMemberships([]); setManualClubInput(false); setManualMembershipInput(false); }}
                   className="text-sm text-gray-600 underline hover:text-gray-900"

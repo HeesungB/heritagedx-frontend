@@ -32,9 +32,20 @@ export function normalizeInitial(initial: string): string {
   return DOUBLE_TO_SINGLE[initial] ?? initial;
 }
 
-/** 지역 문자열에서 첫 단어(도/시) 추출: "충남 아산시" → "충남" */
+// 정식명 → 약칭 매핑
+const PROVINCE_NORMALIZE: Record<string, string> = {
+  경기도: "경기", 강원도: "강원", 충청북도: "충북", 충청남도: "충남",
+  전라북도: "전북", 전라남도: "전남", 경상북도: "경북", 경상남도: "경남",
+  제주도: "제주", 제주특별자치도: "제주",
+  서울특별시: "서울", 부산광역시: "부산", 대구광역시: "대구",
+  인천광역시: "인천", 광주광역시: "광주", 대전광역시: "대전",
+  울산광역시: "울산", 세종특별자치시: "세종",
+};
+
+/** 지역 문자열에서 첫 단어(도/시) 추출 후 약칭으로 정규화: "경기도 용인시" → "경기" */
 export function getProvince(region: string): string {
-  return region.trim().split(/\s+/)[0];
+  const first = region.trim().split(/\s+/)[0];
+  return PROVINCE_NORMALIZE[first] ?? first;
 }
 
 // 도/시 약칭 → 광역 그룹 매핑
@@ -53,4 +64,18 @@ export const REGION_GROUPS = ["수도권", "강원도", "충청도", "전라도"
 export function getRegionGroup(region: string): string | null {
   const province = getProvince(region);
   return REGION_GROUP_MAP[province] ?? null;
+}
+
+/** address에서 "도 시" 부분 추출 (예: "경기도 용인시 처인구 ..." → "경기도 용인시") */
+export function extractRegionFromAddress(address: string): string {
+  const parts = address.trim().split(/\s+/);
+  if (parts.length >= 2) return `${parts[0]} ${parts[1]}`;
+  return parts[0] || "";
+}
+
+/** club의 region이 비어있으면 address에서 추출 */
+export function getEffectiveRegion(region: string, address: string): string {
+  if (region) return region;
+  if (address) return extractRegionFromAddress(address);
+  return "";
 }

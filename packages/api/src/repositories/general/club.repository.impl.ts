@@ -9,7 +9,7 @@ export class ClubRepository implements IClubRepository {
 
   async getAll(params?: ListParams): Promise<ApiResponse<ClubsResponse>> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const response = await this.api.get<any>("/clubs?operationType=MEMBERSHIP", params);
+    const response = await this.api.get<any>("/clubs", params);
     if (response.success && response.data) {
       const { items, pagination } = normalizeListResponse<Club>(
         response.data,

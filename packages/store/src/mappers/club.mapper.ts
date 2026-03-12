@@ -10,6 +10,7 @@ export function mapClubDtoToEntity(dto: Club): ClubEntity {
     code: dto.code,
     name: dto.name,
     region: dto.region ?? "",
+    address: dto.address ?? "",
     contact: dto.contact ?? "",
     holes: dto.holes ?? undefined,
     operationTypes: dto.operationTypes ?? [],
@@ -43,6 +44,7 @@ export function mapClubDetailDtoToEntity(dto: ClubDetail): ClubDetailEntity {
     region: dto.region ?? "",
     address: dto.address ?? "",
     memo: dto.memo ?? null,
+    website: dto.website ?? null,
     updatedAt: dto.updatedAt ?? null,
 
     basicInfo: {

@@ -78,20 +78,36 @@ export function AuthProvider({
     checkSession();
   }, [authApi]);
 
-  // 주기적 토큰 refresh (14분마다)
+  // 재시도 포함 refresh 헬퍼
+  const refreshWithRetry = useCallback(async (): Promise<boolean> => {
+    // 1차: refresh 시도
+    const first = await authApi.refresh();
+    if (first) return true;
+
+    // 2차: 1초 후 재시도
+    await new Promise((r) => setTimeout(r, 1000));
+    const second = await authApi.refresh();
+    if (second) return true;
+
+    // 3차: me()로 세션 유효성 최종 확인
+    const meResult = await authApi.me();
+    return !!(meResult.success && meResult.data);
+  }, [authApi]);
+
+  // 주기적 토큰 refresh (10분마다)
   useEffect(() => {
     if (!user) return;
 
     const interval = setInterval(async () => {
-      const refreshed = await authApi.refresh();
+      const refreshed = await refreshWithRetry();
       if (!refreshed) {
         setUser(null);
         router.replace(loginPath);
       }
-    }, 14 * 60 * 1000);
+    }, 10 * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [user, router, authApi, loginPath]);
+  }, [user, router, refreshWithRetry, loginPath]);
 
   // 탭 복귀 시 토큰 refresh (브라우저 백그라운드 throttle 대응)
   useEffect(() => {
@@ -99,7 +115,7 @@ export function AuthProvider({
 
     const handleVisibilityChange = async () => {
       if (document.visibilityState === "visible") {
-        const refreshed = await authApi.refresh();
+        const refreshed = await refreshWithRetry();
         if (!refreshed) {
           setUser(null);
           router.replace(loginPath);
@@ -111,7 +127,7 @@ export function AuthProvider({
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [user, router, authApi, loginPath]);
+  }, [user, router, refreshWithRetry, loginPath]);
 
   const login = useCallback(
     async (email: string, password: string): Promise<string | null> => {

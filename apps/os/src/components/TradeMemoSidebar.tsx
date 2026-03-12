@@ -43,7 +43,7 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"" | "매수" | "매도">("");
-  const [filterDone, setFilterDone] = useState<"" | "done" | "progress">("");
+  const [filterDone, setFilterDone] = useState<"" | "done" | "progress">("progress");
   const [manualMembershipInput, setManualMembershipInput] = useState(false);
 
   const fetchTrades = useCallback(async () => {
@@ -56,6 +56,7 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
         order: "DESC",
         search: searchQuery.trim() || undefined,
         tradeType: filterType || undefined,
+        isDone: filterDone === "done" ? true : filterDone === "progress" ? false : undefined,
       });
       if (response.data) {
         setTrades((response.data.trades || []).map(mapTradMemoDtoToEntity));
@@ -65,7 +66,7 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, filterType]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searchQuery, filterType, filterDone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchTrades();
@@ -232,10 +233,6 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
     }
   };
 
-  const filteredTrades = filterDone
-    ? trades.filter((t) => filterDone === "done" ? t.isDone : !t.isDone)
-    : trades;
-
   const membershipTypes = clubDetail.memberships?.map(
     (m) => m.membershipName || m.membershipType
   ) || [];
@@ -244,7 +241,7 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
     <aside className="fixed inset-0 z-40 lg:static lg:inset-auto lg:z-auto w-full lg:w-80 h-full min-h-0 border-l border-gray-200 bg-white flex flex-col print:hidden">
       {/* 헤더 */}
       <div className="px-3 py-2.5 border-b border-gray-200 flex items-center justify-between bg-gray-50">
-        <h3 className="font-bold text-sm text-gray-900">거래 메모</h3>
+        <h3 className="font-bold text-sm text-gray-900">상담일지</h3>
         <button
           onClick={onClose}
           className="p-0.5 hover:bg-gray-200 rounded transition-colors"
@@ -294,11 +291,11 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
         {activeTab === "list" && (
           <div className="p-3 space-y-3">
             {/* 검색 + 필터 */}
-            <div className="flex items-center gap-1.5 mb-2">
-              <div className="relative flex-1 min-w-0">
+            <div className="space-y-1.5 mb-2">
+              <div className="relative">
                 <input
                   type="text"
-                  placeholder="검색"
+                  placeholder="골프장명, 고객명, 회원권 검색"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full px-2.5 py-1.5 pr-7 border border-gray-200 rounded text-xs focus:outline-none focus:border-gray-400"
@@ -307,37 +304,39 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </div>
-              <div className="flex items-center gap-0.5 bg-gray-100 rounded p-0.5 shrink-0">
-                {(["", "매수", "매도"] as const).map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => setFilterType(type)}
-                    className={`px-2 py-1 text-[11px] font-medium rounded transition-colors whitespace-nowrap ${
-                      filterType === type
-                        ? type === "매수" ? "bg-blue-600 text-white shadow-sm"
-                          : type === "매도" ? "bg-red-500 text-white shadow-sm"
-                          : "bg-emerald-600 text-white shadow-sm"
-                        : "text-gray-500 hover:text-gray-700"
-                    }`}
-                  >
-                    {type || "전체"}
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-center gap-0.5 bg-gray-100 rounded p-0.5 shrink-0">
-                {([{ value: "", label: "전체" }, { value: "progress", label: "진행중" }, { value: "done", label: "완료" }] as const).map((status) => (
-                  <button
-                    key={status.value}
-                    onClick={() => setFilterDone(status.value as "" | "done" | "progress")}
-                    className={`px-1.5 py-1 text-[11px] rounded transition-colors whitespace-nowrap ${
-                      filterDone === status.value
-                        ? "bg-white text-gray-700 shadow-sm"
-                        : "text-gray-500 hover:text-gray-700"
-                    }`}
-                  >
-                    {status.label}
-                  </button>
-                ))}
+              <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-0.5 bg-gray-100 rounded p-0.5 shrink-0">
+                  {(["", "매수", "매도"] as const).map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => setFilterType(type)}
+                      className={`px-2 py-1 text-[11px] font-medium rounded transition-colors whitespace-nowrap ${
+                        filterType === type
+                          ? type === "매수" ? "bg-blue-600 text-white shadow-sm"
+                            : type === "매도" ? "bg-red-500 text-white shadow-sm"
+                            : "bg-emerald-600 text-white shadow-sm"
+                          : "text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      {type || "전체"}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-0.5 bg-gray-100 rounded p-0.5 shrink-0">
+                  {([{ value: "", label: "전체" }, { value: "progress", label: "진행중" }, { value: "done", label: "완료" }] as const).map((status) => (
+                    <button
+                      key={status.value}
+                      onClick={() => setFilterDone(status.value as "" | "done" | "progress")}
+                      className={`px-1.5 py-1 text-[11px] rounded transition-colors whitespace-nowrap ${
+                        filterDone === status.value
+                          ? "bg-white text-gray-700 shadow-sm"
+                          : "text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      {status.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -354,7 +353,7 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
                 </button>
               </div>
             ) : (
-              filteredTrades.map((trade) => (
+              trades.map((trade) => (
                 <div
                   key={trade.id}
                   className={`border rounded-lg transition-colors border-l-[3px] ${

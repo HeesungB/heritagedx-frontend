@@ -193,17 +193,17 @@ export default function GolfClubDetail({ detail, loading, onConfirm, onReset }: 
       </div>
 
       {/* 외부 안내 URL */}
-      {detail.registration.externalUrl && (
+      {detail.website && (
         <div className="mb-8">
           <label className="text-gray-500 text-sm block mb-1">외부 안내 URL</label>
           <div className="border border-gray-200 bg-gray-50 rounded-lg p-3">
             <a
-              href={detail.registration.externalUrl}
+              href={detail.website}
               target="_blank"
               rel="noopener noreferrer"
               className="text-link underline hover:text-link-hover"
             >
-              {detail.registration.externalUrl}
+              {detail.website}
             </a>
           </div>
         </div>

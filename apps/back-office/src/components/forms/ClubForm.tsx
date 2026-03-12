@@ -24,6 +24,7 @@ const clubSchema = z.object({
   holes: z.string().optional(),
   memberCount: z.string().optional(),
   cityAccessibility: z.string().optional(),
+  website: z.string().optional(),
   memo: z.string().optional(),
   dealerMemo: z.string().optional(),
 });
@@ -61,6 +62,7 @@ export default function ClubForm({
               ? String(initialData.memberCount)
               : (initialData.memberCount as string) || "",
           cityAccessibility: initialData.cityAccessibility || "",
+          website: initialData.website || "",
           memo: initialData.memo || "",
           dealerMemo: initialData.dealerMemo || "",
         }
@@ -114,6 +116,11 @@ export default function ClubForm({
             placeholder="경기도 용인시..."
             {...register("address")}
           />
+          <Input
+            label="홈페이지"
+            placeholder="https://www.example.com"
+            {...register("website")}
+          />
         </CardContent>
       </Card>
 
@@ -130,12 +137,12 @@ export default function ClubForm({
               {...register("openingDate")}
             />
             <Input
-              label="홀 구성"
+              label="코스규모"
               placeholder="36홀"
               {...register("holes")}
             />
             <Input
-              label="회원 수"
+              label="회원수"
               placeholder="1,979명"
               {...register("memberCount")}
             />

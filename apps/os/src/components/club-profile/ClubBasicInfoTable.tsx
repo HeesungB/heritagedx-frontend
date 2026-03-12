@@ -10,9 +10,9 @@ interface ClubBasicInfoTableProps {
   memberDaySchedule?: string;
   phoneNumber?: string;
   totalLength?: string;
-  courseNames?: string[];
   introduction?: string;
   facilities?: string;
+  website?: string;
 }
 
 export default function ClubBasicInfoTable({
@@ -25,9 +25,9 @@ export default function ClubBasicInfoTable({
   memberDaySchedule,
   phoneNumber,
   totalLength,
-  courseNames,
   introduction,
   facilities,
+  website,
 }: ClubBasicInfoTableProps) {
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return "-";
@@ -127,19 +127,25 @@ export default function ClubBasicInfoTable({
             {totalLength || "-"}
           </td>
         </tr>
-        {(courseNames && courseNames.length > 0 || facilities) && (
+        {facilities && (
           <tr>
-            <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium whitespace-nowrap">
-              코스명
-            </td>
-            <td className="border border-gray-300 px-3 py-2 text-sm">
-              {courseNames && courseNames.length > 0 ? courseNames.join(", ") : "-"}
-            </td>
             <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium whitespace-nowrap">
               부대시설
             </td>
-            <td className="border border-gray-300 px-3 py-2 text-sm whitespace-pre-wrap">
-              {facilities || "-"}
+            <td colSpan={3} className="border border-gray-300 px-3 py-2 text-sm whitespace-pre-wrap">
+              {facilities}
+            </td>
+          </tr>
+        )}
+        {website && (
+          <tr>
+            <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium whitespace-nowrap">
+              홈페이지
+            </td>
+            <td colSpan={3} className="border border-gray-300 px-3 py-2 text-sm">
+              <a href={website.startsWith("http") ? website : `https://${website}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                {website}
+              </a>
             </td>
           </tr>
         )}

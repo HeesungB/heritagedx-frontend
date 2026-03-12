@@ -24,6 +24,7 @@ export interface ClubEntity {
   code: string;
   name: string;
   region: string;
+  address: string;
   contact: string;
   holes?: string;
   operationTypes: string[];
@@ -39,6 +40,7 @@ export interface ClubDetailEntity {
   region: string;
   address: string;
   memo: string | null;
+  website: string | null;
   updatedAt: string | null;
 
   basicInfo: {

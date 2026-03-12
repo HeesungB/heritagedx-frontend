@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
     );
 
     const oppositeType = tradeType === "매수" ? "매도" : "매수";
-    const title = `새 거래 메모: ${clubName}`;
+    const title = `새 상담일지: ${clubName}`;
     let messageBody = `[${tradeType}] ${customerName} - ${membershipType}`;
     if (matches.count > 0) {
       messageBody += `\n반대매매(${oppositeType}) ${matches.count}건`;

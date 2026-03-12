@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@heritage-dx/types": "workspace:*",
+    "@heritage-dx/utils": "workspace:*",
     "lucide-react": "^0.468.0"
   },
   "peerDependencies": {

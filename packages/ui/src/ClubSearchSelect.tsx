@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { ChevronDown, X, Search } from "lucide-react";
 import type { Club } from "@heritage-dx/types";
+import { extractRegionFromAddress } from "@heritage-dx/utils";
 
 interface ClubSearchSelectProps {
   clubs: Club[];
@@ -152,10 +153,24 @@ export default function ClubSearchSelect({
                     : "text-gray-700"
                 }`}
               >
-                <span className="text-sm">{c.name}</span>
-                {c.region && (
+                <div className="flex items-center gap-1">
+                  <span className="text-sm">{c.name}</span>
+                  {c.operationTypes?.map((type) => (
+                    <span
+                      key={type}
+                      className={`inline-flex px-1 py-0.5 text-[10px] font-medium rounded ${
+                        type === "MEMBERSHIP"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-green-100 text-green-700"
+                      }`}
+                    >
+                      {type === "MEMBERSHIP" ? "회원제" : type === "PUBLIC" ? "퍼블릭" : type}
+                    </span>
+                  ))}
+                </div>
+                {(c.region || c.address) && (
                   <div className="text-xs text-gray-400">
-                    {c.region}{c.holes ? ` · ${c.holes}` : ""}
+                    {c.region || (c.address ? extractRegionFromAddress(c.address) : "")}{c.holes ? ` · ${c.holes}` : ""}
                   </div>
                 )}
               </button>

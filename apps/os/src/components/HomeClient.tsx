@@ -10,7 +10,9 @@ import ClubDirectory, {
   normalizeInitial,
   getRegionGroup,
   REGION_GROUPS,
+  extractRegionFromAddress,
 } from "@/components/ClubDirectory";
+import { getEffectiveRegion } from "@heritage-dx/utils";
 import MobileNavigation from "@/components/MobileNavigation";
 import { Club, ClubDetail } from "@/types";
 import { useAppStores } from "@/stores";
@@ -178,8 +180,9 @@ function ClubListSidebarWithData({
   const regionGroups = useMemo(() => {
     const groupSet = new Set<string>();
     for (const club of initialClubs) {
-      if (club.region) {
-        const group = getRegionGroup(club.region);
+      const effective = getEffectiveRegion(club.region, club.address);
+      if (effective) {
+        const group = getRegionGroup(effective);
         if (group) groupSet.add(group);
       }
     }
@@ -203,7 +206,8 @@ function ClubListSidebarWithData({
         (club) =>
           club.name?.toLowerCase().includes(query) ||
           club.code?.toLowerCase().includes(query) ||
-          club.region?.toLowerCase().includes(query)
+          club.region?.toLowerCase().includes(query) ||
+          club.address?.toLowerCase().includes(query)
       );
     }
 
@@ -212,7 +216,7 @@ function ClubListSidebarWithData({
     }
 
     if (filterMode === "region" && selectedRegion) {
-      result = result.filter((club) => getRegionGroup(club.region) === selectedRegion);
+      result = result.filter((club) => getRegionGroup(getEffectiveRegion(club.region, club.address)) === selectedRegion);
     }
 
     const sorted = result.sort((a, b) => a.name.localeCompare(b.name, "ko"));
@@ -357,9 +361,21 @@ function ClubListSidebarWithData({
                     <span className={`text-sm font-medium ${isSelected ? "text-gray-900" : "text-gray-900"}`}>
                       {club.name}
                     </span>
+                    {club.operationTypes?.map((type) => (
+                      <span
+                        key={type}
+                        className={`inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded ${
+                          type === "MEMBERSHIP"
+                            ? "bg-blue-100 text-blue-700"
+                            : "bg-green-100 text-green-700"
+                        }`}
+                      >
+                        {type === "MEMBERSHIP" ? "회원제" : type === "PUBLIC" ? "퍼블릭" : type}
+                      </span>
+                    ))}
                   </div>
                   <div className={`text-xs ${isSelected ? "text-gray-500" : "text-gray-500"}`}>
-                    {club.region}{club.holes ? ` · ${club.holes}` : ""}
+                    {club.region || (club.address ? extractRegionFromAddress(club.address) : "")}{club.holes ? ` · ${club.holes}` : ""}
                   </div>
                 </div>
               </div>
@@ -398,8 +414,9 @@ function MobileClubList({
   const regionGroups = useMemo(() => {
     const groupSet = new Set<string>();
     for (const club of initialClubs) {
-      if (club.region) {
-        const group = getRegionGroup(club.region);
+      const effective = getEffectiveRegion(club.region, club.address);
+      if (effective) {
+        const group = getRegionGroup(effective);
         if (group) groupSet.add(group);
       }
     }
@@ -423,7 +440,8 @@ function MobileClubList({
         (club) =>
           club.name?.toLowerCase().includes(query) ||
           club.code?.toLowerCase().includes(query) ||
-          club.region?.toLowerCase().includes(query)
+          club.region?.toLowerCase().includes(query) ||
+          club.address?.toLowerCase().includes(query)
       );
     }
 
@@ -432,7 +450,7 @@ function MobileClubList({
     }
 
     if (filterMode === "region" && selectedRegion) {
-      result = result.filter((club) => getRegionGroup(club.region) === selectedRegion);
+      result = result.filter((club) => getRegionGroup(getEffectiveRegion(club.region, club.address)) === selectedRegion);
     }
 
     const sorted = result.sort((a, b) => a.name.localeCompare(b.name, "ko"));
@@ -570,9 +588,21 @@ function MobileClubList({
                     <span className={`text-sm font-medium ${isSelected ? "text-gray-900" : "text-gray-900"}`}>
                       {club.name}
                     </span>
+                    {club.operationTypes?.map((type) => (
+                      <span
+                        key={type}
+                        className={`inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded ${
+                          type === "MEMBERSHIP"
+                            ? "bg-blue-100 text-blue-700"
+                            : "bg-green-100 text-green-700"
+                        }`}
+                      >
+                        {type === "MEMBERSHIP" ? "회원제" : type === "PUBLIC" ? "퍼블릭" : type}
+                      </span>
+                    ))}
                   </div>
                   <div className={`text-xs ${isSelected ? "text-gray-500" : "text-gray-500"}`}>
-                    {club.region}{club.holes ? ` · ${club.holes}` : ""}
+                    {club.region || (club.address ? extractRegionFromAddress(club.address) : "")}{club.holes ? ` · ${club.holes}` : ""}
                   </div>
                 </div>
               </div>

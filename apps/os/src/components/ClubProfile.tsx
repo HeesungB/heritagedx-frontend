@@ -14,6 +14,12 @@ import CostCalculatorSection from "./club-profile/CostCalculatorSection";
 import DocumentsSection from "./club-profile/DocumentsSection";
 import EstimateSection from "./club-profile/EstimateSection";
 import { trackEvent } from "@/lib/gtag";
+import {
+  useSheetStorage,
+  loadCustomTemplates,
+  saveCustomTemplates,
+  migrateOldStorageKeys,
+} from "@/hooks/useSheetStorage";
 
 interface ClubProfileProps {
   detail: ClubDetail | null;
@@ -35,62 +41,22 @@ export default function ClubProfile({ detail, loading, clubs, onClubNavigate }: 
   const [selectedMembershipIndex, setSelectedMembershipIndex] = useState(0);
   const prevDetailCode = useRef<string | null>(null);
 
-  // 견적서 입력 필드 상태
-  const [estimateRecipient, setEstimateRecipient] = useState("");
-  const [estimatePrice, setEstimatePrice] = useState("");
-  const [estimateCommission, setEstimateCommission] = useState("");
-  const [estimateAcqTax, setEstimateAcqTax] = useState("");
-  const [estimateStampDuty, setEstimateStampDuty] = useState("");
-  const [estimateDeposit, setEstimateDeposit] = useState("");
-  const [estimateManagerTitle, setEstimateManagerTitle] = useState("");
-  const [estimateTradeType, setEstimateTradeType] = useState<"매수" | "매도">("매수");
+  // Per-club storage hooks
+  const benefitsStorage = useSheetStorage(detail?.code, "benefits");
+  const estimateStorage = useSheetStorage(detail?.code, "estimate");
 
-  // 혜택지 커스텀 항목 상태
-  const [sheetCustomItems, setSheetCustomItems] = useState<{
-    clubInfo: Array<{ id: string; label: string; value: string }>;
-    membershipInfo: Array<{ id: string; label: string; value: string }>;
-    costs: Array<{ id: string; label: string; value: string }>;
-    memo: Array<{ id: string; label: string; value: string }>;
-  }>({
-    clubInfo: [],
-    membershipInfo: [],
-    costs: [],
-    memo: [],
-  });
+  // Global custom templates (shared across all clubs)
+  const [customTemplates, setCustomTemplates] = useState<string[]>(() => loadCustomTemplates());
 
-  const [sheetCustomTemplates, setSheetCustomTemplates] = useState<string[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const saved = localStorage.getItem("sheetCustomTemplates");
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  // 혜택지 입력 필드 상태
-  const [sheetRecipient, setSheetRecipient] = useState("");
-  const [sheetBenefits, setSheetBenefits] = useState("");
-  const [sheetMarketNote, setSheetMarketNote] = useState("");
-  const [sheetManagerName, setSheetManagerName] = useState(user?.name || "");
-  const [sheetManagerTitle, setSheetManagerTitle] = useState("");
-  const [sheetManagerPhone, setSheetManagerPhone] = useState("");
-  const [hiddenSheetItems, setHiddenSheetItems] = useState<Set<string>>(() => {
-    if (typeof window === "undefined") return new Set();
-    try {
-      const saved = localStorage.getItem("sheetHiddenItems");
-      return saved ? new Set(JSON.parse(saved)) : new Set();
-    } catch {
-      return new Set();
-    }
-  });
-
-  // 로그인 유저 이름을 담당자 기본값으로 설정
+  // Migrate old global storage keys on mount
   useEffect(() => {
-    if (user?.name && !sheetManagerName) {
-      setSheetManagerName(user.name);
-    }
-  }, [user?.name]); // eslint-disable-line react-hooks/exhaustive-deps
+    migrateOldStorageKeys();
+  }, []);
+
+  // Save templates when they change
+  useEffect(() => {
+    saveCustomTemplates(customTemplates);
+  }, [customTemplates]);
 
   // 서류 상태
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
@@ -104,37 +70,7 @@ export default function ClubProfile({ detail, loading, clubs, onClubNavigate }: 
     );
     setSelectedScenarioCode(hasPS_BASIC ? "PS_BASIC" : null);
     setSelectedMembershipIndex(0);
-    setSheetCustomItems({ clubInfo: [], membershipInfo: [], costs: [], memo: [] });
-    // 첫 번째 회원권의 memberBenefits로 혜택지 자동 채움
-    const firstBenefits = detail?.memberships?.[0]?.memberBenefits;
-    if (firstBenefits) {
-      setSheetBenefits(firstBenefits);
-    }
-  }, [detail?.code, detail?.scenarios]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // 회원권 탭 변경 시 해당 memberBenefits로 혜택지 갱신
-  useEffect(() => {
-    const benefits = detail?.memberships?.[selectedMembershipIndex]?.memberBenefits;
-    if (benefits) {
-      setSheetBenefits(benefits);
-    }
-  }, [selectedMembershipIndex]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // hiddenSheetItems 변경 시 localStorage에 저장
-  useEffect(() => {
-    localStorage.setItem(
-      "sheetHiddenItems",
-      JSON.stringify([...hiddenSheetItems])
-    );
-  }, [hiddenSheetItems]);
-
-  // sheetCustomTemplates 변경 시 localStorage에 저장
-  useEffect(() => {
-    localStorage.setItem(
-      "sheetCustomTemplates",
-      JSON.stringify(sheetCustomTemplates)
-    );
-  }, [sheetCustomTemplates]);
+  }, [detail?.code, detail?.scenarios]);
 
   // GA4: 골프장 상세 조회 이벤트
   useEffect(() => {
@@ -230,12 +166,12 @@ export default function ClubProfile({ detail, loading, clubs, onClubNavigate }: 
                   <button
                     onClick={() => { setIsMemoSidebarOpen(true); setIsMapSidebarOpen(false); }}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 transition-colors"
-                    title="거래 메모"
+                    title="상담일지"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
-                    메모
+                    상담일지
                   </button>
                 )}
                 {detail.updatedAt && (
@@ -281,17 +217,20 @@ export default function ClubProfile({ detail, loading, clubs, onClubNavigate }: 
                 memberDaySchedule={detail.memberships?.[selectedMembershipIndex]?.memberDaySchedule ?? undefined}
                 phoneNumber={(detail.contacts?.find(c => c.isPrimary)?.phoneNumber ?? primaryContact?.phoneNumber) ?? undefined}
                 totalLength={detail.basicInfo.totalLength ?? undefined}
-                courseNames={detail.basicInfo.courseNames ?? undefined}
+
 
                 introduction={detail.basicInfo.introduction ?? undefined}
                 facilities={detail.basicInfo.facilities ?? undefined}
+                website={detail.website ?? undefined}
               />
 
               {detail.memberships && detail.memberships.length > 0 ? (
                 <MembershipInfoSection
                   memberships={detail.memberships}
                   selectedIndex={selectedMembershipIndex}
+                  membershipId={selectedMembership?.id}
                   memo={detail.memo}
+                  membershipInfo={detail.marketInfo.membershipInfo}
                   reservationNotes={detail.memberships?.[selectedMembershipIndex]?.reservationNotes || detail.registration.reservationNotes}
                   caddyFee={detail.costs.caddyFee ?? undefined}
                   cartFee={detail.costs.cartFee ?? undefined}
@@ -316,24 +255,15 @@ export default function ClubProfile({ detail, loading, clubs, onClubNavigate }: 
             <BenefitsSheetSection
               detail={detail}
               selectedMembershipIndex={selectedMembershipIndex}
-              sheetRecipient={sheetRecipient}
-              onSheetRecipientChange={setSheetRecipient}
-              sheetBenefits={sheetBenefits}
-              onSheetBenefitsChange={setSheetBenefits}
-              sheetMarketNote={sheetMarketNote}
-              onSheetMarketNoteChange={setSheetMarketNote}
-              sheetManagerName={sheetManagerName}
-              onSheetManagerNameChange={setSheetManagerName}
-              sheetManagerTitle={sheetManagerTitle}
-              onSheetManagerTitleChange={setSheetManagerTitle}
-              sheetManagerPhone={sheetManagerPhone}
-              onSheetManagerPhoneChange={setSheetManagerPhone}
-              hiddenSheetItems={hiddenSheetItems}
-              onHiddenSheetItemsChange={setHiddenSheetItems}
-              customItems={sheetCustomItems}
-              onCustomItemsChange={setSheetCustomItems}
-              customTemplates={sheetCustomTemplates}
-              onCustomTemplatesChange={setSheetCustomTemplates}
+              fieldOverrides={benefitsStorage.overrides}
+              onFieldOverrideChange={benefitsStorage.setOverride}
+              hiddenSheetItems={benefitsStorage.hiddenItems}
+              onHiddenSheetItemsChange={benefitsStorage.setHiddenItems}
+              customItems={benefitsStorage.customItems}
+              onCustomItemsChange={benefitsStorage.setCustomItems}
+              customTemplates={customTemplates}
+              onCustomTemplatesChange={setCustomTemplates}
+              defaultManagerName={user?.name}
             />
           )}
 
@@ -341,22 +271,8 @@ export default function ClubProfile({ detail, loading, clubs, onClubNavigate }: 
             <EstimateSection
               detail={detail}
               selectedMembershipIndex={selectedMembershipIndex}
-              recipient={estimateRecipient}
-              onRecipientChange={setEstimateRecipient}
-              price={estimatePrice}
-              onPriceChange={setEstimatePrice}
-              commission={estimateCommission}
-              onCommissionChange={setEstimateCommission}
-              acqTax={estimateAcqTax}
-              onAcqTaxChange={setEstimateAcqTax}
-              stampDuty={estimateStampDuty}
-              onStampDutyChange={setEstimateStampDuty}
-              deposit={estimateDeposit}
-              onDepositChange={setEstimateDeposit}
-              managerTitle={estimateManagerTitle}
-              onManagerTitleChange={setEstimateManagerTitle}
-              tradeType={estimateTradeType}
-              onTradeTypeChange={setEstimateTradeType}
+              fieldOverrides={estimateStorage.overrides}
+              onFieldOverrideChange={estimateStorage.setOverride}
             />
           )}
 
@@ -400,7 +316,7 @@ export default function ClubProfile({ detail, loading, clubs, onClubNavigate }: 
         />
       )}
 
-      {/* 오른쪽: 거래 메모 사이드바 */}
+      {/* 오른쪽: 상담일지 사이드바 */}
       {isMemoSidebarOpen && detail && (
         <TradeMemoSidebar
           clubDetail={detail}

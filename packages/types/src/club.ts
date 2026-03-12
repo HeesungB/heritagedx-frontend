@@ -80,6 +80,7 @@ export interface Club {
   submissionMethods?: string[];
   processingTime?: string;
   externalUrl?: string;
+  website?: string;
   operationTypes?: string[] | null;
   createdAt?: string;
   updatedAt?: string;
@@ -149,6 +150,7 @@ export interface ClubDetail {
   submissionMethods?: string[];
   processingTime?: string;
   externalUrl?: string;
+  website?: string;
   // 시나리오 및 서류
   scenariosCount?: number;
   scenarios?: ScenarioWithDocuments[];

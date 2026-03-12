@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { Club, Membership } from "@/types";
 import PriceChart from "./PriceChart";
-import NearbyClubPrices from "./NearbyClubPrices";
 
 interface MembershipInfoSectionProps {
   memberships: Membership[];
   selectedIndex: number;
+  membershipId?: string;
   memo?: string | null;
+  membershipInfo?: string | null;
   reservationNotes?: string | null;
   caddyFee?: number;
   cartFee?: number;
@@ -57,7 +58,9 @@ function CollapsibleSection({
 export default function MembershipInfoSection({
   memberships,
   selectedIndex,
+  membershipId,
   memo,
+  membershipInfo,
   reservationNotes,
   caddyFee,
   cartFee,
@@ -74,7 +77,6 @@ export default function MembershipInfoSection({
 
   const [openSections, setOpenSections] = useState({
     basic: true,
-    market: true,
     fee: true,
     costs: true,
     transfer: true,
@@ -133,7 +135,6 @@ export default function MembershipInfoSection({
   const displayTypeName = (type: string) =>
     type === "준회원" ? "가족(준)회원" : type;
 
-  const hasMarketInfo = !!(membership?.estimatedSalePrice || membership?.recentMarketPrice || membership?.avgMarketPrice3y || membership?.dealerPriceRange || membership?.estimatedPriceDate || membership?.id);
   const hasCosts = !!(registrationFee || stampDuty || agencyFee || otherCosts);
   const hasTransfer = !!(membership?.transferManagerName || membership?.transferManagerPhone || membership?.buyerDocuments || membership?.sellerDocuments);
 
@@ -170,18 +171,34 @@ export default function MembershipInfoSection({
                 {membership?.initialSalePrice || "-"}
               </td>
             </tr>
-            {/* 특이 사항 */}
-            <tr>
-              <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium align-top whitespace-nowrap">
-                특이 사항
-              </td>
-              <td
-                colSpan={3}
-                className="border border-gray-300 px-3 py-2 text-sm whitespace-pre-wrap"
-              >
-                {memo || "-"}
-              </td>
-            </tr>
+            {/* 회원구성 */}
+            {membershipInfo && (
+              <tr>
+                <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium align-top whitespace-nowrap">
+                  회원구성
+                </td>
+                <td
+                  colSpan={3}
+                  className="border border-gray-300 px-3 py-2 text-sm whitespace-pre-wrap"
+                >
+                  {membershipInfo}
+                </td>
+              </tr>
+            )}
+            {/* 회원 혜택 */}
+            {membership?.memberBenefits && (
+              <tr>
+                <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium align-top whitespace-nowrap">
+                  회원 혜택
+                </td>
+                <td
+                  colSpan={3}
+                  className="border border-gray-300 px-3 py-2 text-sm whitespace-pre-wrap"
+                >
+                  {membership.memberBenefits}
+                </td>
+              </tr>
+            )}
             {/* 예약 안내 */}
             {reservationNotes && (
               <tr>
@@ -210,96 +227,23 @@ export default function MembershipInfoSection({
                 </td>
               </tr>
             )}
-            {/* 회원 혜택 */}
-            {membership?.memberBenefits && (
+            {/* 기타정보 */}
+            {memo && (
               <tr>
                 <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium align-top whitespace-nowrap">
-                  회원 혜택
+                  기타정보
                 </td>
                 <td
                   colSpan={3}
                   className="border border-gray-300 px-3 py-2 text-sm whitespace-pre-wrap"
                 >
-                  {membership.memberBenefits}
+                  {memo}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </CollapsibleSection>
-
-      {/* 시세 정보 */}
-      {hasMarketInfo && (
-        <CollapsibleSection
-          title="회원권 정보"
-          isOpen={openSections.market}
-          onToggle={() => toggleSection("market")}
-        >
-          <div>
-            {(membership?.estimatedSalePrice || membership?.recentMarketPrice || membership?.avgMarketPrice3y || membership?.dealerPriceRange || membership?.estimatedPriceDate) && (
-              <table className="w-full border-collapse table-fixed">
-                <colgroup>
-                  <col className="w-24" />
-                  <col />
-                  <col className="w-24" />
-                  <col />
-                </colgroup>
-                <tbody>
-                  {(membership?.estimatedSalePrice || membership?.recentMarketPrice) && (
-                    <tr>
-                      <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium whitespace-nowrap">
-                        현재 시세
-                      </td>
-                      <td
-                        colSpan={3}
-                        className="border border-gray-300 px-3 py-2 text-sm"
-                      >
-                        {(() => {
-                          const raw = membership?.estimatedSalePrice || membership?.recentMarketPrice || "";
-                          const num = parseInt(raw.replace(/[^0-9]/g, ""), 10);
-                          return isNaN(num) ? raw : `${num.toLocaleString()}원`;
-                        })()}
-                      </td>
-                    </tr>
-                  )}
-                  {(membership?.avgMarketPrice3y || membership?.dealerPriceRange || membership?.estimatedPriceDate) && (
-                    <tr>
-                      <td className="bg-gray-100 border border-gray-300 px-3 py-2 text-sm text-gray-600 font-medium align-top whitespace-nowrap">
-                        시세 상세
-                      </td>
-                      <td
-                        colSpan={3}
-                        className="border border-gray-300 px-3 py-2 text-sm"
-                      >
-                        <div className="space-y-0.5">
-                          {membership?.avgMarketPrice3y && (
-                            <div><span className="text-gray-500">3년 평균:</span> {membership.avgMarketPrice3y}</div>
-                          )}
-                          {membership?.dealerPriceRange && (
-                            <div><span className="text-gray-500">딜러 시세:</span> {membership.dealerPriceRange}</div>
-                          )}
-                          {membership?.estimatedPriceDate && (
-                            <div><span className="text-gray-500">기준일:</span> {membership.estimatedPriceDate}</div>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            )}
-            {membership?.id && <PriceChart membershipId={membership.id} />}
-            {currentClubAddress && clubs && clubs.length > 0 && (
-              <NearbyClubPrices
-                currentClubAddress={currentClubAddress}
-                currentClubName={currentClubName || ""}
-                clubs={clubs}
-                onClubClick={onClubNavigate}
-              />
-            )}
-          </div>
-        </CollapsibleSection>
-      )}
 
       {/* 이용 요금 */}
       <CollapsibleSection
@@ -395,20 +339,27 @@ export default function MembershipInfoSection({
         </div>
       </CollapsibleSection>
 
+      {/* 시세 추이 */}
+      {membershipId && (
+        <div className="border border-gray-200 rounded-lg overflow-hidden">
+          <PriceChart key={membershipId} membershipId={membershipId} />
+        </div>
+      )}
+
       {/* 부가 비용 */}
       {hasCosts && (() => {
         const costItems: { label: string; value: string }[] = [];
         if (registrationFee) costItems.push({ label: "명의개서료", value: registrationFee });
         if (stampDuty) costItems.push({ label: "인지대", value: stampDuty });
         if (agencyFee) costItems.push({ label: "대행수수료", value: agencyFee });
-        if (otherCosts) costItems.push({ label: "부가비용", value: otherCosts });
+        if (otherCosts) costItems.push({ label: "기타비용", value: otherCosts });
         const rows: { label: string; value: string }[][] = [];
         for (let i = 0; i < costItems.length; i += 2) {
           rows.push(costItems.slice(i, i + 2));
         }
         return (
           <CollapsibleSection
-            title="부가 비용"
+            title="기타 비용"
             isOpen={openSections.costs}
             onToggle={() => toggleSection("costs")}
           >

@@ -66,7 +66,7 @@ export default function Header() {
             </Link>
             <Link href="/trade-memos" className={navLinkClass(isTradeMemosPage)}>
               <MessageSquare className="w-3.5 h-3.5" />
-              거래 메모
+              상담일지
             </Link>
             <Link href="/trade-records" className={navLinkClass(isTradeRecordsPage)}>
               <FileText className="w-3.5 h-3.5" />
@@ -148,7 +148,7 @@ export default function Header() {
             </Link>
             <Link href="/trade-memos" className={mobileNavLinkClass(isTradeMemosPage)} onClick={() => setMobileMenuOpen(false)}>
               <MessageSquare className="w-4 h-4" />
-              거래 메모
+              상담일지
             </Link>
             <Link href="/trade-records" className={mobileNavLinkClass(isTradeRecordsPage)} onClick={() => setMobileMenuOpen(false)}>
               <FileText className="w-4 h-4" />

@@ -22,6 +22,7 @@ export class ConsultationRepository implements IConsultationRepository {
     if (params?.clubId) searchParams.append("clubId", params.clubId);
     if (params?.sort) searchParams.append("sort", params.sort);
     if (params?.order) searchParams.append("order", params.order);
+    if (params?.isDone !== undefined) searchParams.append("isDone", String(params.isDone));
     const queryString = searchParams.toString();
     const endpoint = `/consultations${queryString ? `?${queryString}` : ""}`;
     return this.api.get<TradeMemosResponse>(endpoint);

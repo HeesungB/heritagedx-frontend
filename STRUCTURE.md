@@ -25,7 +25,7 @@ heritage-dx/
 │   │   │   ├── app/                 # Next.js App Router
 │   │   │   ├── components/          # 38개 컴포넌트
 │   │   │   ├── contexts/            # AuthContext, RepositoryContext
-│   │   │   ├── hooks/               # useOrganization, useTaxSettings
+│   │   │   ├── hooks/               # useOrganization, useTaxSettings, useSheetStorage
 │   │   │   ├── lib/                 # server-repositories.ts, authApi.ts, firebase-admin.ts
 │   │   │   ├── types/               # 앱 전용 타입
 │   │   │   └── utils/               # distance, taxCalculator

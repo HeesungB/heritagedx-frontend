@@ -14,4 +14,6 @@ export {
   normalizeInitial,
   getProvince,
   getRegionGroup,
+  extractRegionFromAddress,
+  getEffectiveRegion,
 } from "./korean";

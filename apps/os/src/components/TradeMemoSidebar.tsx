@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { MembershipTrade, MembershipTradeForm, ClubDetail } from "@/types";
 import { useConsultationRepository } from "@heritage-dx/api";
-import { Button, Loading } from "@heritage-dx/ui";
+import { Button, Loading, Textarea } from "@heritage-dx/ui";
 import { mapTradMemoDtoToEntity } from "@heritage-dx/store";
 import { trackEvent } from "@/lib/gtag";
 
@@ -238,7 +238,7 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
   ) || [];
 
   return (
-    <aside className="fixed inset-0 z-40 lg:static lg:inset-auto lg:z-auto w-full lg:w-80 h-full min-h-0 border-l border-gray-200 bg-white flex flex-col print:hidden">
+    <aside className="fixed inset-0 z-40 lg:static lg:inset-auto lg:z-auto w-full lg:w-96 h-full min-h-0 border-l border-gray-200 bg-white flex flex-col print:hidden">
       {/* 헤더 */}
       <div className="px-3 py-2.5 border-b border-gray-200 flex items-center justify-between bg-gray-50">
         <h3 className="font-bold text-sm text-gray-900">상담일지</h3>
@@ -289,7 +289,7 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
       {/* 콘텐츠 */}
       <div className="flex-1 overflow-y-auto">
         {activeTab === "list" && (
-          <div className="p-3 space-y-3">
+          <div className="p-2.5 space-y-2">
             {/* 검색 + 필터 */}
             <div className="space-y-1.5 mb-2">
               <div className="relative">
@@ -360,14 +360,14 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
                     trade.isDone
                       ? "border-gray-300 border-l-gray-300 bg-gray-50 opacity-60"
                       : trade.tradeType === "매수"
-                        ? "border-gray-200 border-l-blue-600 bg-white shadow-md hover:shadow-lg"
-                        : "border-gray-200 border-l-red-500 bg-white shadow-md hover:shadow-lg"
+                        ? "border-gray-200 border-l-blue-600 bg-white shadow-sm hover:shadow"
+                        : "border-gray-200 border-l-red-500 bg-white shadow-sm hover:shadow"
                   }`}
                 >
-                  {/* 헤더: 뱃지 + 골프장명 + 회원권종류 */}
-                  <div className="px-3 py-2 border-b border-gray-200">
+                  {/* 헤더: 뱃지 + 골프장명 + 회원권종류 (1줄) */}
+                  <div className="px-2.5 py-1.5">
                     <div className="flex items-center gap-1.5">
-                      <span className={`px-2 py-0.5 rounded text-[11px] font-bold shrink-0 ${
+                      <span className={`px-1.5 py-px rounded text-[10px] font-bold shrink-0 ${
                         trade.isDone
                           ? "bg-gray-200 text-gray-500"
                           : trade.tradeType === "매수"
@@ -379,46 +379,46 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
                       <span className={`text-xs font-semibold truncate ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>
                         {trade.clubName}
                       </span>
+                      {trade.membershipType && (
+                        <span className={`text-[11px] font-medium shrink-0 ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>
+                          · {trade.membershipType}
+                        </span>
+                      )}
                     </div>
-                    {trade.membershipType && (
-                      <div className={`text-[11px] mt-0.5 ml-9 font-medium ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>
-                        {trade.membershipType}
-                      </div>
-                    )}
                   </div>
 
                   {/* 본문 */}
-                  <div className="px-3 py-2">
+                  <div className="px-2.5 py-1.5">
                     {/* 고객정보 */}
-                    <div className="flex items-baseline justify-between pb-2 border-b border-dashed border-gray-200">
-                      <span className={`text-sm font-bold ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>{trade.customerName}</span>
+                    <div className="flex items-baseline justify-between pb-1.5">
+                      <span className={`text-xs font-bold ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>{trade.customerName}</span>
                       <span className={`text-xs font-medium ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.contact}</span>
                     </div>
 
                     {/* 가격 그리드 */}
-                    <div className="grid grid-cols-2 gap-2 py-2 border-b border-dashed border-gray-200">
-                      <div className="bg-gray-100 rounded px-2 py-1.5">
-                        <div className="text-[11px] font-medium text-gray-500">제시가</div>
-                        <div className={`text-sm font-bold ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>{formatPrice(trade.offerPrice)}</div>
+                    <div className="grid grid-cols-2 gap-x-3 py-1.5">
+                      <div>
+                        <div className="text-[11px] font-medium text-gray-500">제시</div>
+                        <div className={`text-xs font-bold ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>{formatPrice(trade.offerPrice)}</div>
                         {trade.offerPriceNote && <div className={`text-[11px] font-medium ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.offerPriceNote}</div>}
                       </div>
-                      <div className="bg-gray-100 rounded px-2 py-1.5">
-                        <div className="text-[11px] font-medium text-gray-500">희망가</div>
-                        <div className={`text-sm font-bold ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>{formatPrice(trade.desiredPrice)}</div>
+                      <div>
+                        <div className="text-[11px] font-medium text-gray-500">희망</div>
+                        <div className={`text-xs font-bold ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>{formatPrice(trade.desiredPrice)}</div>
                         {trade.desiredPriceNote && <div className={`text-[11px] font-medium ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.desiredPriceNote}</div>}
                       </div>
                     </div>
 
                     {/* 메모 / 특이사항 */}
                     {(trade.notes || trade.remarks) && (
-                      <div className={`border-l-2 pl-2 py-2 text-xs leading-relaxed border-b border-b-dashed border-b-gray-200 ${trade.isDone ? "border-l-gray-300 text-gray-400" : "border-l-gray-400 text-gray-700"}`}>
+                      <div className={`border-l-2 pl-2 py-1 text-[11px] leading-snug ${trade.isDone ? "border-l-gray-300 text-gray-400" : "border-l-gray-400 text-gray-700"}`}>
                         {trade.notes && <p>{trade.notes}</p>}
                         {trade.remarks && <p className="italic">{trade.remarks}</p>}
                       </div>
                     )}
 
                     {/* 푸터: 날짜 + 액션 */}
-                    <div className="flex items-center justify-between pt-2">
+                    <div className="flex items-center justify-between pt-1.5 border-t border-gray-100">
                       <div className="flex items-center gap-1 text-[11px] text-gray-500">
                         <span>{trade.registrationDate}</span>
                         {trade.createdByName && <><span>·</span><span>{trade.createdByName}</span></>}
@@ -517,7 +517,7 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
                     key={type}
                     type="button"
                     onClick={() => setForm((f) => ({ ...f, tradeType: type }))}
-                    className={`flex-1 py-2 text-sm rounded border transition-colors ${
+                    className={`flex-1 py-1.5 text-xs rounded border transition-colors ${
                       form.tradeType === type
                         ? type === "매수"
                           ? "bg-blue-600 text-white border-blue-600"
@@ -651,11 +651,10 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
             {/* 메모 */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">메모</label>
-              <textarea
+              <Textarea
                 value={form.notes}
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500 resize-none"
-                rows={2}
+                minRows={3}
                 placeholder="타회원권 교환 희망 등"
               />
             </div>
@@ -685,11 +684,10 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
             {/* 특이사항 */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">특이사항</label>
-              <input
-                type="text"
+              <Textarea
                 value={form.remarks}
                 onChange={(e) => setForm((f) => ({ ...f, remarks: e.target.value }))}
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
+                minRows={2}
                 placeholder="계약금 입금 완료 등"
               />
             </div>

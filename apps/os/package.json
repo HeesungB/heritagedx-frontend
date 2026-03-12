@@ -18,7 +18,7 @@
     "@heritage-dx/ui": "workspace:*",
     "@heritage-dx/utils": "workspace:*",
     "firebase-admin": "^13.7.0",
-    "html2canvas": "^1.4.1",
+    "html-to-image": "^1.11.11",
     "jszip": "^3.10.1",
     "lucide-react": "^0.468.0",
     "next": "^15.1.0",

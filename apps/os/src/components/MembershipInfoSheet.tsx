@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { forwardRef, useState } from "react";
 import { ClubDetail } from "@/types";
 import type { SheetCustomItemsMap, SheetCustomItem } from "@/hooks/useSheetStorage";
 
@@ -29,7 +29,7 @@ interface MembershipInfoSheetProps {
   defaultManagerName?: string;
 }
 
-export default function MembershipInfoSheet({
+const MembershipInfoSheet = forwardRef<HTMLDivElement, MembershipInfoSheetProps>(function MembershipInfoSheet({
   detail,
   selectedMembershipIndex: externalIndex,
   onMembershipChange,
@@ -40,7 +40,7 @@ export default function MembershipInfoSheet({
   onHiddenItemsChange,
   onCustomItemsChange,
   defaultManagerName,
-}: MembershipInfoSheetProps) {
+}, ref) {
   const [internalIndex, setInternalIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const memberships = detail.memberships || [];
@@ -92,7 +92,7 @@ export default function MembershipInfoSheet({
     );
 
   // 테이블 셀 스타일
-  const thCls = "bg-gray-100 border border-gray-300 px-2 py-1.5 text-xs text-gray-600 whitespace-nowrap";
+  const thCls = "bg-gray-100 border border-gray-300 px-2 py-1.5 text-xs text-gray-600 whitespace-nowrap text-center";
   const tdCls = "border border-gray-300 px-2 py-1.5 text-xs";
   const thTopCls = `${thCls} align-top`;
 
@@ -103,7 +103,7 @@ export default function MembershipInfoSheet({
         type="text"
         value={resolve(`label_${key}`, defaultLabel)}
         onChange={(e) => onFieldOverrideChange!(`label_${key}`, e.target.value)}
-        className="bg-transparent border-none outline-none w-full hover:bg-emerald-50 focus:bg-white focus:ring-1 focus:ring-emerald-400 rounded px-1 -mx-1 transition-colors text-gray-600 text-xs"
+        className="bg-transparent border-none outline-none w-full hover:bg-emerald-50 focus:bg-white focus:ring-1 focus:ring-emerald-400 rounded px-1 -mx-1 transition-colors text-gray-600 text-xs text-center"
       />
     ) : defaultLabel;
 
@@ -186,7 +186,7 @@ export default function MembershipInfoSheet({
     if (!val && !isEditable) return null;
     return (
       <tr>
-        <td className={opts?.thClass || thTopCls}>{editableLabel(key, label)}</td>
+        <td className={opts?.thClass || thCls}>{editableLabel(key, label)}</td>
         <td colSpan={3} className={`${tdCls} whitespace-pre-wrap`}>
           {renderEditableCell(key, original, opts)}
         </td>
@@ -322,7 +322,7 @@ export default function MembershipInfoSheet({
     (onCustomItemsChange);
 
   return (
-    <div className="bg-white p-8 max-w-4xl mx-auto font-sans text-sm print:p-4 print:max-w-none print:m-0">
+    <div ref={ref} className="bg-white p-8 max-w-4xl mx-auto font-sans text-sm print:p-4 print:max-w-none print:m-0">
       {/* 상단 헤더 - 수신자 정보 */}
       {(resolve("recipient", "") || isEditable) && (
         <div className="mb-6 pb-4 border-b border-gray-200">
@@ -414,9 +414,7 @@ export default function MembershipInfoSheet({
                   "openingDate", "개 장 일", detail.basicInfo.openingDate,
                   "totalLength", "코스거리", detail.basicInfo.totalLength,
                 )}
-                {renderFullRow("facilities", "부대시설", detail.basicInfo.facilities, {
-                  type: "textarea", rows: 2,
-                })}
+                {renderFullRow("facilities", "부대시설", detail.basicInfo.facilities)}
                 {/* 홈페이지: editable or link */}
                 {v("homepage") && (() => {
                   const hpVal = resolve("homepage", detail.website);
@@ -468,9 +466,7 @@ export default function MembershipInfoSheet({
                   membership?.membershipName || membership?.membershipType,
                   "initialSalePrice", "분 양 가", membership?.initialSalePrice,
                 )}
-                {renderFullRow("memberComposition", "회원구성", detail.marketInfo?.membershipInfo, {
-                  type: "textarea", rows: 3, thClass: thTopCls,
-                })}
+                {renderFullRow("memberComposition", "회원구성", detail.marketInfo?.membershipInfo)}
                 {renderFullRow("benefits", "회원 혜택", membership?.memberBenefits, {
                   type: "textarea", placeholder: "예: - 월 주중 8회 주말 7회 우선예약", rows: 3, thClass: thTopCls,
                 })}
@@ -525,7 +521,7 @@ export default function MembershipInfoSheet({
         const feeTypes = getFeeTypes(weekdayFee, weekendFee);
         const displayType = (t: string) => t === "준회원" ? "가족(준)회원" : t;
 
-        const feeThCls = "bg-gray-100 border border-gray-300 px-2 py-1.5 text-xs text-gray-600 font-medium";
+        const feeThCls = "bg-gray-100 border border-gray-300 px-2 py-1.5 text-xs text-gray-600 font-medium text-center";
         const feeTdCls = "border border-gray-300 px-2 py-1.5 text-xs text-center";
 
         // 그린피 셀 렌더 (편집 가능)
@@ -842,4 +838,6 @@ export default function MembershipInfoSheet({
       </div>
     </div>
   );
-}
+});
+
+export default MembershipInfoSheet;

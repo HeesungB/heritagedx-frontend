@@ -119,7 +119,7 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
     };
 
     const thCls =
-      "bg-gray-100 border border-gray-300 px-2 py-1.5 text-xs font-medium text-gray-600 whitespace-nowrap";
+      "bg-gray-100 border border-gray-300 px-2 py-1.5 text-xs font-medium text-gray-600 whitespace-nowrap text-center";
     const tdCls = "border border-gray-300 px-2 py-1.5 text-xs";
     const thAccent =
       "bg-gray-100 border border-gray-300 px-2 py-1.5 text-xs font-semibold text-gray-700 whitespace-nowrap text-center";
@@ -146,7 +146,7 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
           type="text"
           value={resolveField(`label_${key}`, defaultLabel)}
           onChange={(e) => onFieldOverrideChange!(`label_${key}`, e.target.value)}
-          className="bg-transparent border-none outline-none w-full hover:bg-emerald-50 focus:bg-white focus:ring-1 focus:ring-emerald-400 rounded px-1 -mx-1 transition-colors text-inherit font-inherit text-xs"
+          className="bg-transparent border-none outline-none w-full hover:bg-emerald-50 focus:bg-white focus:ring-1 focus:ring-emerald-400 rounded px-1 -mx-1 transition-colors text-inherit font-inherit text-xs text-center"
         />
       ) : defaultLabel;
 

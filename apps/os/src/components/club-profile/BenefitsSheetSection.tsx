@@ -216,20 +216,19 @@ export default function BenefitsSheetSection({
       </div>
 
       {/* Sheet (inline editing) */}
-      <div ref={sheetRef}>
-        <MembershipInfoSheet
-          detail={detail}
-          selectedMembershipIndex={selectedMembershipIndex}
-          onMembershipChange={() => {}}
-          hiddenItems={hiddenSheetItems}
-          customItems={customItems}
-          fieldOverrides={fieldOverrides}
-          onFieldOverrideChange={onFieldOverrideChange}
-          onHiddenItemsChange={onHiddenSheetItemsChange}
-          onCustomItemsChange={onCustomItemsChange}
-          defaultManagerName={defaultManagerName}
-        />
-      </div>
+      <MembershipInfoSheet
+        ref={sheetRef}
+        detail={detail}
+        selectedMembershipIndex={selectedMembershipIndex}
+        onMembershipChange={() => {}}
+        hiddenItems={hiddenSheetItems}
+        customItems={customItems}
+        fieldOverrides={fieldOverrides}
+        onFieldOverrideChange={onFieldOverrideChange}
+        onHiddenItemsChange={onHiddenSheetItemsChange}
+        onCustomItemsChange={onCustomItemsChange}
+        defaultManagerName={defaultManagerName}
+      />
 
       {/* Actions */}
       <div className="flex justify-center gap-4 print:hidden">

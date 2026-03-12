@@ -90,7 +90,7 @@ heritage-dx/
    api-client, api,     api-client, api,
    store, auth, ui)     store, auth, ui)
   + recharts            + react-hook-form
-  + html2canvas         + zod
+  + html-to-image       + zod
   + jszip, pdf-lib
 ```
 
@@ -426,7 +426,7 @@ getInitialData()    // 초기 데이터 프리로드
 #### 주요 의존성
 
 - **recharts** — 시세 차트 (`PriceChart`)
-- **html2canvas** + **pdf-lib** — 견적서 PDF 생성 (`EstimateSheet`)
+- **html-to-image** + **pdf-lib** — 혜택지/견적서 JPEG·PDF 생성
 - **jszip** — 서류 ZIP 다운로드
 - **Naver Map API** — 골프장 지도 (`NaverMap`)
 - **firebase-admin** — FCM 푸시 알림 전송 + Firestore 토큰 관리

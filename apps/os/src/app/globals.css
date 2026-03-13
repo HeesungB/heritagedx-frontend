@@ -90,6 +90,15 @@
     max-height: none !important;
   }
 
+  /* 인쇄 시 스크롤바 숨기기 (Windows 대응) */
+  *::-webkit-scrollbar {
+    display: none !important;
+  }
+  * {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+
   /* 전체 너비로 표시 */
   .print\\:w-full,
   .flex-1,

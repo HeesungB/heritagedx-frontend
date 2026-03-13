@@ -189,11 +189,11 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
     return (
       <div
         ref={ref}
-        className="bg-white p-8 max-w-4xl mx-auto font-sans text-sm print:p-4 print:max-w-none print:m-0"
+        className="bg-white p-6 max-w-4xl mx-auto font-sans text-sm print:p-4 print:max-w-none print:m-0"
       >
         {/* 제목 영역 */}
-        <div className="border-t-4 border-emerald-600 mb-6">
-          <h1 className="text-center text-xl font-bold py-4 text-gray-800">
+        <div className="border-t-4 border-emerald-600 mb-3">
+          <h1 className="text-center text-xl font-bold py-2 text-gray-800">
             {isDataEditable ? (
               <input
                 type="text"
@@ -224,7 +224,7 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
         </div>
 
         {/* 수신 / 공급자 정보 (단일 테이블) */}
-        <div className="mb-6">
+        <div className="mb-3">
           <table className="w-full border-collapse border border-gray-300">
             <colgroup>
               <col style={{ width: "11%" }} />
@@ -369,23 +369,9 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
           </table>
         </div>
 
-        {/* 안내 문구 */}
-        <div className="text-center text-sm text-emerald-800 py-3 bg-emerald-50 border border-emerald-200 rounded mb-6">
-          {isDataEditable ? (
-            <input
-              type="text"
-              value={resolveField("estimateIntro", "의뢰하신 件에 대하여 아래와 같이 견적합니다.")}
-              onChange={(e) => onFieldOverrideChange!("estimateIntro", e.target.value)}
-              className="bg-transparent border-none outline-none w-full text-center hover:bg-emerald-50 focus:bg-white focus:ring-1 focus:ring-emerald-400 rounded px-1 -mx-1 transition-colors"
-            />
-          ) : (
-            resolveField("estimateIntro", "의뢰하신 件에 대하여 아래와 같이 견적합니다.")
-          )}
-        </div>
-
         {/* 견적 내역 */}
-        <div className="mb-6">
-          <div className="mb-3">
+        <div className="mb-3">
+          <div className="mb-1.5">
             <span className="text-emerald-600 text-base align-middle">🔑</span>
             {renderSectionTitle("sectionEstimate", "견적 내역")}
           </div>
@@ -502,8 +488,8 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
         </div>
 
         {/* 구비서류 */}
-        <div className="mb-6">
-          <div className="mb-3">
+        <div className="mb-3">
+          <div className="mb-1.5">
             <span className="text-emerald-600 text-base align-middle">🔑</span>
             {renderSectionTitle("sectionDocuments", isSell ? "매도시 구비서류" : "매수시 구비서류")}
           </div>
@@ -540,7 +526,7 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
         </div>
 
         {/* 안내 문구 */}
-        <div className="text-xs text-gray-500 space-y-1 mb-8 pl-1">
+        <div className="text-xs text-gray-500 space-y-1 mb-3 pl-1">
           {isDataEditable ? (
             <textarea
               ref={(el) => { if (el) autoResize(el); }}
@@ -565,7 +551,7 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
         </div>
 
         {/* 하단 로고 및 연락처 */}
-        <div className="pt-4 border-t border-gray-200">
+        <div className="pt-2 border-t border-gray-200">
           <table className="w-full text-xs text-gray-500">
             <tbody>
               <tr>

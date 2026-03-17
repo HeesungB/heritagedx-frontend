@@ -71,3 +71,11 @@ export type {
 export type { Organization } from "./organization";
 
 export type { Claim, ClaimInput } from "./claim";
+
+export type {
+  KpiTradesResponse,
+  KpiTradesParams,
+  KpiConsultationsResponse,
+  KpiConsultationsParams,
+  Employee,
+} from "./kpi";

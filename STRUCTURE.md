@@ -37,6 +37,7 @@ heritage-dx/
 │       │   ├── app/                 # Next.js App Router
 │       │   ├── components/
 │       │   │   ├── forms/           # ClubForm, DocumentForm, MembershipForm, ScenarioForm
+│       │   │   ├── kpi/             # KPI 대시보드 컴포넌트
 │       │   │   └── layout/          # Header, Sidebar, PageContainer
 │       │   ├── contexts/            # AuthContext, DataContext, RepositoryContext
 │       │   ├── hooks/               # useFCMToken, useFCMForeground, useNotifications
@@ -90,6 +91,7 @@ heritage-dx/
    api-client, api,     api-client, api,
    store, auth, ui)     store, auth, ui)
   + recharts            + react-hook-form
+                        + recharts
   + html-to-image       + zod
   + jszip, pdf-lib
 ```
@@ -125,6 +127,7 @@ heritage-dx/
 | `scenario.ts` | `Scenario`, `ScenarioSide`, `ScenarioOwnerType`, `ScenarioConditions`, `ScenarioWithDocuments`, `AvailableFilters` |
 | `trade.ts` | `TradeMemo`, `TradeMemoInput`, `TradeRecord`, `TradeRecordInput` |
 | `claim.ts` | `Claim`, `ClaimInput` |
+| `kpi.ts` | `KpiTradesResponse`, `KpiTradesParams`, `KpiConsultationsResponse`, `KpiConsultationsParams`, `Employee` |
 | `user.ts` | `User`, `UserRole` (`SUPER_ADMIN` \| `ORG_ADMIN` \| `EDITOR`), `AdminUser`, `LoginResponse` |
 | `organization.ts` | `Organization` |
 
@@ -211,7 +214,7 @@ packages/api/
 | `IMembershipTradeRepository` | `getAll(params?)`, `create(data)`, `update(id, data)`, `delete(id)` |
 | `IClaimRepository` | `create(data)` |
 
-**Admin Repository (관리자 API):** 12개 — clubs, scenarios, documents, club-documents, scenario-documents, club-scenario-documents, club-scenarios, global-documents, customer-documents, users, organizations, memberships
+**Admin Repository (관리자 API):** 13개 — clubs, scenarios, documents, club-documents, scenario-documents, club-scenario-documents, club-scenarios, global-documents, customer-documents, users, organizations, memberships, kpi
 
 **Server Repository (ISR):** `IClubRepository`, `IScenarioRepository` — raw `fetch()` + `{ next: { revalidate } }`
 
@@ -459,16 +462,19 @@ getInitialData()    // 초기 데이터 프리로드
     ├── common-documents/page.tsx         # 공용 서류 관리
     ├── my-organization/page.tsx          # 조직 설정
     ├── notifications/page.tsx            # 알림 목록
+    ├── kpi/page.tsx                       # KPI 통계 대시보드
     ├── trade-memos/page.tsx              # 상담 기록 (거래 메모)
     ├── trade-records/page.tsx            # 거래 내역
     └── users/page.tsx                    # 사용자 관리
 ```
 
-#### 컴포넌트 (7개)
+#### 컴포넌트 (11개)
 
 **레이아웃** (`layout/`): `Header`, `Sidebar`, `PageContainer`
 
 **폼** (`forms/`): `ClubForm`, `DocumentForm`, `MembershipForm`, `ScenarioForm`
+
+**KPI** (`kpi/`): `KpiMiniDashboard`, `KpiFilterBar`, `KpiTrendChart`, `KpiEmployeeComparison`
 - react-hook-form + zod 스키마 검증 기반
 
 #### API 레이어 (Repository Pattern)

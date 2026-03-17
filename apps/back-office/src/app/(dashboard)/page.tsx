@@ -10,6 +10,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import { Card, CardContent } from "@heritage-dx/ui";
+import KpiMiniDashboard from "@/components/kpi/KpiMiniDashboard";
 
 interface QuickLink {
   title: string;
@@ -58,6 +59,8 @@ export default function DashboardPage() {
           안녕하세요, {user?.name ?? "관리자"}님
         </h1>
         <p className="text-gray-500 mb-8">Heritage 백오피스에 오신 것을 환영합니다.</p>
+
+        <KpiMiniDashboard />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {quickLinks.map((link) => (

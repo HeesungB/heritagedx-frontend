@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FolderOpen, LogOut, Users, MessageSquare, FileText, Building2, Home, Menu, X, Bell } from "lucide-react";
+import { FolderOpen, LogOut, Users, MessageSquare, FileText, Building2, Home, Menu, X, Bell, BarChart3 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/hooks/useNotifications";
 
@@ -21,6 +21,7 @@ export default function Header() {
   const isNotificationsPage = pathname.startsWith("/notifications");
   const isHomePage = pathname === "/";
   const isClubsPage = pathname.startsWith("/clubs");
+  const isKpiPage = pathname.startsWith("/kpi");
   const isCommonDocsPage = pathname.startsWith("/common-documents");
   const isTradeMemosPage = pathname.startsWith("/trade-memos");
   const isTradeRecordsPage = pathname.startsWith("/trade-records");
@@ -71,6 +72,10 @@ export default function Header() {
             <Link href="/trade-records" className={navLinkClass(isTradeRecordsPage)}>
               <FileText className="w-3.5 h-3.5" />
               거래 내역
+            </Link>
+            <Link href="/kpi" className={navLinkClass(isKpiPage)}>
+              <BarChart3 className="w-3.5 h-3.5" />
+              통계
             </Link>
             <Link href="/common-documents" className={navLinkClass(isCommonDocsPage)}>
               <FolderOpen className="w-3.5 h-3.5" />
@@ -153,6 +158,10 @@ export default function Header() {
             <Link href="/trade-records" className={mobileNavLinkClass(isTradeRecordsPage)} onClick={() => setMobileMenuOpen(false)}>
               <FileText className="w-4 h-4" />
               거래 내역
+            </Link>
+            <Link href="/kpi" className={mobileNavLinkClass(isKpiPage)} onClick={() => setMobileMenuOpen(false)}>
+              <BarChart3 className="w-4 h-4" />
+              통계
             </Link>
             <Link href="/common-documents" className={mobileNavLinkClass(isCommonDocsPage)} onClick={() => setMobileMenuOpen(false)}>
               <FolderOpen className="w-4 h-4" />

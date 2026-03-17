@@ -20,6 +20,7 @@ export type {
   IUserAdminRepository,
   IOrganizationAdminRepository,
   IMembershipAdminRepository,
+  IKpiAdminRepository,
   GeneralRepositories,
   AdminRepositories,
   ServerRepositories,

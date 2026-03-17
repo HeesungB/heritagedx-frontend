@@ -19,6 +19,7 @@ export type {
   IUserAdminRepository,
   IOrganizationAdminRepository,
   IMembershipAdminRepository,
+  IKpiAdminRepository,
 } from "./admin";
 
 import type {
@@ -42,6 +43,7 @@ import type {
   IUserAdminRepository,
   IOrganizationAdminRepository,
   IMembershipAdminRepository,
+  IKpiAdminRepository,
 } from "./admin";
 
 export interface GeneralRepositories {
@@ -65,6 +67,7 @@ export interface AdminRepositories {
   users: IUserAdminRepository;
   organizations: IOrganizationAdminRepository;
   memberships: IMembershipAdminRepository;
+  kpi: IKpiAdminRepository;
 }
 
 export interface ServerRepositories {

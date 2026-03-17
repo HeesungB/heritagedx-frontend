@@ -63,6 +63,12 @@ export type {
   LoginResponse,
   // Organization
   Organization,
+  // KPI
+  KpiTradesResponse,
+  KpiTradesParams,
+  KpiConsultationsResponse,
+  KpiConsultationsParams,
+  Employee,
 } from "@heritage-dx/types";
 
 // Back-office aliases

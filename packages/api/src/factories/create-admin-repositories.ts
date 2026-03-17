@@ -12,6 +12,7 @@ import { CustomerDocumentAdminRepository } from "../repositories/admin/customer-
 import { UserAdminRepository } from "../repositories/admin/user-admin.repository.impl";
 import { OrganizationAdminRepository } from "../repositories/admin/organization-admin.repository.impl";
 import { MembershipAdminRepository } from "../repositories/admin/membership-admin.repository.impl";
+import { KpiAdminRepository } from "../repositories/admin/kpi-admin.repository.impl";
 
 export function createAdminRepositories(
   apiClient: ApiClient,
@@ -30,5 +31,6 @@ export function createAdminRepositories(
     users: new UserAdminRepository(apiClient),
     organizations: new OrganizationAdminRepository(apiClient),
     memberships: new MembershipAdminRepository(apiClient),
+    kpi: new KpiAdminRepository(apiClient),
   };
 }

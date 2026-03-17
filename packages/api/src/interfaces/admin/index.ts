@@ -10,3 +10,4 @@ export type { ICustomerDocumentAdminRepository } from "./customer-document-admin
 export type { IUserAdminRepository } from "./user-admin.repository";
 export type { IOrganizationAdminRepository } from "./organization-admin.repository";
 export type { IMembershipAdminRepository } from "./membership-admin.repository";
+export type { IKpiAdminRepository } from "./kpi-admin.repository";

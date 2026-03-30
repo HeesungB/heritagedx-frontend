@@ -236,7 +236,7 @@ const MembershipInfoSheet = forwardRef<HTMLDivElement, MembershipInfoSheetProps>
                   onCustomItemsChange({ ...customItems, [sectionKey]: updated });
                 }}
                 placeholder="항목명"
-                className={`${inlineInputCls} text-gray-600`}
+                className={`${inlineInputCls} text-gray-600 text-xs text-center`}
               />
             </td>
             <td colSpan={3} className={tdCls}>

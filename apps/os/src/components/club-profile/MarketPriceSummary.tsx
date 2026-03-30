@@ -23,8 +23,8 @@ function ListingCard({ listing }: { listing: MembershipListing }) {
   const hasSell = listing.sellRepresentativePrice != null && listing.sellRepresentativePrice > 0;
 
   return (
-    <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-gray-50 border border-gray-100 w-[280px]">
-      <span className="text-[11px] text-gray-600 font-medium truncate w-[80px] shrink-0" title={listing.membershipName}>
+    <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-gray-50 border border-gray-100 min-w-[280px] w-auto">
+      <span className="text-[11px] text-gray-600 font-medium truncate min-w-[120px] shrink-0" title={listing.membershipName}>
         {listing.membershipName}
       </span>
       <div className="h-3 w-px bg-gray-200" />

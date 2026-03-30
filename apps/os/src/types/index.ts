@@ -179,6 +179,9 @@ export interface MembershipTradeRecordForm {
   actualTransactionDate: string;
 }
 
+// Listing price types
+export type { MembershipListing } from "./exchange-price";
+
 // Notice types
 export interface Notice {
   id: string;

@@ -14,6 +14,7 @@ import CostCalculatorSection from "./club-profile/CostCalculatorSection";
 import DocumentsSection from "./club-profile/DocumentsSection";
 import EstimateSection from "./club-profile/EstimateSection";
 import { trackEvent } from "@/lib/gtag";
+import MarketPriceSummary from "./club-profile/MarketPriceSummary";
 import {
   useSheetStorage,
   loadCustomTemplates,
@@ -183,8 +184,11 @@ export default function ClubProfile({ detail, loading, clubs, onClubNavigate }: 
             </div>
           </div>
 
+          {/* 종합 시세 정보 */}
+          <MarketPriceSummary clubId={detail.id} />
+
           {/* 탭 네비게이션 */}
-          <div className="border-b border-gray-200 print:hidden mt-4 px-6">
+          <div className="border-b border-gray-200 print:hidden mt-2 px-6">
           <div className="flex">
             {tabs.map((tab) => (
               <button

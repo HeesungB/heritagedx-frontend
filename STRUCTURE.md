@@ -25,9 +25,10 @@ heritage-dx/
 │   │   │   ├── app/                 # Next.js App Router
 │   │   │   ├── components/          # 38개 컴포넌트
 │   │   │   ├── contexts/            # AuthContext, RepositoryContext
-│   │   │   ├── hooks/               # useOrganization, useTaxSettings, useSheetStorage
+│   │   │   ├── hooks/               # useOrganization, useTaxSettings, useSheetStorage, useMarketPriceSummary
 │   │   │   ├── lib/                 # server-repositories.ts, authApi.ts, firebase-admin.ts
-│   │   │   ├── types/               # 앱 전용 타입
+│   │   │   ├── types/               # 앱 전용 타입 (exchange-price.ts 포함)
+│   │   │   ├── constants/           # golfCourseCoordinates.json, exchangePrices.json
 │   │   │   └── utils/               # distance, taxCalculator
 │   │   ├── next.config.ts
 │   │   ├── tailwind.config.ts

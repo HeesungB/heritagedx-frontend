@@ -91,7 +91,9 @@ export default function MapSidebar({ currentAddress, clubName, onClose, clubs, o
 
         for (const [address, data] of Object.entries(coordinatesMap)) {
           if (!data) continue;
+          // API에 등록된 골프장만 표시
           const isCurrent = address === currentAddress;
+          if (!isCurrent && !clubLookupRef.current.has(normalizeName(data.name))) continue;
 
           const marker = new naver.maps.Marker({
             position: new naver.maps.LatLng(data.lat, data.lng),

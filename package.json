@@ -14,7 +14,14 @@
     "data-sync:warm": "node scripts/data-sync.mjs warm"
   },
   "devDependencies": {
+    "@wonderflow/config": "^14.3.0",
     "turbo": "^2.3.0"
   },
-  "packageManager": "pnpm@9.15.0"
+  "packageManager": "pnpm@9.15.0",
+  "dependencies": {
+    "@wonderflow/react-components": "^14.3.0",
+    "@wonderflow/symbols": "^14.3.0",
+    "@wonderflow/themes": "^14.3.0",
+    "@wonderflow/tokens": "^14.3.0"
+  }
 }

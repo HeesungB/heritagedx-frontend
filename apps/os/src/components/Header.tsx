@@ -79,7 +79,7 @@ export default function Header({ clubName }: HeaderProps) {
             </div>
             <div>
               <h1 className="text-lg font-bold text-white tracking-tight leading-tight">HERITAGE OS</h1>
-              <p className="text-xs text-emerald-100 hidden sm:block leading-tight">회원권 딜러 실무 정보 허브</p>
+              <p className="text-xs text-emerald-100 hidden sm:block leading-tight">Brokerage Operation Software</p>
             </div>
           </div>
           <div className="w-px h-6 bg-white/20 hidden sm:block" />

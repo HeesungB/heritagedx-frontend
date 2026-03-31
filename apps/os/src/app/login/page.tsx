@@ -61,7 +61,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md px-4">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">HERITAGE OS</h1>
-          <p className="mt-2 text-gray-500">회원권 딜러 실무 정보 허브</p>
+          <p className="mt-2 text-gray-500">Brokerage Operation Software</p>
         </div>
 
         <div className="bg-white border border-gray-200 rounded-lg shadow-sm">

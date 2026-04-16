@@ -12,6 +12,10 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "Heritage OS (HDX)",
   description: "회원권 명의개서 서류 처리",
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 export default function RootLayout({

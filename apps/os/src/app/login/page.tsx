@@ -116,16 +116,16 @@ export default function LoginPage() {
 
           {/* Title */}
           <h1 className="relative z-10 mt-5 text-[40px] font-extrabold leading-[1.2] tracking-[-0.018em]">
-            현장의 속도로
+            상담부터 계약까지
             <br />
-            완성되는 거래의 흐름
+            거래의 전 과정을 한 화면에서
           </h1>
 
           {/* Subtitle */}
           <p className="relative z-10 mt-4 text-[15px] font-medium leading-[1.625] tracking-[-0.02em] text-[#99a1af]">
-            상담부터 계약까지, 회원권 거래의 모든 단계를
+            운영 효율과 성과를 높이는
             <br />
-            한 화면에서 정확하고 신속하게 처리합니다.
+            회원권 업계 최초의 운영 시스템
           </p>
 
           <div className="flex-1" />

@@ -26,6 +26,8 @@ export type {
   IMembershipTradeAdminRepository,
   INoticeRepository,
   NoticeListParams,
+  ICustomerRepository,
+  CustomerListParams,
   GeneralRepositories,
   AdminRepositories,
   ServerRepositories,
@@ -49,6 +51,7 @@ export {
   useMarketPriceRepository,
   useConsultationAdminRepository,
   useMembershipTradeAdminRepository,
+  useCustomerRepository,
 } from "./context/RepositoryContext";
 
 // Normalizers

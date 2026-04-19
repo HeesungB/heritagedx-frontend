@@ -18,3 +18,10 @@ export type {
   MembershipTradeAdminStore,
   MembershipTradeAdminStoreState,
 } from "./membership-trade-admin.store";
+
+export { createCustomerStore } from "./customer.store";
+export type {
+  CustomerStore,
+  CustomerStoreState,
+  CustomerCreateResult,
+} from "./customer.store";

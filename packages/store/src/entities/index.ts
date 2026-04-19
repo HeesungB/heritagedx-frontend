@@ -36,4 +36,10 @@ export { isDocumentExpired, isDocumentDownloadable } from "./document";
 export type { OrganizationEntity } from "./organization";
 export type { UserRole, UserEntity, AdminUserEntity } from "./user";
 export type { EmployeeEntity } from "./employee";
+export type {
+  CustomerEntity,
+  CustomerHistorySummaryEntity,
+  CustomerHistoryRecentConsultationEntity,
+  CustomerHistoryRecentMembershipTradeEntity,
+} from "./customer";
 export type { ClubDocumentEntity, ClubScenarioDocumentEntity } from "./club-document";

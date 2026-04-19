@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FolderOpen, LogOut, Users, MessageSquare, FileText, Building2, Home, Menu, X, Bell, BarChart3 } from "lucide-react";
+import { FolderOpen, LogOut, Users, MessageSquare, FileText, Building2, Home, Menu, X, Bell, BarChart3, UserCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/hooks/useNotifications";
 import { ROLE_LABELS, canManageOrg } from "@heritage-dx/store";
@@ -20,6 +20,7 @@ export default function Header() {
   const isCommonDocsPage = pathname.startsWith("/common-documents");
   const isTradeMemosPage = pathname.startsWith("/trade-memos");
   const isTradeRecordsPage = pathname.startsWith("/trade-records");
+  const isCustomersPage = pathname.startsWith("/customers");
   const isUsersPage = pathname.startsWith("/users");
   const isMyOrgPage = pathname.startsWith("/my-organization");
   const canManageUsers = canManageOrg(user);
@@ -59,6 +60,10 @@ export default function Header() {
             <Link href="/clubs" className={navLinkClass(isClubsPage)}>
               <Building2 className="w-3.5 h-3.5" />
               골프장
+            </Link>
+            <Link href="/customers" className={navLinkClass(isCustomersPage)}>
+              <UserCircle className="w-3.5 h-3.5" />
+              고객
             </Link>
             <Link href="/trade-memos" className={navLinkClass(isTradeMemosPage)}>
               <MessageSquare className="w-3.5 h-3.5" />
@@ -145,6 +150,10 @@ export default function Header() {
             <Link href="/clubs" className={mobileNavLinkClass(isClubsPage)} onClick={() => setMobileMenuOpen(false)}>
               <Building2 className="w-4 h-4" />
               골프장
+            </Link>
+            <Link href="/customers" className={mobileNavLinkClass(isCustomersPage)} onClick={() => setMobileMenuOpen(false)}>
+              <UserCircle className="w-4 h-4" />
+              고객
             </Link>
             <Link href="/trade-memos" className={mobileNavLinkClass(isTradeMemosPage)} onClick={() => setMobileMenuOpen(false)}>
               <MessageSquare className="w-4 h-4" />

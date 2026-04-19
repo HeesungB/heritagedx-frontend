@@ -23,3 +23,4 @@ export type { NoticesPagination } from "./useNotices";
 export { useNoticeMutations } from "./useNoticeMutations";
 export { useMarketPrices } from "./useMarketPrices";
 export type { MarketPricePeriod, MarketPricePoint } from "./useMarketPrices";
+export { useCustomers } from "./useCustomers";

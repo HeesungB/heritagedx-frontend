@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { MembershipTrade, MembershipTradeForm, ClubDetail } from "@/types";
-import { Button, Loading, Textarea } from "@heritage-dx/ui";
+import { Button, Loading, Textarea, ConfirmModal } from "@heritage-dx/ui";
 import { useAppStores } from "@/stores";
 import { useConsultations } from "@heritage-dx/store";
 import { useSendTradeNotification } from "@/hooks/useSendTradeNotification";
+import { useCustomerEnsureFlow } from "@/hooks/useCustomerEnsureFlow";
+import CustomerAutocomplete from "@/components/CustomerAutocomplete";
 import { trackEvent } from "@/lib/gtag";
 
 interface TradeMemoSidebarProps {
@@ -18,6 +20,7 @@ type SidebarTab = "list" | "create";
 const initialForm: Omit<MembershipTradeForm, "clubId" | "clubName"> = {
   membershipType: "",
   tradeType: "매수",
+  customerId: null,
   customerName: "",
   contact: "",
   offerPrice: 0,
@@ -47,6 +50,7 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
   const [filterType, setFilterType] = useState<"" | "매수" | "매도">("");
   const [filterDone, setFilterDone] = useState<"" | "done" | "progress">("progress");
   const [manualMembershipInput, setManualMembershipInput] = useState(false);
+  const ensureFlow = useCustomerEnsureFlow();
 
   useEffect(() => {
     fetchFromStore({
@@ -60,73 +64,104 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
     });
   }, [searchQuery, filterType, filterDone]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const persistConsultation = async () => {
+    const cleaned = {
+      ...form,
+      tradeDate: form.tradeDate || null,
+      registrationDate: form.registrationDate || null,
+      offerPriceNote: form.offerPriceNote || null,
+      desiredPriceNote: form.desiredPriceNote || null,
+      notes: form.notes || null,
+      remarks: form.remarks || null,
+    };
+
+    const input = {
+      club: clubDetail.name,
+      membership: cleaned.membershipType,
+      tradeType: cleaned.tradeType,
+      customerName: cleaned.customerName,
+      contact: cleaned.contact,
+      offerPrice: cleaned.offerPrice || null,
+      offerPriceNote: cleaned.offerPriceNote,
+      desiredPrice: cleaned.desiredPrice || null,
+      desiredPriceNote: cleaned.desiredPriceNote,
+      depositAmount: cleaned.depositAmount || null,
+      notes: cleaned.notes,
+      registrationDate: cleaned.registrationDate,
+      tradeDate: cleaned.tradeDate,
+      remarks: cleaned.remarks,
+      isDone: cleaned.isDone,
+    };
+
+    const wasEditing = !!editingTrade;
+    const entity = editingTrade
+      ? await update(editingTrade.id, input)
+      : await create(input);
+
+    if (!entity) {
+      setErrorMessage("오류가 발생했습니다.");
+      return;
+    }
+
+    if (!wasEditing) {
+      sendNotification({
+        tradeId: entity.id,
+        clubName: clubDetail.name,
+        tradeType: form.tradeType,
+        customerName: form.customerName,
+        membershipType: form.membershipType,
+        offerPrice: form.offerPrice || null,
+        desiredPrice: form.desiredPrice || null,
+      });
+    }
+
+    setEditingTrade(null);
+    setForm(initialForm);
+    setActiveTab("list");
+    setSuccessMessage(wasEditing ? "수정 완료" : "등록 완료");
+    setTimeout(() => setSuccessMessage(null), 2500);
+    if (!wasEditing) {
+      trackEvent("trade_memo_create", { club_name: clubDetail.name, trade_type: form.tradeType });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
     setErrorMessage(null);
+
+    if (
+      !editingTrade &&
+      !form.customerId &&
+      form.customerName.trim() &&
+      form.contact.trim()
+    ) {
+      ensureFlow.requestEnsure({
+        name: form.customerName.trim(),
+        contact: form.contact.trim(),
+      });
+      return;
+    }
+
+    setSubmitting(true);
     try {
-      const cleaned = {
-        ...form,
-        tradeDate: form.tradeDate || null,
-        registrationDate: form.registrationDate || null,
-        offerPriceNote: form.offerPriceNote || null,
-        desiredPriceNote: form.desiredPriceNote || null,
-        notes: form.notes || null,
-        remarks: form.remarks || null,
-      };
+      await persistConsultation();
+    } catch (err) {
+      console.error("메모 저장 실패:", err);
+      setErrorMessage("네트워크 오류가 발생했습니다.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-      const input = {
-        club: clubDetail.name,
-        membership: cleaned.membershipType,
-        tradeType: cleaned.tradeType,
-        customerName: cleaned.customerName,
-        contact: cleaned.contact,
-        offerPrice: cleaned.offerPrice || null,
-        offerPriceNote: cleaned.offerPriceNote,
-        desiredPrice: cleaned.desiredPrice || null,
-        desiredPriceNote: cleaned.desiredPriceNote,
-        depositAmount: cleaned.depositAmount || null,
-        notes: cleaned.notes,
-        registrationDate: cleaned.registrationDate,
-        tradeDate: cleaned.tradeDate,
-        remarks: cleaned.remarks,
-        isDone: cleaned.isDone,
-      };
-
-      const wasEditing = !!editingTrade;
-      let entity;
-      if (editingTrade) {
-        entity = await update(editingTrade.id, input);
-      } else {
-        entity = await create(input);
-      }
-
-      if (!entity) {
-        setErrorMessage("오류가 발생했습니다.");
-        return;
-      }
-
-      // 신규 등록일 때만 Back Office에 푸시 알림 전송 (fire-and-forget)
-      if (!wasEditing) {
-        sendNotification({
-          tradeId: entity.id,
-          clubName: clubDetail.name,
-          tradeType: form.tradeType,
-          customerName: form.customerName,
-          membershipType: form.membershipType,
-          offerPrice: form.offerPrice || null,
-          desiredPrice: form.desiredPrice || null,
-        });
-      }
-
-      setEditingTrade(null);
-      setForm(initialForm);
-      setActiveTab("list");
-      setSuccessMessage(wasEditing ? "수정 완료" : "등록 완료");
-      setTimeout(() => setSuccessMessage(null), 2500);
-      if (!wasEditing) {
-        trackEvent("trade_memo_create", { club_name: clubDetail.name, trade_type: form.tradeType });
-      }
+  const handleConfirmEnsure = async () => {
+    const result = await ensureFlow.confirm();
+    if (!result.ok) {
+      setErrorMessage(result.errorMessage ?? "고객 등록에 실패했습니다.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await persistConsultation();
     } catch (err) {
       console.error("메모 저장 실패:", err);
       setErrorMessage("네트워크 오류가 발생했습니다.");
@@ -161,6 +196,7 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
     setForm({
       membershipType: tradeType,
       tradeType: trade.tradeType || "매수",
+      customerId: trade.customerId ?? null,
       customerName: trade.customerName || "",
       contact: trade.contact || "",
       offerPrice: trade.offerPrice ? Number(trade.offerPrice) : 0,
@@ -553,31 +589,22 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
               )}
             </div>
 
-            {/* 고객명 + 연락처 */}
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">고객명 <span className="text-red-500">*</span></label>
-                <input
-                  type="text"
-                  value={form.customerName}
-                  onChange={(e) => setForm((f) => ({ ...f, customerName: e.target.value }))}
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
-                  placeholder="홍길동"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">연락처 <span className="text-red-500">*</span></label>
-                <input
-                  type="text"
-                  value={form.contact}
-                  onChange={(e) => setForm((f) => ({ ...f, contact: e.target.value }))}
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
-                  placeholder="010-1234-5678"
-                  required
-                />
-              </div>
-            </div>
+            {/* 고객명 + 연락처 (자동완성) */}
+            <CustomerAutocomplete
+              value={{
+                customerId: form.customerId,
+                name: form.customerName,
+                contact: form.contact,
+              }}
+              onChange={(next) =>
+                setForm((f) => ({
+                  ...f,
+                  customerId: next.customerId,
+                  customerName: next.name,
+                  contact: next.contact,
+                }))
+              }
+            />
 
             {/* 제시가 */}
             <div>
@@ -697,6 +724,21 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
           </form>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={!!ensureFlow.pending}
+        onClose={ensureFlow.cancel}
+        onConfirm={handleConfirmEnsure}
+        title="신규 고객 등록 안내"
+        message={
+          ensureFlow.pending
+            ? `${ensureFlow.pending.name}(${ensureFlow.pending.contact}) 님은 고객 리스트에 없습니다. 먼저 고객으로 등록한 뒤 상담일지를 저장할까요?`
+            : ""
+        }
+        confirmText="고객 등록 후 저장"
+        cancelText="취소"
+        isLoading={ensureFlow.processing || submitting}
+      />
     </aside>
   );
 }

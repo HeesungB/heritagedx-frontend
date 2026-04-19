@@ -22,14 +22,14 @@ heritage-dx/
 ├── apps/
 │   ├── os/                          # 공개 사이트 (포트 3000)
 │   │   ├── src/
-│   │   │   ├── app/                 # Next.js App Router (loading/error: clubs, trades, claims, membership-trades)
+│   │   │   ├── app/                 # Next.js App Router (loading/error: clubs, trades, claims, membership-trades, customers)
 │   │   │   ├── components/          # 41개 컴포넌트 (top-level 29 + club-profile/ 12)
 │   │   │   │   ├── club-profile/        # ClubBasicInfoTable, MembershipInfoSection, MembershipTradesSection,
 │   │   │   │   │                        #   EstimateSection, CostCalculatorSection, GreenFeeField, InfoField,
 │   │   │   │   │                        #   BenefitsSheetSection, DocumentsSection, MarketPriceSummary,
 │   │   │   │   │                        #   NearbyClubPrices, PriceChart
 │   │   │   ├── contexts/            # AuthContext, RepositoryContext
-│   │   │   ├── hooks/               # useOrganization, useTaxSettings (localStorage 세율 오버라이드), useSheetStorage, useMarketPriceSummary, useSendTradeNotification, useGeocode
+│   │   │   ├── hooks/               # useOrganization, useTaxSettings (localStorage 세율 오버라이드), useSheetStorage, useMarketPriceSummary, useSendTradeNotification, useGeocode, useCustomerEnsureFlow
 │   │   │   ├── lib/                 # server-repositories.ts, authApi.ts, firebase-admin.ts, gtag.ts
 │   │   │   ├── types/               # 앱 전용 타입 (exchange-price.ts 포함)
 │   │   │   ├── constants/           # golfCourseCoordinates.json
@@ -236,6 +236,7 @@ packages/api/
 | `IClaimRepository` | `create(data)` |
 | `IMarketPriceRepository` | `listByMembership(membershipId, { from, to })` |
 | `INoticeRepository` | `list(params?)`, `create(input)`, `update(id, input)`, `delete(id)` |
+| `ICustomerRepository` | `getAll(params?)`, `getOne(id)`, `create(data)`, `update(id, data)`, `delete(id)`, `getHistory(id)`, `getHistorySummary(id)` |
 
 - `packages/api/src/interfaces/general/notice.repository.ts` — `INoticeRepository` 인터페이스 (`NoticeListParams`, `list`, `create`, `update`, `delete`). 읽기는 `/notices` 공개 엔드포인트, 쓰기는 `/admin/notices` 관리자 엔드포인트(서버측 토큰 검증)로 라우팅.
 - `packages/api/src/repositories/general/notice.repository.impl.ts` — `ApiClient` 기반 구현체
@@ -272,6 +273,7 @@ packages/api/
 - `useConsultationAdminRepository()`, `useMembershipTradeAdminRepository()` — 관리자 convenience hooks (백오피스 승인 UI에서 사용)
 - `useNoticeRepository()` — notice general 리포지토리 convenience hook (훅 내부에서만 소비)
 - `useMarketPriceRepository()` — market-price general 리포지토리 convenience hook (훅 내부에서만 소비)
+- `useCustomerRepository()` — customer general 리포지토리 convenience hook (OS/BO 고객 페이지, 고객 자동완성, 이력 조회에서 사용)
 - `useGeneralRepositories()`, `useAdminRepositories()` — 집합 hooks
 
 ### 4.5. `@heritage-dx/store`
@@ -307,11 +309,13 @@ packages/store/
 │   │   ├── organization.ts   # OrganizationEntity
 │   │   ├── user.ts           # UserRole, UserEntity, AdminUserEntity
 │   │   ├── employee.ts       # EmployeeEntity
+│   │   ├── customer.ts       # CustomerEntity
 │   │   └── club-document.ts  # ClubDocumentEntity, ClubScenarioDocumentEntity
 │   ├── mappers/              # DTO ↔ Entity 변환 (순수 함수)
 │   │   ├── index.ts
 │   │   ├── club.mapper.ts
 │   │   ├── consultation.mapper.ts
+│   │   ├── customer.mapper.ts       # mapCustomerDtoToEntity, mapCustomerEntityToInput, mapCustomerEntityToUpdateInput
 │   │   ├── membership-trade.mapper.ts
 │   │   ├── membership.mapper.ts
 │   │   ├── scenario.mapper.ts
@@ -329,7 +333,8 @@ packages/store/
 │   │   ├── consultation.store.ts           # general — requestApproval
 │   │   ├── membership-trade.store.ts       # general — requestFinalReview
 │   │   ├── consultation-admin.store.ts     # admin — approveFirst/hold/reject/reopen
-│   │   └── membership-trade-admin.store.ts # admin — 동일한 4개 액션
+│   │   ├── membership-trade-admin.store.ts # admin — 동일한 4개 액션
+│   │   └── customer.store.ts               # CRUD + searchByQuery (자동완성용)
 │   └── hooks/                # 컴포넌트용 편의 훅
 │       ├── index.ts
 │       ├── useClubs.ts
@@ -352,7 +357,8 @@ packages/store/
 │       ├── useMyOrganization.ts    # 나의 조직 정보 조회
 │       ├── useNotices.ts           # 공지사항 목록 조회 (read)
 │       ├── useNoticeMutations.ts   # 공지사항 CRUD (write)
-│       └── useMarketPrices.ts      # 회원권 시세 추이 조회 (membershipId, period)
+│       ├── useMarketPrices.ts      # 회원권 시세 추이 조회 (membershipId, period)
+│       └── useCustomers.ts         # 고객 CRUD + searchByQuery (자동완성/목록)
 ```
 
 **Entity 설계 원칙:**
@@ -372,6 +378,7 @@ packages/store/
 - `createMembershipTradeStore(generalRepos)` — CRUD + `requestFinalReview`
 - `createConsultationAdminStore(adminRepos)` — CRUD + `approvalAction`/`approveFirst`/`hold`/`reject`/`reopen`
 - `createMembershipTradeAdminStore(adminRepos)` — CRUD + `workflowAction`/`approveFirst`/`hold`/`reject`/`reopen`
+- `createCustomerStore(generalRepos)` — 고객 CRUD + `searchByQuery(query, limit)` (자동완성에서 소비). `create` 결과는 `{ success, entity?, conflict?, errorMessage? }` 형태로 409(연락처 중복)를 플래그로 전달한다.
 - 패턴: 캐시 히트 → stale 데이터 즉시 반환 + 백그라운드 refresh
 
 **Exports:**
@@ -494,6 +501,7 @@ ESLint 9 flat config 공유 패키지. `eslint-config-next`의 `core-web-vitals`
 │   └── loading.tsx               # 로딩 스켈레톤
 ├── trades/page.tsx               # 거래 메모 (상담 기록)
 ├── membership-trades/page.tsx    # 거래 내역
+├── customers/page.tsx            # 고객 관리 (CRUD + 이력 Drawer)
 └── claims/page.tsx               # 건의사항
 ```
 
@@ -516,6 +524,9 @@ ESLint 9 flat config 공유 패키지. `eslint-config-next`의 `core-web-vitals`
 
 **건의사항:**
 `ClaimsPageClient`
+
+**고객:**
+`CustomersPageClient`, `CustomerAutocomplete` — `/customers` 페이지 CRUD + 상담/거래 폼에서 재사용되는 이름/연락처 자동완성. 미등록 고객 저장 시에는 `useCustomerEnsureFlow` 훅이 `ConfirmModal`을 띄워 `POST /customers` → `POST /consultations` 를 순차 실행한다.
 
 **모달/시트:**
 `PasswordChangeModal`, `TaxGuideModal`, `TaxSettingsModal`, `EstimateSheet`
@@ -599,6 +610,7 @@ getInitialData()    // 초기 데이터 프리로드
     ├── kpi/page.tsx                       # KPI 통계 대시보드
     ├── trade-memos/page.tsx              # 상담 기록 (승인 UI — useConsultationAdminRepository)
     ├── trade-records/page.tsx            # 거래 내역 (승인 UI — useMembershipTradeAdminRepository)
+    ├── customers/page.tsx                # 고객 목록 + 담당자 필터 + 이력 Drawer (useCustomerRepository)
     └── users/page.tsx                    # 사용자 관리
 ```
 

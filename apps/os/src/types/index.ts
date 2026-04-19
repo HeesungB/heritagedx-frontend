@@ -74,6 +74,7 @@ export interface MembershipTradeForm {
   clubName: string;
   membershipType: string;
   tradeType: "매도" | "매수";
+  customerId: string | null;
   customerName: string;
   contact: string;
   offerPrice: number;

@@ -3,10 +3,12 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import Header from "@/components/Header";
 import { MembershipTrade, MembershipTradeForm, Club } from "@/types";
-import { ClubSearchSelect, Button, Loading } from "@heritage-dx/ui";
+import { ClubSearchSelect, Button, Loading, ConfirmModal } from "@heritage-dx/ui";
 import { useAppStores } from "@/stores";
 import { useClubs, useClubDetail, useConsultations, canDeleteConsultation } from "@heritage-dx/store";
 import { useSendTradeNotification } from "@/hooks/useSendTradeNotification";
+import { useCustomerEnsureFlow } from "@/hooks/useCustomerEnsureFlow";
+import CustomerAutocomplete from "@/components/CustomerAutocomplete";
 import { trackEvent } from "@/lib/gtag";
 import { StatusBadge } from "@/components/approval/StatusBadge";
 import type { ApprovalStatus } from "@heritage-dx/store";
@@ -20,6 +22,7 @@ const emptyForm: MembershipTradeForm = {
   clubName: "",
   membershipType: "",
   tradeType: "매수",
+  customerId: null,
   customerName: "",
   contact: "",
   offerPrice: 0,
@@ -66,6 +69,7 @@ export default function TradesPageClient() {
   const [formMemberships, setFormMemberships] = useState<string[]>([]);
   const [manualClubInput, setManualClubInput] = useState(false);
   const [manualMembershipInput, setManualMembershipInput] = useState(false);
+  const ensureFlow = useCustomerEnsureFlow();
   const formRef = useRef(form);
   formRef.current = form;
 
@@ -149,65 +153,96 @@ export default function TradesPageClient() {
     return clubs.filter((c) => tradeClubNames.has(c.name));
   }, [rawTrades, clubs]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-    setErrorMessage(null);
-    try {
-      const input = {
-        club: form.clubName,
-        membership: form.membershipType,
+  const persistConsultation = async () => {
+    const input = {
+      club: form.clubName,
+      membership: form.membershipType,
+      tradeType: form.tradeType,
+      customerName: form.customerName,
+      contact: form.contact,
+      offerPrice: form.offerPrice || null,
+      offerPriceNote: form.offerPriceNote || null,
+      desiredPrice: form.desiredPrice || null,
+      desiredPriceNote: form.desiredPriceNote || null,
+      depositAmount: form.depositAmount || null,
+      notes: form.notes || null,
+      registrationDate: form.registrationDate || null,
+      tradeDate: form.tradeDate || null,
+      remarks: form.remarks || null,
+      isDone: form.isDone,
+    };
+
+    const wasEditing = !!editingTrade;
+    const entity = editingTrade
+      ? await update(editingTrade.id, input)
+      : await create(input);
+
+    if (!entity) {
+      setErrorMessage("오류가 발생했습니다.");
+      return;
+    }
+
+    if (!wasEditing) {
+      sendNotification({
+        tradeId: entity.id,
+        clubName: form.clubName,
         tradeType: form.tradeType,
         customerName: form.customerName,
-        contact: form.contact,
+        membershipType: form.membershipType,
         offerPrice: form.offerPrice || null,
-        offerPriceNote: form.offerPriceNote || null,
         desiredPrice: form.desiredPrice || null,
-        desiredPriceNote: form.desiredPriceNote || null,
-        depositAmount: form.depositAmount || null,
-        notes: form.notes || null,
-        registrationDate: form.registrationDate || null,
-        tradeDate: form.tradeDate || null,
-        remarks: form.remarks || null,
-        isDone: form.isDone,
-      };
+      });
+    }
 
-      const wasEditing = !!editingTrade;
-      let entity;
-      if (editingTrade) {
-        entity = await update(editingTrade.id, input);
-      } else {
-        entity = await create(input);
-      }
+    setEditingTrade(null);
+    setForm(emptyForm);
+    setShowForm(false);
+    setFormClubCode("");
+    setFormMemberships([]);
+    setManualClubInput(false);
+    setManualMembershipInput(false);
+    if (!wasEditing) {
+      trackEvent("trade_memo_create", { club_name: form.clubName, trade_type: form.tradeType });
+    }
+  };
 
-      if (!entity) {
-        setErrorMessage("오류가 발생했습니다.");
-        return;
-      }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
 
-      // 신규 등록일 때만 Back Office에 푸시 알림 전송 (fire-and-forget)
-      if (!wasEditing) {
-        sendNotification({
-          tradeId: entity.id,
-          clubName: form.clubName,
-          tradeType: form.tradeType,
-          customerName: form.customerName,
-          membershipType: form.membershipType,
-          offerPrice: form.offerPrice || null,
-          desiredPrice: form.desiredPrice || null,
-        });
-      }
+    if (
+      !editingTrade &&
+      !form.customerId &&
+      form.customerName.trim() &&
+      form.contact.trim()
+    ) {
+      ensureFlow.requestEnsure({
+        name: form.customerName.trim(),
+        contact: form.contact.trim(),
+      });
+      return;
+    }
 
-      setEditingTrade(null);
-      setForm(emptyForm);
-      setShowForm(false);
-      setFormClubCode("");
-      setFormMemberships([]);
-      setManualClubInput(false);
-      setManualMembershipInput(false);
-      if (!wasEditing) {
-        trackEvent("trade_memo_create", { club_name: form.clubName, trade_type: form.tradeType });
-      }
+    setSubmitting(true);
+    try {
+      await persistConsultation();
+    } catch (err) {
+      console.error("메모 저장 실패:", err);
+      setErrorMessage("네트워크 오류가 발생했습니다.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleConfirmEnsure = async () => {
+    const result = await ensureFlow.confirm();
+    if (!result.ok) {
+      setErrorMessage(result.errorMessage ?? "고객 등록에 실패했습니다.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await persistConsultation();
     } catch (err) {
       console.error("메모 저장 실패:", err);
       setErrorMessage("네트워크 오류가 발생했습니다.");
@@ -224,6 +259,7 @@ export default function TradesPageClient() {
       clubName: trade.clubName || "",
       membershipType: trade.membershipType || "",
       tradeType: trade.tradeType || "매수",
+      customerId: trade.customerId ?? null,
       customerName: trade.customerName || "",
       contact: trade.contact || "",
       offerPrice: trade.offerPrice ? Number(trade.offerPrice) : 0,
@@ -621,33 +657,22 @@ export default function TradesPageClient() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* 고객명 */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">고객명 <span className="text-red-500">*</span></label>
-                    <input
-                      type="text"
-                      value={form.customerName}
-                      onChange={(e) => setForm((f) => ({ ...f, customerName: e.target.value }))}
-                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
-                      placeholder="홍길동"
-                      required
-                    />
-                  </div>
-
-                  {/* 연락처 */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">연락처 <span className="text-red-500">*</span></label>
-                    <input
-                      type="text"
-                      value={form.contact}
-                      onChange={(e) => setForm((f) => ({ ...f, contact: e.target.value }))}
-                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
-                      placeholder="010-1234-5678"
-                      required
-                    />
-                  </div>
-                </div>
+                {/* 고객 (자동완성) */}
+                <CustomerAutocomplete
+                  value={{
+                    customerId: form.customerId,
+                    name: form.customerName,
+                    contact: form.contact,
+                  }}
+                  onChange={(next) =>
+                    setForm((f) => ({
+                      ...f,
+                      customerId: next.customerId,
+                      customerName: next.name,
+                      contact: next.contact,
+                    }))
+                  }
+                />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* 제시가 */}
@@ -960,6 +985,21 @@ export default function TradesPageClient() {
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={!!ensureFlow.pending}
+        onClose={ensureFlow.cancel}
+        onConfirm={handleConfirmEnsure}
+        title="신규 고객 등록 안내"
+        message={
+          ensureFlow.pending
+            ? `${ensureFlow.pending.name}(${ensureFlow.pending.contact}) 님은 고객 리스트에 없습니다. 먼저 고객으로 등록한 뒤 상담일지를 저장할까요?`
+            : ""
+        }
+        confirmText="고객 등록 후 저장"
+        cancelText="취소"
+        isLoading={ensureFlow.processing || submitting}
+      />
     </div>
   );
 }

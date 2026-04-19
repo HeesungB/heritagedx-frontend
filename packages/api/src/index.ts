@@ -8,6 +8,7 @@ export type {
   IConsultationRepository,
   IMembershipTradeRepository,
   IClaimRepository,
+  IMarketPriceRepository,
   IClubAdminRepository,
   IScenarioAdminRepository,
   IDocumentAdminRepository,
@@ -21,6 +22,10 @@ export type {
   IOrganizationAdminRepository,
   IMembershipAdminRepository,
   IKpiAdminRepository,
+  IConsultationAdminRepository,
+  IMembershipTradeAdminRepository,
+  INoticeRepository,
+  NoticeListParams,
   GeneralRepositories,
   AdminRepositories,
   ServerRepositories,
@@ -40,6 +45,10 @@ export {
   useConsultationRepository,
   useMembershipTradeRepository,
   useClaimRepository,
+  useNoticeRepository,
+  useMarketPriceRepository,
+  useConsultationAdminRepository,
+  useMembershipTradeAdminRepository,
 } from "./context/RepositoryContext";
 
 // Normalizers

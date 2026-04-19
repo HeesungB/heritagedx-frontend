@@ -11,22 +11,12 @@ export type {
   DocumentEntity as Document,
   DocumentsSummaryEntity as DocumentsSummary,
   ScenarioWithDocsEntity as ScenarioWithDocuments,
-  TradeMemoEntity as MembershipTrade,
-  TradeRecordEntity as MembershipTradeRecord,
+  ConsultationEntity as MembershipTrade,
+  MembershipTradeEntity as MembershipTradeRecord,
   PaginationState,
   FetchStatus,
 } from "@heritage-dx/store";
 
-// Scenario/filter types (from shared DTO — used by scenario components, no entity needed)
-export type {
-  AvailableFilters,
-  FilterOption,
-  Scenario,
-  ScenarioOptions,
-} from "@heritage-dx/types";
-
-// Local import for use within this file
-import type { AvailableFilters } from "@heritage-dx/types";
 
 // OS-specific types (no entity equivalent)
 
@@ -78,74 +68,19 @@ export interface DocumentsResponse {
   timestamp: string;
 }
 
-export interface ScenarioMatchRequest {
-  clubCode: string;
-  side: "Buyer" | "Seller";
-  ownerType: "Personal" | "Corporate" | "Family" | "Special" | "All";
-  hasProxy?: boolean;
-  isCertificateLost?: boolean;
-  transferStructure?: "Withdraw" | "Abandon" | null;
-  isFamily?: boolean;
-}
-
-export interface ScenarioMatchResponse {
-  success: boolean;
-  data: {
-    matched: boolean;
-    scenario: {
-      id: string;
-      scenarioCode: string;
-      name: string;
-      description: string | null;
-      side: "Buyer" | "Seller";
-      ownerType: "Personal" | "Corporate" | "Family" | "Special" | "All";
-      hasProxy: boolean;
-      isCertificateLost: boolean;
-      transferStructure: string | null;
-      isFamily: boolean;
-      requiresTaxInvoice: boolean;
-      displayOrder: number;
-    };
-    matchedConditions: {
-      side: string;
-      ownerType: string;
-      hasProxy: boolean;
-      isCertificateLost: boolean;
-      transferStructure: string | null;
-      isFamily: boolean;
-    };
-    clubInfo: {
-      code: string;
-      name: string;
-    };
-  };
-  timestamp: string;
-}
-
-export interface ScenarioOptionsResponse {
-  success: boolean;
-  data: {
-    clubCode: string;
-    clubName: string;
-    availableFilters: AvailableFilters;
-    scenarios: import("@heritage-dx/types").Scenario[];
-    totalScenarios: number;
-  };
-  timestamp: string;
-}
-
 // Trade form types (flat form state — separate from entity types)
 export interface MembershipTradeForm {
   clubId: string;
   clubName: string;
   membershipType: string;
-  tradeType: string;
+  tradeType: "매도" | "매수";
   customerName: string;
   contact: string;
   offerPrice: number;
   offerPriceNote: string;
   desiredPrice: number;
   desiredPriceNote: string;
+  depositAmount: number;
   notes: string;
   registrationDate: string;
   tradeDate: string;
@@ -167,7 +102,7 @@ export interface MembershipTradeRecordForm {
   marketProfit: number;
   expense: number;
   description: string;
-  contractFee: number;
+  depositAmount: number;
   balanceDate: string;
   balanceCompleted: boolean;
   manager: string;
@@ -201,10 +136,12 @@ export interface NoticesResponse {
   data: {
     notices: Notice[];
     pagination: {
-      currentPage: number;
+      page: number;
+      limit: number;
+      total: number;
       totalPages: number;
-      totalItems: number;
-      itemsPerPage: number;
+      hasNext: boolean;
+      hasPrev: boolean;
     };
   };
   timestamp: string;

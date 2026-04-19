@@ -14,7 +14,6 @@ import {
   X,
 } from "lucide-react";
 import { useAdminRepositories } from "@heritage-dx/api";
-import { Club } from "@/types";
 import { ConfirmModal } from "@heritage-dx/ui";
 import {
   INITIALS,
@@ -22,8 +21,6 @@ import {
   normalizeInitial,
   getRegionGroup,
   REGION_GROUPS,
-  extractRegionFromAddress,
-  getEffectiveRegion,
 } from "@heritage-dx/utils";
 import { useData } from "@/contexts/DataContext";
 
@@ -43,7 +40,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void } = {}) {
 
   // 선택 & 메뉴
   const [selectedClubCode, setSelectedClubCode] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Club | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ code: string; name: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [menuOpenCode, setMenuOpenCode] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -62,7 +59,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void } = {}) {
   const availableRegionGroups = useMemo(() => {
     const set = new Set<string>();
     clubs.forEach((club) => {
-      const effective = getEffectiveRegion(club.region || "", club.address || "");
+      const effective = club.region || "";
       if (effective) {
         const group = getRegionGroup(effective);
         if (group) set.add(group);
@@ -97,7 +94,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void } = {}) {
     // 지역 필터
     if (filterMode === "region" && activeRegion) {
       result = result.filter(
-        (club) => getRegionGroup(getEffectiveRegion(club.region || "", club.address || "")) === activeRegion
+        (club) => getRegionGroup(club.region || "") === activeRegion
       );
     }
 
@@ -108,8 +105,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         (club) =>
           club.name.toLowerCase().includes(term) ||
           club.code.toLowerCase().includes(term) ||
-          (club.region && club.region.toLowerCase().includes(term)) ||
-          (club.address && club.address.toLowerCase().includes(term))
+          (club.region && club.region.toLowerCase().includes(term))
       );
     }
 
@@ -153,7 +149,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void } = {}) {
     }
   };
 
-  const handleClubSelect = (club: Club) => {
+  const handleClubSelect = (club: { code: string }) => {
     router.push(`/clubs/${club.code}`);
   };
 
@@ -336,7 +332,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void } = {}) {
                     ))}
                   </div>
                   <div className="text-xs text-gray-500">
-                    {club.region || (club.address ? extractRegionFromAddress(club.address) : "")}
+                    {club.region ?? ""}
                   </div>
                 </button>
                 {/* 더보기 메뉴 */}

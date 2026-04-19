@@ -74,3 +74,23 @@ export function useMembershipTradeRepository() {
 export function useClaimRepository() {
   return useGeneralRepositories().claims;
 }
+
+export function useNoticeRepository() {
+  return useGeneralRepositories().notices;
+}
+
+export function useMarketPriceRepository() {
+  return useGeneralRepositories().marketPrices;
+}
+
+export function useCustomerRepository() {
+  return useGeneralRepositories().customers;
+}
+
+export function useConsultationAdminRepository() {
+  return useAdminRepositories().consultations;
+}
+
+export function useMembershipTradeAdminRepository() {
+  return useAdminRepositories().membershipTrades;
+}

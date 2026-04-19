@@ -6,12 +6,7 @@ import { usePathname } from "next/navigation";
 import { FolderOpen, LogOut, Users, MessageSquare, FileText, Building2, Home, Menu, X, Bell, BarChart3 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/hooks/useNotifications";
-
-const roleLabels: Record<string, string> = {
-  SUPER_ADMIN: "최고 관리자",
-  ORG_ADMIN: "관리자",
-  EDITOR: "편집자",
-};
+import { ROLE_LABELS, canManageOrg } from "@heritage-dx/store";
 
 export default function Header() {
   const pathname = usePathname();
@@ -27,7 +22,7 @@ export default function Header() {
   const isTradeRecordsPage = pathname.startsWith("/trade-records");
   const isUsersPage = pathname.startsWith("/users");
   const isMyOrgPage = pathname.startsWith("/my-organization");
-  const canManageUsers = user?.role === "SUPER_ADMIN" || user?.role === "ORG_ADMIN";
+  const canManageUsers = canManageOrg(user);
 
   const navLinkClass = (active: boolean) =>
     `flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full transition-all ${
@@ -115,7 +110,7 @@ export default function Header() {
               <div className="text-sm">
                 <span className="font-medium text-white">{user.name}</span>
                 <span className="ml-2 px-2 py-0.5 text-[11px] font-medium bg-white/15 text-indigo-100 rounded-full">
-                  {roleLabels[user.role] || user.role}
+                  {ROLE_LABELS[user.role]}
                 </span>
               </div>
               <div className="w-px h-5 bg-white/20" />
@@ -196,7 +191,7 @@ export default function Header() {
                 <div className="px-4 py-2 text-sm">
                   <span className="font-medium text-white">{user.name}</span>
                   <span className="ml-2 px-2 py-0.5 text-[11px] font-medium bg-white/15 text-indigo-100 rounded-full">
-                    {roleLabels[user.role] || user.role}
+                    {ROLE_LABELS[user.role]}
                   </span>
                 </div>
                 <button

@@ -22,16 +22,16 @@ import {
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { clubDetailSchema, type ClubDetailFormValues } from "@heritage-dx/store/schemas";
 
-import {
-  ClubDetailResponse,
-  ClubDocument,
-  ClubScenarioDocument,
-  Scenario,
-  CustomerDocument,
-  Membership,
-} from "@/types";
+import type { ClubDetailResponse } from "@/types";
+import type {
+  ClubDocumentEntity as ClubDocument,
+  ClubScenarioDocumentEntity as ClubScenarioDocument,
+  ScenarioEntity as Scenario,
+} from "@heritage-dx/store";
+import { getScenarioBasicAccent } from "@heritage-dx/store";
+import type { Membership, CustomerDocument } from "@heritage-dx/types";
 import { useClubRepository, useAdminRepositories } from "@heritage-dx/api";
 import { PageContainer } from "@/components/layout";
 import {
@@ -47,7 +47,9 @@ import {
   Drawer,
   Badge,
 } from "@heritage-dx/ui";
-import DocumentForm from "@/components/forms/DocumentForm";
+import DocumentForm, {
+  type DocumentUploadData,
+} from "@/components/forms/DocumentForm";
 import MembershipForm from "@/components/forms/MembershipForm";
 
 interface PageProps {
@@ -86,41 +88,6 @@ const FIXED_SCENARIOS = [
   },
 ];
 
-// 빈 문자열을 undefined로 변환하는 헬퍼
-const optionalNumber = z.preprocess(
-  (val) => {
-    if (val === "" || val === undefined || val === null) return undefined;
-    const num = Number(val);
-    return isNaN(num) ? undefined : num;
-  },
-  z.number().optional()
-);
-
-// 기본정보 폼 스키마
-const clubInfoSchema = z.object({
-  name: z.string().min(1, "골프장명을 입력하세요"),
-  companyName: z.string().optional(),
-  region: z.string().optional(),
-  address: z.string().optional(),
-  openingDate: z.string().optional(),
-  holes: z.string().optional(),
-  memberCount: z.string().optional(),
-  cityAccessibility: z.string().optional(),
-  memo: z.string().optional(),
-  dealerMemo: z.string().optional(),
-  membershipInfo: z.string().optional(),
-  introduction: z.string().optional(),
-  facilities: z.string().optional(),
-  registrationFee: z.string().optional(),
-  stampDuty: z.string().optional(),
-  agencyFee: z.string().optional(),
-  otherCosts: z.string().optional(),
-  website: z.string().optional(),
-  caddyFee: optionalNumber,
-  cartFee: optionalNumber,
-});
-
-type ClubInfoFormData = z.infer<typeof clubInfoSchema>;
 
 export default function ClubDetailPage({ params }: PageProps) {
   const clubsRepo = useClubRepository();
@@ -204,8 +171,8 @@ export default function ClubDetailPage({ params }: PageProps) {
     handleSubmit: handleSubmitClubInfo,
     reset: resetClubInfo,
     formState: { errors: clubInfoErrors, isDirty: isClubInfoDirty },
-  } = useForm<ClubInfoFormData>({
-    resolver: zodResolver(clubInfoSchema),
+  } = useForm<ClubDetailFormValues>({
+    resolver: zodResolver(clubDetailSchema),
   });
 
   // club 데이터 로드 시 폼 초기화
@@ -239,15 +206,11 @@ export default function ClubDetailPage({ params }: PageProps) {
   useEffect(() => {
     if (docSearchTerm) {
       setFilteredDocuments(
-        documents.filter(
-          (d) =>
-            (d.cleanName || d.name || "")
-              .toLowerCase()
-              .includes(docSearchTerm.toLowerCase()) ||
-            (d.docCode || d.code || "")
-              .toLowerCase()
-              .includes(docSearchTerm.toLowerCase())
-        )
+        documents.filter((d) =>
+          (d.name || "")
+            .toLowerCase()
+            .includes(docSearchTerm.toLowerCase()),
+        ),
       );
     } else {
       setFilteredDocuments(documents);
@@ -380,7 +343,7 @@ export default function ClubDetailPage({ params }: PageProps) {
   }, [loadData]);
 
   // 기본정보 인라인 저장
-  const handleClubInfoSave = async (data: ClubInfoFormData) => {
+  const handleClubInfoSave = async (data: ClubDetailFormValues) => {
     const clubId = club?.id;
     if (!clubId) {
       alert("골프장 ID가 없습니다.");
@@ -402,8 +365,7 @@ export default function ClubDetailPage({ params }: PageProps) {
     setIsSaving(false);
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleDocumentSubmit = async (data: any) => {
+  const handleDocumentSubmit = async (data: DocumentUploadData) => {
     if (!selectedDocument) return;
     const clubId = club?.id || "";
     const docId = selectedDocument.id || "";
@@ -660,8 +622,7 @@ export default function ClubDetailPage({ params }: PageProps) {
   };
 
   // 회원권 추가
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleAddMembership = async (data: any) => {
+  const handleAddMembership = async (data: Record<string, unknown>) => {
     const clubId = club?.id;
     if (!clubId) {
       alert("골프장 ID가 없습니다.");
@@ -684,8 +645,10 @@ export default function ClubDetailPage({ params }: PageProps) {
   };
 
   // 회원권 수정
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleUpdateMembership = async (membershipId: string, data: any) => {
+  const handleUpdateMembership = async (
+    membershipId: string,
+    data: Record<string, unknown>,
+  ) => {
     const clubId = club?.id;
     if (!membershipId || !clubId) return;
     setIsSavingMembership(true);
@@ -1071,13 +1034,13 @@ export default function ClubDetailPage({ params }: PageProps) {
           ) : (
             filteredDocuments.map((document) => (
               <div
-                key={`${document.id}-${document.docCode || document.code}`}
+                key={document.id}
                 onClick={() => setSelectedDocument(document)}
                 className="flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors group"
               >
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-gray-900 truncate">
-                    {document.cleanName || document.name}
+                    {document.name}
                   </div>
                   <div className="text-sm text-gray-500 truncate">
                     {document.fileDescription && `${document.fileDescription}`}
@@ -1117,13 +1080,7 @@ export default function ClubDetailPage({ params }: PageProps) {
             const isActive = activeScenario === s.code;
 
             // 각 시나리오별 상단 라인 색상
-            const lineColorMap: Record<string, string> = {
-              PS_BASIC: "border-t-orange-500", // 개인 양도: 주황
-              PB_BASIC: "border-t-blue-500",   // 개인 양수: 파란색
-              CS_BASIC: "border-t-green-500",  // 법인 양도: 초록
-              CB_BASIC: "border-t-purple-500", // 법인 양수: 보라
-            };
-            const lineColor = lineColorMap[s.code] || "border-t-gray-500";
+            const lineColor = getScenarioBasicAccent(s.code)?.borderTop ?? "border-t-gray-500";
 
             return (
               <button
@@ -1219,7 +1176,7 @@ export default function ClubDetailPage({ params }: PageProps) {
                         </div>
                         <div>
                           <div className="font-medium text-gray-900">
-                            {document.cleanName || document.name}
+                            {document.name}
                           </div>
                           {document.fileDescription && (
                             <div className="text-xs text-gray-500">
@@ -1337,12 +1294,7 @@ export default function ClubDetailPage({ params }: PageProps) {
                           )}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {[
-                            membership.hasAssociateMember && "준회원",
-                            membership.canDelegate && "위임가능",
-                          ]
-                            .filter(Boolean)
-                            .join(" | ") || "-"}
+                          {membership.membershipType || "-"}
                         </div>
                       </div>
                     </div>
@@ -1385,7 +1337,7 @@ export default function ClubDetailPage({ params }: PageProps) {
                 {isExpanded && (
                   <CardContent className="border-t">
                     <MembershipForm
-                      initialData={membership}
+                      initialData={membership as unknown as import("@heritage-dx/store").MembershipEntity}
                       onSubmit={async (data) => {
                         await handleUpdateMembership(membership.id, data);
                       }}
@@ -1588,8 +1540,6 @@ export default function ClubDetailPage({ params }: PageProps) {
             <DocumentForm
               initialData={{
                 id: selectedDocument.id,
-                cleanName:
-                  selectedDocument.name || selectedDocument.cleanName || "",
                 name: selectedDocument.name,
                 description: selectedDocument.fileDescription,
               }}
@@ -1607,9 +1557,7 @@ export default function ClubDetailPage({ params }: PageProps) {
         onClose={() => setDeleteDocTarget(null)}
         onConfirm={handleDeleteDocument}
         title="서류 삭제"
-        message={`"${
-          deleteDocTarget?.cleanName || deleteDocTarget?.name
-        }" 서류를 삭제하시겠습니까?`}
+        message={`"${deleteDocTarget?.name ?? ""}" 서류를 삭제하시겠습니까?`}
         confirmText="삭제"
         variant="danger"
         isLoading={isDeletingDoc}

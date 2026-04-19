@@ -1,4 +1,4 @@
-import type { Pagination } from "@heritage-dx/types";
+import type { ApprovalStatus, Pagination, WorkflowStatus } from "@heritage-dx/types";
 
 export interface ListParams {
   page?: number;
@@ -12,6 +12,16 @@ export interface TradeListParams extends ListParams {
   sort?: string;
   order?: "ASC" | "DESC";
   isDone?: boolean;
+  isShared?: boolean;
+  organizationId?: string;
+  customerId?: string;
+  // 상담 전용
+  approvalStatus?: ApprovalStatus;
+  linkedTradeId?: string;
+  isConverted?: boolean;
+  // 거래 전용
+  workflowStatus?: WorkflowStatus;
+  sourceConsultationId?: string;
 }
 
 export interface PaginatedList<T> {

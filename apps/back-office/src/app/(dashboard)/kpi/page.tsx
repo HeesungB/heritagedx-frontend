@@ -1,235 +1,79 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
-import { useAdminRepositories } from "@heritage-dx/api";
+import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+import {
+  useKpi,
+  useKpiSummary,
+  useKpiSeries,
+  useKpiByEmployee,
+  type KpiFilters,
+  type KpiMetric,
+  type EmployeeEntity,
+} from "@heritage-dx/store";
 import { wonToManwon, formatManwon } from "@heritage-dx/utils";
 import {
   TrendingUp,
   MessageSquare,
   FileText,
   BarChart3,
+  AlertCircle,
 } from "lucide-react";
-import type { Employee } from "@/types";
-import KpiFilterBar, {
-  type KpiFilters,
-  getDateRange,
-  getTimeBuckets,
-} from "@/components/kpi/KpiFilterBar";
-import KpiTrendChart, {
-  type TrendDataPoint,
-  type KpiMetric,
-} from "@/components/kpi/KpiTrendChart";
-import KpiEmployeeComparison, {
-  type EmployeeKpiData,
-} from "@/components/kpi/KpiEmployeeComparison";
+import KpiFilterBar from "@/components/kpi/KpiFilterBar";
 
-interface KpiSummary {
-  tradeCount: number;
-  profit: number;
-  consultationCount: number;
-}
+// recharts 는 초기 번들 분리 — /kpi 진입 시점에만 로드 (1-2)
+const KpiTrendChart = dynamic(() => import("@/components/kpi/KpiTrendChart"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-72 bg-gray-100 rounded animate-pulse" aria-label="추세 차트 로딩 중" />
+  ),
+});
+const KpiEmployeeComparison = dynamic(
+  () => import("@/components/kpi/KpiEmployeeComparison"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-72 bg-gray-100 rounded animate-pulse" aria-label="담당자 비교 차트 로딩 중" />
+    ),
+  },
+);
 
 export default function KpiPage() {
-  const { kpi } = useAdminRepositories();
+  const { fetchEmployees } = useKpi();
 
   const [filters, setFilters] = useState<KpiFilters>({
     preset: "thisMonth",
     dateField: "contractDate",
     employeeId: "",
   });
-
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [summary, setSummary] = useState<KpiSummary>({
-    tradeCount: 0,
-    profit: 0,
-    consultationCount: 0,
-  });
-  const [trendData, setTrendData] = useState<TrendDataPoint[]>([]);
-  const [employeeData, setEmployeeData] = useState<EmployeeKpiData[]>([]);
+  const [employees, setEmployees] = useState<EmployeeEntity[]>([]);
   const [viewMode, setViewMode] = useState<KpiMetric>("all");
-  const [loadingSummary, setLoadingSummary] = useState(true);
-  const [loadingTrend, setLoadingTrend] = useState(true);
-  const [loadingEmployees, setLoadingEmployees] = useState(true);
 
-  const reqSummary = useRef(0);
-  const reqTrend = useRef(0);
-  const reqEmp = useRef(0);
-
-  // Load employee list once
+  // 직원 목록 1회 로드
   useEffect(() => {
-    kpi.getEmployees().then((res) => {
+    fetchEmployees().then((res) => {
       if (res?.data) setEmployees(res.data);
     });
-  }, [kpi]);
+  }, [fetchEmployees]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch summary
-  const fetchSummary = useCallback(async () => {
-    const id = ++reqSummary.current;
-    setLoadingSummary(true);
-    const { startDate, endDate } = getDateRange(filters.preset, filters.customStart, filters.customEnd);
-
-    try {
-      const [tradesRes, consultsRes] = await Promise.all([
-        kpi.getTrades({
-          startDate,
-          endDate,
-          dateField: filters.dateField,
-          ...(filters.employeeId && { userId: filters.employeeId }),
-        }),
-        kpi.getConsultations({
-          startDate,
-          endDate,
-          dateField: filters.dateField === "contractDate" ? "registrationDate" : "createdAt",
-          ...(filters.employeeId && { userId: filters.employeeId }),
-        }),
-      ]);
-
-      if (id !== reqSummary.current) return;
-
-      console.log("[KPI 상세] 요약 trades 응답:", tradesRes);
-      console.log("[KPI 상세] 요약 consultations 응답:", consultsRes);
-
-      setSummary({
-        tradeCount: tradesRes?.data?.totalCount ?? 0,
-        profit: tradesRes?.data?.totalNetProfit ?? 0,
-        consultationCount: consultsRes?.data?.totalCount ?? 0,
-      });
-    } catch {
-      // ignore
-    } finally {
-      if (id === reqSummary.current) setLoadingSummary(false);
-    }
-  }, [kpi, filters]);
-
-  // Fetch trend
-  const fetchTrend = useCallback(async () => {
-    const id = ++reqTrend.current;
-    setLoadingTrend(true);
-    const { startDate, endDate } = getDateRange(filters.preset, filters.customStart, filters.customEnd);
-    const buckets = getTimeBuckets(filters.preset, startDate, endDate);
-
-    try {
-      const [tradeResults, consultResults] = await Promise.all([
-        Promise.all(
-          buckets.map((b) =>
-            kpi.getTrades({
-              startDate: b.startDate,
-              endDate: b.endDate,
-              dateField: filters.dateField,
-              ...(filters.employeeId && { userId: filters.employeeId }),
-            }),
-          ),
-        ),
-        Promise.all(
-          buckets.map((b) =>
-            kpi.getConsultations({
-              startDate: b.startDate,
-              endDate: b.endDate,
-              dateField: filters.dateField === "contractDate" ? "registrationDate" : "createdAt",
-              ...(filters.employeeId && { userId: filters.employeeId }),
-            }),
-          ),
-        ),
-      ]);
-
-      if (id !== reqTrend.current) return;
-
-      console.log("[KPI 상세] 추이 trades 응답:", tradeResults.map((r, i) => ({
-        label: buckets[i].label,
-        raw: r,
-        data: r?.data,
-      })));
-
-      setTrendData(
-        buckets.map((b, i) => ({
-          label: b.label,
-          tradeCount: tradeResults[i]?.data?.totalCount ?? 0,
-          consultationCount: consultResults[i]?.data?.totalCount ?? 0,
-          profit: tradeResults[i]?.data?.totalNetProfit ?? 0,
-        })),
-      );
-    } catch {
-      // ignore
-    } finally {
-      if (id === reqTrend.current) setLoadingTrend(false);
-    }
-  }, [kpi, filters]);
-
-  // Fetch employee comparison
-  const fetchEmployeeComparison = useCallback(async () => {
-    if (!employees.length) return;
-    const id = ++reqEmp.current;
-    setLoadingEmployees(true);
-    const { startDate, endDate } = getDateRange(filters.preset, filters.customStart, filters.customEnd);
-
-    try {
-      const [tradeResults, consultResults] = await Promise.all([
-        Promise.all(
-          employees.map((emp) =>
-            kpi.getTrades({
-              startDate,
-              endDate,
-              dateField: filters.dateField,
-              userId: emp.id,
-            }),
-          ),
-        ),
-        Promise.all(
-          employees.map((emp) =>
-            kpi.getConsultations({
-              startDate,
-              endDate,
-              dateField: filters.dateField === "contractDate" ? "registrationDate" : "createdAt",
-              userId: emp.id,
-            }),
-          ),
-        ),
-      ]);
-
-      if (id !== reqEmp.current) return;
-
-      console.log("[KPI 상세] 직원별 trades 응답:", employees.map((emp, i) => ({
-        name: emp.name,
-        userId: emp.id,
-        raw: tradeResults[i],
-        data: tradeResults[i]?.data,
-      })));
-      console.log("[KPI 상세] 직원별 consultations 응답:", employees.map((emp, i) => ({
-        name: emp.name,
-        userId: emp.id,
-        raw: consultResults[i],
-        data: consultResults[i]?.data,
-      })));
-
-      setEmployeeData(
-        employees.map((emp, i) => ({
-          id: emp.id,
-          name: emp.name,
-          tradeCount: tradeResults[i]?.data?.totalCount ?? 0,
-          consultationCount: consultResults[i]?.data?.totalCount ?? 0,
-          profit: tradeResults[i]?.data?.totalNetProfit ?? 0,
-        })),
-      );
-    } catch {
-      // ignore
-    } finally {
-      if (id === reqEmp.current) setLoadingEmployees(false);
-    }
-  }, [kpi, employees, filters]);
-
-  useEffect(() => {
-    fetchSummary();
-  }, [fetchSummary]);
-
-  useEffect(() => {
-    fetchTrend();
-  }, [fetchTrend]);
-
-  useEffect(() => {
-    fetchEmployeeComparison();
-  }, [fetchEmployeeComparison]);
+  const {
+    data: summary,
+    isLoading: loadingSummary,
+    error: summaryError,
+  } = useKpiSummary(filters);
+  const {
+    data: trendData,
+    isLoading: loadingTrend,
+    error: trendError,
+  } = useKpiSeries(filters);
+  const {
+    data: employeeData,
+    isLoading: loadingEmployees,
+    error: employeeError,
+  } = useKpiByEmployee(filters, employees);
 
   const profitManwon = wonToManwon(summary.profit);
+  const pageError = summaryError ?? trendError ?? employeeError;
 
   return (
     <div className="pt-14 min-h-screen">
@@ -248,6 +92,24 @@ export default function KpiPage() {
             onChange={setFilters}
           />
         </div>
+
+        {/* Error banner */}
+        {pageError && (
+          <div className="mb-6 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="font-medium">KPI 데이터를 일부 또는 전부 불러오지 못했습니다.</p>
+              <p className="text-xs mt-0.5 text-red-600">{pageError}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="text-xs font-medium text-red-700 hover:text-red-800 underline"
+            >
+              새로고침
+            </button>
+          </div>
+        )}
 
         {/* Summary cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">

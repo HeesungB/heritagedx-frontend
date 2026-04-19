@@ -12,12 +12,11 @@ export function mapMembershipDtoToEntity(dto: Membership): MembershipEntity {
 
     weekdayGreenFee: dto.weekdayGreenFee ?? {},
     weekendGreenFee: dto.weekendGreenFee ?? {},
-    caddyFee: dto.caddyFee ?? null,
-    cartFee: dto.cartFee ?? null,
 
     reservationNotes: dto.reservationNotes ?? null,
     weekendReservationDifficulty: coerceToNumber(dto.weekendReservationDifficulty),
     memberDaySchedule: dto.memberDaySchedule ?? null,
+    reservationSystem: dto.reservationSystem ?? null,
 
     recentMarketPrice: dto.recentMarketPrice ?? null,
     recentPriceUpdateDate: dto.recentPriceUpdateDate ?? null,
@@ -28,34 +27,18 @@ export function mapMembershipDtoToEntity(dto: Membership): MembershipEntity {
     transactionTendency: dto.transactionTendency ?? null,
     recentTransactionType: dto.recentTransactionType ?? null,
     tradableTypeSummary: dto.tradableTypeSummary ?? null,
-    registrationDifficulty: dto.registrationDifficulty ?? null,
-    additionalDocumentFrequency: dto.additionalDocumentFrequency ?? null,
-    balanceRisk: dto.balanceRisk ?? null,
+    registrationDifficulty: coerceToNumber(dto.registrationDifficulty),
+    additionalDocumentFrequency: coerceToNumber(dto.additionalDocumentFrequency),
+    balanceRisk: coerceToNumber(dto.balanceRisk),
     transactionRiskMemo: dto.transactionRiskMemo ?? null,
 
-    hasAssociateMember: dto.hasAssociateMember ?? false,
-    associateMemberCondition: dto.associateMemberCondition ?? null,
-    associateMemberWeekdayFee: dto.associateMemberWeekdayFee ?? null,
-    associateMemberWeekendFee: dto.associateMemberWeekendFee ?? null,
-
-    hasFamilyMember: dto.hasFamilyMember ?? false,
-    familyMemberCondition: dto.familyMemberCondition ?? null,
-    familyMemberWeekdayFee: dto.familyMemberWeekdayFee ?? null,
-    familyMemberWeekendFee: dto.familyMemberWeekendFee ?? null,
-
     registeredPersonCount: dto.registeredPersonCount ?? null,
-
-    canDelegate: dto.canDelegate ?? false,
-    delegationWeekdayRule: dto.delegationWeekdayRule ?? null,
-    delegationWeekendRule: dto.delegationWeekendRule ?? null,
-    delegationRestriction: dto.delegationRestriction ?? null,
 
     initialSalePrice: dto.initialSalePrice ?? null,
     initialSaleYear: dto.initialSaleYear ?? null,
     initialSaleMethod: dto.initialSaleMethod ?? null,
     estimatedSalePrice: dto.estimatedSalePrice ?? null,
     estimatedPriceDate: dto.estimatedPriceDate ?? null,
-    admissionAge: dto.admissionAge ?? null,
 
     memberBenefits: dto.memberBenefits ?? null,
     specialNotes: dto.specialNotes ?? null,

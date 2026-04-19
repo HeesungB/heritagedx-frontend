@@ -3,11 +3,11 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { authApi } from "@/lib/authApi";
-import { Organization } from "@/types/organization";
+import { OrganizationEntity } from "@/types/organization";
 
 export function useOrganization() {
   const { user } = useAuth();
-  const [organization, setOrganization] = useState<Organization | null>(null);
+  const [organization, setOrganization] = useState<OrganizationEntity | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {

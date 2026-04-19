@@ -11,3 +11,5 @@ export type { IUserAdminRepository } from "./user-admin.repository";
 export type { IOrganizationAdminRepository } from "./organization-admin.repository";
 export type { IMembershipAdminRepository } from "./membership-admin.repository";
 export type { IKpiAdminRepository } from "./kpi-admin.repository";
+export type { IConsultationAdminRepository } from "./consultation-admin.repository";
+export type { IMembershipTradeAdminRepository } from "./membership-trade-admin.repository";

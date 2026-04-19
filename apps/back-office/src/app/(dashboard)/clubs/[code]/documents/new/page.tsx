@@ -61,8 +61,8 @@ export default function NewClubDocumentPage({ params }: PageProps) {
       } else {
         // 파일이 없으면 JSON으로 전송
         response = await clubDocumentsAdmin.create(club.id, {
-          cleanName: data.name,
-          description: data.fileDescription,
+          name: data.name,
+          fileDescription: data.fileDescription,
         });
       }
       if (response.success) {

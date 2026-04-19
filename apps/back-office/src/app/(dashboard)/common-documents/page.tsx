@@ -29,7 +29,7 @@ import {
   Badge,
 } from "@heritage-dx/ui";
 import { useAdminRepositories } from "@heritage-dx/api";
-import { GlobalDocument } from "@/types";
+import type { GlobalDocument } from "@heritage-dx/types";
 
 export default function CommonDocumentsPage() {
   const { globalDocuments: globalDocumentsAdmin } = useAdminRepositories();

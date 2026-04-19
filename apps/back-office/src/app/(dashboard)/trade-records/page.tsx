@@ -9,6 +9,9 @@ import {
   FileText,
   Edit3,
   Check,
+  CheckCircle2,
+  PauseCircle,
+  XCircle,
 } from "lucide-react";
 import {
   PageLoading,
@@ -24,9 +27,14 @@ import {
   Badge,
   ClubSearchSelect,
 } from "@heritage-dx/ui";
-import { useMembershipTradeRepository, useClubRepository } from "@heritage-dx/api";
-import { TradeRecord, Club } from "@/types";
+import { useMembershipTradeAdminRepository, useClubRepository } from "@heritage-dx/api";
+import type { MembershipTrade, Club, Pagination } from "@heritage-dx/types";
+import type { WorkflowStatus } from "@heritage-dx/store";
+import { canDeleteTrade } from "@heritage-dx/store";
+import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
+import { StatusBadge } from "@/components/approval/StatusBadge";
+import { ActionReasonModal, type ReasonAction } from "@/components/approval/ActionReasonModal";
 
 const formatPrice = (price: string | number | null) => {
   if (!price) return "-";
@@ -43,13 +51,14 @@ const formatPrice = (price: string | number | null) => {
   return `${num.toLocaleString()}원`;
 };
 
-export default function TradeRecordsPage() {
-  const membershipTradesRepo = useMembershipTradeRepository();
+export default function MembershipTradesPage() {
+  const membershipTradesRepo = useMembershipTradeAdminRepository();
   const clubsRepo = useClubRepository();
+  const { user } = useAuth();
   const { preloadedRecords, clearPreloadedRecords, clubs } = useData();
   const usedPreloadRef = useRef(false);
 
-  const [rawRecords, setRawRecords] = useState<TradeRecord[]>([]);
+  const [rawRecords, setRawRecords] = useState<MembershipTrade[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -61,14 +70,13 @@ export default function TradeRecordsPage() {
   const [memberships, setMemberships] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [filterWorkflow, setFilterWorkflow] = useState<"" | WorkflowStatus>("");
+  const [approvalBusyId, setApprovalBusyId] = useState<string | null>(null);
+  const [reasonModal, setReasonModal] = useState<{ action: ReasonAction; recordId: string } | null>(null);
+  const [reasonSubmitting, setReasonSubmitting] = useState(false);
   const clubsRef = useRef<Club[]>(clubs);
   const [page, setPage] = useState(1);
-  const [pagination, setPagination] = useState<{
-    currentPage: number;
-    totalPages: number;
-    totalItems: number;
-    itemsPerPage: number;
-  } | null>(null);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
 
   // 디바운스: searchInput → searchQuery (300ms)
   useEffect(() => {
@@ -133,8 +141,8 @@ export default function TradeRecordsPage() {
   }, [rawRecords, selectedClubCode, selectedMembership, dateFrom, dateTo]);
 
   const [showAddDrawer, setShowAddDrawer] = useState(false);
-  const [editingRecord, setEditingRecord] = useState<TradeRecord | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<TradeRecord | null>(null);
+  const [editingRecord, setEditingRecord] = useState<MembershipTrade | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<MembershipTrade | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -172,7 +180,7 @@ export default function TradeRecordsPage() {
   }, [formClubCode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [form, setForm] = useState({
-    tradeType: "매수" as string,
+    tradeType: "매수" as "매도" | "매수",
     membershipName: "",
     customerName: "",
     contact: "",
@@ -183,7 +191,7 @@ export default function TradeRecordsPage() {
     commission: "",
     marketProfit: "",
     expense: "",
-    contractFee: "",
+    depositAmount: "",
     contractDate: "",
     balanceDate: "",
     actualTransactionDate: "",
@@ -212,7 +220,7 @@ export default function TradeRecordsPage() {
       commission: "",
       marketProfit: "",
       expense: "",
-      contractFee: "",
+      depositAmount: "",
       contractDate: "",
       balanceDate: "",
       actualTransactionDate: "",
@@ -252,6 +260,7 @@ export default function TradeRecordsPage() {
         tradeType: filterType || undefined,
         sort: "contractDate",
         order: "DESC",
+        workflowStatus: filterWorkflow || undefined,
       });
       if (response.success && response.data) {
         setRawRecords(response.data.trades || []);
@@ -264,7 +273,30 @@ export default function TradeRecordsPage() {
       setRawRecords([]);
     }
     setIsLoading(false);
-  }, [page, searchQuery, filterType, preloadedRecords, clearPreloadedRecords]);
+  }, [page, searchQuery, filterType, filterWorkflow, preloadedRecords, clearPreloadedRecords]);
+
+  const runWorkflowAction = async (
+    record: MembershipTrade,
+    action: "APPROVE_FIRST" | "HOLD" | "REJECT" | "REQUEST_APPROVAL",
+    reason?: string,
+  ) => {
+    setApprovalBusyId(record.id);
+    try {
+      const response = await membershipTradesRepo.workflowAction(record.id, { action, reason });
+      if (response.success && response.data) {
+        const updated = response.data;
+        setRawRecords((prev) => prev.map((r) => (r.id === record.id ? updated : r)));
+        return true;
+      }
+      alert(response.error || "처리에 실패했습니다.");
+      return false;
+    } catch {
+      alert("처리 중 오류가 발생했습니다.");
+      return false;
+    } finally {
+      setApprovalBusyId(null);
+    }
+  };
 
   useEffect(() => {
     loadRecords();
@@ -299,7 +331,7 @@ export default function TradeRecordsPage() {
         commission: form.commission ? Number(form.commission) : null,
         marketProfit: form.marketProfit ? Number(form.marketProfit) : null,
         expense: form.expense ? Number(form.expense) : null,
-        contractFee: form.contractFee ? Number(form.contractFee) : null,
+        depositAmount: form.depositAmount ? Number(form.depositAmount) : null,
         contractDate: form.contractDate || null,
         balanceDate: form.balanceDate || null,
         actualTransactionDate: form.actualTransactionDate || null,
@@ -355,7 +387,7 @@ export default function TradeRecordsPage() {
         commission: form.commission ? Number(form.commission) : null,
         marketProfit: form.marketProfit ? Number(form.marketProfit) : null,
         expense: form.expense ? Number(form.expense) : null,
-        contractFee: form.contractFee ? Number(form.contractFee) : null,
+        depositAmount: form.depositAmount ? Number(form.depositAmount) : null,
         contractDate: form.contractDate || null,
         balanceDate: form.balanceDate || null,
         actualTransactionDate: form.actualTransactionDate || null,
@@ -398,12 +430,12 @@ export default function TradeRecordsPage() {
     setDeleteTarget(null);
   };
 
-  const handleEdit = (record: TradeRecord) => {
+  const handleEdit = (record: MembershipTrade) => {
     setEditingRecord(record);
     const matchedClub = clubsRef.current.find((c) => c.name === record.clubName);
     setFormClubCode(matchedClub?.code || "");
     setForm({
-      tradeType: record.tradeType || "매수",
+      tradeType: (record.tradeType as "매도" | "매수") || "매수",
       membershipName: record.membershipName || "",
       customerName: record.customerName || "",
       contact: record.contact || "",
@@ -414,7 +446,7 @@ export default function TradeRecordsPage() {
       commission: record.commission != null ? String(record.commission) : "",
       marketProfit: record.marketProfit != null ? String(record.marketProfit) : "",
       expense: record.expense != null ? String(record.expense) : "",
-      contractFee: record.contractFee != null ? String(record.contractFee) : "",
+      depositAmount: record.depositAmount != null ? String(record.depositAmount) : "",
       contractDate: record.contractDate || "",
       balanceDate: record.balanceDate || "",
       actualTransactionDate: record.actualTransactionDate || "",
@@ -439,7 +471,7 @@ export default function TradeRecordsPage() {
           <FileText className="w-6 h-6 text-primary" />
           <h1 className="text-xl font-bold text-gray-900">거래 내역</h1>
           {pagination && (
-            <Badge variant="default">총 {pagination.totalItems}건</Badge>
+            <Badge variant="default">총 {pagination.total}건</Badge>
           )}
         </div>
         <p className="text-sm text-gray-500">모든 거래 내역을 관리합니다.</p>
@@ -483,6 +515,18 @@ export default function TradeRecordsPage() {
                 </button>
               ))}
             </div>
+            <select
+              value={filterWorkflow}
+              onChange={(e) => { setFilterWorkflow(e.target.value as "" | WorkflowStatus); setPage(1); }}
+              className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 bg-white w-[140px] h-[34px]"
+            >
+              <option value="">승인 상태 전체</option>
+              <option value="DRAFT">작성중</option>
+              <option value="PENDING_APPROVAL">승인대기</option>
+              <option value="FIRST_APPROVED">승인</option>
+              <option value="ON_HOLD">보류</option>
+              <option value="REJECTED">반려</option>
+            </select>
             <ClubSearchSelect
               clubs={availableClubs}
               selectedClubCode={selectedClubCode}
@@ -545,6 +589,7 @@ export default function TradeRecordsPage() {
                 <table className="min-w-[500px] w-full text-sm">
                   <thead>
                     <tr className="border-b text-left text-xs text-gray-500">
+                      <th className="py-2 pr-3 font-medium">승인</th>
                       <th className="py-2 pr-3 font-medium">유형</th>
                       <th className="py-2 pr-3 font-medium">회원권</th>
                       <th className="py-2 pr-3 font-medium">고객명</th>
@@ -564,6 +609,50 @@ export default function TradeRecordsPage() {
                   <tbody>
                     {displayRecords.map((record) => (
                       <tr key={record.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors group">
+                        <td className="py-2.5 pr-3 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <StatusBadge status={record.workflowStatus} />
+                            {record.workflowStatus === "PENDING_APPROVAL" && (
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={approvalBusyId === record.id}
+                                  onClick={() => runWorkflowAction(record, "APPROVE_FIRST")}
+                                  className="p-1 rounded hover:bg-emerald-50 text-emerald-600 disabled:opacity-50"
+                                  title="승인"
+                                >
+                                  <CheckCircle2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={approvalBusyId === record.id}
+                                  onClick={() => setReasonModal({ action: "HOLD", recordId: record.id })}
+                                  className="p-1 rounded hover:bg-orange-50 text-orange-600 disabled:opacity-50"
+                                  title="보류"
+                                >
+                                  <PauseCircle className="w-4 h-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={approvalBusyId === record.id}
+                                  onClick={() => setReasonModal({ action: "REJECT", recordId: record.id })}
+                                  className="p-1 rounded hover:bg-rose-50 text-rose-600 disabled:opacity-50"
+                                  title="반려"
+                                >
+                                  <XCircle className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
+                            {(record.workflowStatus === "ON_HOLD" || record.workflowStatus === "REJECTED") && (
+                              <span
+                                className="text-[11px] text-gray-400"
+                                title="딜러의 다시 열기 요청 대기"
+                              >
+                                딜러 요청 대기
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className="py-2.5 pr-3 whitespace-nowrap">
                           <Badge variant={record.tradeType === "매수" ? "info" : "error"}>{record.tradeType}</Badge>
                         </td>
@@ -598,9 +687,11 @@ export default function TradeRecordsPage() {
                             <button onClick={() => handleEdit(record)} className="p-1 hover:bg-gray-200 rounded" title="수정">
                               <Edit3 className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
                             </button>
-                            <button onClick={() => setDeleteTarget(record)} className="p-1 hover:bg-gray-200 rounded" title="삭제">
-                              <Trash2 className="w-3.5 h-3.5 text-gray-400 hover:text-error" />
-                            </button>
+                            {canDeleteTrade(user) && (
+                              <button onClick={() => setDeleteTarget(record)} className="p-1 hover:bg-gray-200 rounded" title="삭제">
+                                <Trash2 className="w-3.5 h-3.5 text-gray-400 hover:text-error" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -611,7 +702,7 @@ export default function TradeRecordsPage() {
               {pagination && pagination.totalPages > 1 && (
                 <div className="flex items-center justify-center gap-2 mt-6 pt-4 border-t">
                   <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>이전</Button>
-                  <span className="text-sm text-gray-600">{pagination.currentPage} / {pagination.totalPages}</span>
+                  <span className="text-sm text-gray-600">{pagination.page} / {pagination.totalPages}</span>
                   <Button variant="outline" size="sm" disabled={page >= pagination.totalPages} onClick={() => setPage((p) => p + 1)}>다음</Button>
                 </div>
               )}
@@ -631,7 +722,7 @@ export default function TradeRecordsPage() {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">거래유형 <span className="text-red-500">*</span></label>
             <div className="flex gap-2">
-              {["매수", "매도"].map((type) => (
+              {(["매수", "매도"] as const).map((type) => (
                 <button key={type} type="button" onClick={() => setForm((f) => ({ ...f, tradeType: type }))}
                   className={`flex-1 py-2 text-sm rounded-lg border transition-colors ${
                     form.tradeType === type
@@ -701,7 +792,7 @@ export default function TradeRecordsPage() {
               </div>
               <div><label className="block text-sm font-medium text-gray-700 mb-1">시세차익 (원)</label><Input type="number" value={form.marketProfit} onChange={(e) => setForm((f) => ({ ...f, marketProfit: e.target.value }))} placeholder="0" /></div>
               <div><label className="block text-sm font-medium text-gray-700 mb-1">비용 (원)</label><Input type="number" value={form.expense} onChange={(e) => setForm((f) => ({ ...f, expense: e.target.value }))} placeholder="0" /></div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">계약금 (원)</label><Input type="number" value={form.contractFee} onChange={(e) => setForm((f) => ({ ...f, contractFee: e.target.value }))} placeholder="0" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">계약금 (원)</label><Input type="number" value={form.depositAmount} onChange={(e) => setForm((f) => ({ ...f, depositAmount: e.target.value }))} placeholder="0" /></div>
             </div>
           </div>
 
@@ -767,6 +858,23 @@ export default function TradeRecordsPage() {
         confirmText="삭제"
         variant="danger"
         isLoading={isDeleting}
+      />
+
+      <ActionReasonModal
+        open={!!reasonModal}
+        action={reasonModal?.action ?? null}
+        submitting={reasonSubmitting}
+        onCancel={() => setReasonModal(null)}
+        onConfirm={async (reason) => {
+          if (!reasonModal) return;
+          setReasonSubmitting(true);
+          const target = rawRecords.find((r) => r.id === reasonModal.recordId);
+          if (target) {
+            const ok = await runWorkflowAction(target, reasonModal.action, reason);
+            if (ok) setReasonModal(null);
+          }
+          setReasonSubmitting(false);
+        }}
       />
     </div>
   );

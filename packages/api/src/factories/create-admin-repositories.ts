@@ -13,6 +13,8 @@ import { UserAdminRepository } from "../repositories/admin/user-admin.repository
 import { OrganizationAdminRepository } from "../repositories/admin/organization-admin.repository.impl";
 import { MembershipAdminRepository } from "../repositories/admin/membership-admin.repository.impl";
 import { KpiAdminRepository } from "../repositories/admin/kpi-admin.repository.impl";
+import { ConsultationAdminRepository } from "../repositories/admin/consultation-admin.repository.impl";
+import { MembershipTradeAdminRepository } from "../repositories/admin/membership-trade-admin.repository.impl";
 
 export function createAdminRepositories(
   apiClient: ApiClient,
@@ -32,5 +34,7 @@ export function createAdminRepositories(
     organizations: new OrganizationAdminRepository(apiClient),
     memberships: new MembershipAdminRepository(apiClient),
     kpi: new KpiAdminRepository(apiClient),
+    consultations: new ConsultationAdminRepository(apiClient),
+    membershipTrades: new MembershipTradeAdminRepository(apiClient),
   };
 }

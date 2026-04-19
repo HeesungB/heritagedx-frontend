@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
-import { Membership } from "@/types";
+import type { MembershipEntity } from "@heritage-dx/store";
+import { membershipSchema, type MembershipFormValues } from "@heritage-dx/store/schemas";
 import {
   Button,
   Input,
@@ -17,86 +17,9 @@ import {
   Select,
 } from "@heritage-dx/ui";
 
-// 빈 문자열을 undefined로 변환하는 헬퍼
-const optionalNumber = z.preprocess(
-  (val) => {
-    if (val === "" || val === undefined || val === null) return undefined;
-    const num = Number(val);
-    return isNaN(num) ? undefined : num;
-  },
-  z.number().optional()
-);
-
-const membershipSchema = z.object({
-  membershipType: z.enum(["개인", "법인"], {
-    errorMap: () => ({ message: "회원권 종류를 선택하세요" }),
-  }),
-  membershipName: z.string().optional(),
-
-  // 예약 안내
-  reservationNotes: z.string().optional(),
-  memberDaySchedule: z.string().optional(),
-
-  // 시세 정보
-  recentMarketPrice: z.string().optional(),
-  recentPriceUpdateDate: z.string().optional(),
-  avgMarketPrice3y: z.string().optional(),
-  dealerPriceRange: z.string().optional(),
-
-  // 거래 정보
-  minTransactionUnit: z.string().optional(),
-  transactionTendency: z.string().optional(),
-  recentTransactionType: z.string().optional(),
-  tradableTypeSummary: z.string().optional(),
-  registrationDifficulty: z.string().optional(),
-  additionalDocumentFrequency: z.string().optional(),
-  balanceRisk: z.string().optional(),
-  transactionRiskMemo: z.string().optional(),
-
-  // 준회원 정보
-  hasAssociateMember: z.boolean(),
-  associateMemberCondition: z.string().optional(),
-
-  // 가족회원 정보
-  hasFamilyMember: z.boolean(),
-  familyMemberCondition: z.string().optional(),
-
-  // 위임 정보
-  canDelegate: z.boolean(),
-  delegationWeekdayRule: z.string().optional(),
-  delegationWeekendRule: z.string().optional(),
-  delegationRestriction: z.string().optional(),
-
-  // 분양/입회 정보
-  initialSalePrice: z.string().optional(),
-  initialSaleYear: z.string().optional(),
-  initialSaleMethod: z.string().optional(),
-  estimatedSalePrice: z.string().optional(),
-  estimatedPriceDate: z.string().optional(),
-  registeredPersonCount: optionalNumber,
-  admissionAge: optionalNumber,
-
-  // 회원 혜택/특이사항
-  memberBenefits: z.string().optional(),
-  specialNotes: z.string().optional(),
-
-  // 명의개서 담당자
-  transferManagerName: z.string().optional(),
-  transferManagerPhone: z.string().optional(),
-  buyerDocuments: z.string().optional(),
-  sellerDocuments: z.string().optional(),
-
-  // 메타 정보
-  isActive: z.boolean(),
-  displayOrder: optionalNumber,
-});
-
-type MembershipFormData = z.infer<typeof membershipSchema>;
-
 interface MembershipFormProps {
-  initialData?: Membership;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onSubmit: (data: any) => Promise<void>;
+  initialData?: MembershipEntity;
+  onSubmit: (data: Record<string, unknown>) => Promise<void>;
   onCancel?: () => void;
   isLoading?: boolean;
 }
@@ -120,7 +43,7 @@ interface GreenFeeRow {
 }
 
 // initialData의 Record<string, number>에서 GreenFeeRow[] 로 변환
-function buildGreenFeeRows(initialData?: Membership): GreenFeeRow[] {
+function buildGreenFeeRows(initialData?: MembershipEntity): GreenFeeRow[] {
   const weekday = initialData?.weekdayGreenFee || {};
   const weekend = initialData?.weekendGreenFee || {};
   const allTypes = new Set([...Object.keys(weekday), ...Object.keys(weekend)]);
@@ -148,7 +71,7 @@ function buildGreenFeeRows(initialData?: Membership): GreenFeeRow[] {
   }));
 }
 
-export default function MembershipForm({
+export default function MembershipEntityForm({
   initialData,
   onSubmit,
   onCancel,
@@ -164,7 +87,7 @@ export default function MembershipForm({
     handleSubmit,
     control,
     formState: { errors },
-  } = useForm<MembershipFormData>({
+  } = useForm<MembershipFormValues>({
     resolver: zodResolver(membershipSchema),
     defaultValues: initialData
       ? {
@@ -184,21 +107,12 @@ export default function MembershipForm({
           additionalDocumentFrequency: initialData.additionalDocumentFrequency != null ? String(initialData.additionalDocumentFrequency) : "",
           balanceRisk: initialData.balanceRisk != null ? String(initialData.balanceRisk) : "",
           transactionRiskMemo: initialData.transactionRiskMemo || "",
-          hasAssociateMember: initialData.hasAssociateMember || false,
-          associateMemberCondition: initialData.associateMemberCondition || "",
-          hasFamilyMember: initialData.hasFamilyMember || false,
-          familyMemberCondition: initialData.familyMemberCondition || "",
-          canDelegate: initialData.canDelegate || false,
-          delegationWeekdayRule: initialData.delegationWeekdayRule || "",
-          delegationWeekendRule: initialData.delegationWeekendRule || "",
-          delegationRestriction: initialData.delegationRestriction || "",
           initialSalePrice: initialData.initialSalePrice || "",
           initialSaleYear: initialData.initialSaleYear || "",
           initialSaleMethod: initialData.initialSaleMethod || "",
           estimatedSalePrice: initialData.estimatedSalePrice || "",
           estimatedPriceDate: initialData.estimatedPriceDate || "",
-          registeredPersonCount: initialData.registeredPersonCount,
-          admissionAge: initialData.admissionAge,
+          registeredPersonCount: initialData.registeredPersonCount ?? undefined,
           memberBenefits: initialData.memberBenefits || "",
           specialNotes: initialData.specialNotes || "",
           transferManagerName: initialData.transferManagerName || "",
@@ -210,18 +124,10 @@ export default function MembershipForm({
         }
       : {
           membershipType: undefined as unknown as "개인" | "법인",
-          hasAssociateMember: false,
-          hasFamilyMember: false,
-          canDelegate: false,
           isActive: true,
           displayOrder: 0,
         },
   });
-
-  // 체크박스 상태 감시
-  const hasAssociateMember = useWatch({ control, name: "hasAssociateMember" });
-  const hasFamilyMember = useWatch({ control, name: "hasFamilyMember" });
-  const canDelegate = useWatch({ control, name: "canDelegate" });
 
   // 그린피 행 관리
   const updateGreenFeeRow = (index: number, field: keyof GreenFeeRow, value: string) => {
@@ -236,23 +142,9 @@ export default function MembershipForm({
     setGreenFeeRows((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // API에서 거부하는 필드 목록 (백엔드 DTO에 미포함)
-  const API_REJECTED_FIELDS = new Set([
-    "hasAssociateMember",
-    "hasFamilyMember",
-    "canDelegate",
-    "associateMemberCondition",
-    "familyMemberCondition",
-    "delegationWeekdayRule",
-    "delegationWeekendRule",
-    "delegationRestriction",
-    "admissionAge",
-  ]);
-
   // PUT 시 제외해야 하는 필드 (폼 관리 + 메타 + 관계 데이터)
   const EXCLUDE_FROM_PUT = new Set([
     ...Object.keys(membershipSchema.shape),
-    ...API_REJECTED_FIELDS,
     "weekdayGreenFee",
     "weekendGreenFee",
     "id",
@@ -265,10 +157,9 @@ export default function MembershipForm({
   ]);
 
   // 폼 제출: Zod 데이터 + 그린피 Record + initialData의 미관리 필드 합치기
-  const handleFormSubmit = (data: MembershipFormData) => {
-    console.log("🟢 MembershipForm handleFormSubmit 진입, data:", data);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const cleaned: Record<string, any> = {};
+  const handleFormSubmit = (data: MembershipFormValues) => {
+    console.log("🟢 MembershipEntityForm handleFormSubmit 진입, data:", data);
+    const cleaned: Record<string, unknown> = {};
 
     // 1) initialData에서 폼이 관리하지 않는 필드 보존 (reservationSystem 등)
     //    단, 배열은 관계 데이터일 가능성이 높으므로 제외
@@ -284,7 +175,6 @@ export default function MembershipForm({
     // 2) 폼 데이터 처리
     for (const [key, value] of Object.entries(data)) {
       if (value === "" || value === null || value === undefined) continue;
-      if (API_REJECTED_FIELDS.has(key)) continue;
       // 1-5 정수 필드
       if (["registrationDifficulty", "additionalDocumentFrequency", "balanceRisk"].includes(key)) {
         cleaned[key] = parseInt(value as string, 10);
@@ -321,11 +211,14 @@ export default function MembershipForm({
 
   return (
     <form onSubmit={handleSubmit(handleFormSubmit, (errors) => {
-      console.error("🔴 MembershipForm 유효성 검증 실패:", errors);
+      console.error("🔴 MembershipEntityForm 유효성 검증 실패:", errors);
       console.error("🔴 에러 필드:", Object.keys(errors));
       Object.entries(errors).forEach(([field, error]) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        console.error(`  - ${field}:`, (error as any)?.message || error);
+        const message =
+          error && typeof error === "object" && "message" in error
+            ? (error as { message?: unknown }).message
+            : error;
+        console.error(`  - ${field}:`, message);
       });
     })} className="space-y-6">
       {/* 기본 정보 */}
@@ -479,12 +372,6 @@ export default function MembershipForm({
               placeholder="명"
               {...register("registeredPersonCount")}
             />
-            <Input
-              label="입회 나이"
-              type="number"
-              placeholder="세"
-              {...register("admissionAge")}
-            />
           </div>
         </CardContent>
       </Card>
@@ -580,96 +467,6 @@ export default function MembershipForm({
 
         {showExtra && (
           <div className="p-4 pt-0 space-y-6">
-            {/* 준회원 정보 */}
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
-                  {...register("hasAssociateMember")}
-                />
-                <span className="text-sm font-medium text-gray-700">
-                  준회원 제도 운영
-                </span>
-              </label>
-              {hasAssociateMember && (
-                <div className="space-y-2 pl-6 border-l-2 border-gray-200">
-                  <Textarea
-                    label="자격 조건"
-                    minRows={2}
-                    placeholder="준회원 자격 조건"
-                    {...register("associateMemberCondition")}
-                  />
-                  <p className="text-sm text-gray-500">
-                    준회원 그린피는 위 비용 정보 섹션에서 입력할 수 있습니다.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* 가족회원 정보 */}
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
-                  {...register("hasFamilyMember")}
-                />
-                <span className="text-sm font-medium text-gray-700">
-                  가족회원 제도 운영
-                </span>
-              </label>
-              {hasFamilyMember && (
-                <div className="space-y-2 pl-6 border-l-2 border-gray-200">
-                  <Textarea
-                    label="자격 조건"
-                    minRows={2}
-                    placeholder="가족회원 자격 조건"
-                    {...register("familyMemberCondition")}
-                  />
-                  <p className="text-sm text-gray-500">
-                    가족회원 그린피는 위 비용 정보 섹션에서 입력할 수 있습니다.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* 위임 정보 */}
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
-                  {...register("canDelegate")}
-                />
-                <span className="text-sm font-medium text-gray-700">
-                  예약 위임 가능
-                </span>
-              </label>
-              {canDelegate && (
-                <div className="space-y-2 pl-6 border-l-2 border-gray-200">
-                  <Textarea
-                    label="주중 위임 규정"
-                    minRows={2}
-                    placeholder="주중 예약 위임 규정"
-                    {...register("delegationWeekdayRule")}
-                  />
-                  <Textarea
-                    label="주말 위임 규정"
-                    minRows={2}
-                    placeholder="주말 예약 위임 규정"
-                    {...register("delegationWeekendRule")}
-                  />
-                  <Textarea
-                    label="위임 제한사항"
-                    minRows={2}
-                    placeholder="위임 관련 제한사항"
-                    {...register("delegationRestriction")}
-                  />
-                </div>
-              )}
-            </div>
-
             {/* 추가 시세 정보 */}
             <div className="space-y-2">
               <h4 className="text-sm font-medium text-gray-700">추가 시세 정보</h4>

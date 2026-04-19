@@ -2,95 +2,43 @@
 export type {
   ClubEntity,
   ClubDetailEntity,
-  TradeMemoEntity,
-  TradeRecordEntity,
+  ClubContactEntity,
+  BankAccountEntity,
+  ConsultationEntity,
+  MembershipTradeEntity,
   MembershipEntity,
   DocumentEntity,
+  GlobalDocumentEntity,
+  CustomerDocumentEntity,
+  ScenarioEntity,
+  OrganizationEntity,
+  UserRole,
+  UserEntity,
+  AdminUserEntity,
+  EmployeeEntity,
+  ClubDocumentEntity,
+  ClubScenarioDocumentEntity,
   PaginationState,
   FetchStatus,
 } from "@heritage-dx/store";
 
-// Re-export shared types from @heritage-dx/types
-export type {
-  // API
-  ApiResponse,
-  Pagination,
-  SearchParams,
-  // Club
-  Club,
-  ClubContact,
-  BankAccount,
-  ClubsResponse,
-  ClubDetail,
-  // Membership
-  Membership,
-  // Document
-  Document,
-  DocumentsResponse,
-  ClubDocument,
-  ClubDocumentsResponse,
-  GlobalDocument,
-  GlobalDocumentsResponse,
-  CustomerDocument,
-  CustomerDocumentsResponse,
-  ClubScenarioDocument,
-  ScenarioDocumentLink,
-  // Scenario
-  Scenario,
-  ScenarioSide,
-  ScenarioOwnerType,
-  ScenarioConditions,
-  ScenariosResponse,
-  ScenarioWithDocuments,
-  ScenarioOptionItem,
-  ClubScenarioOptions,
-  ScenarioDocumentsResponse,
-  ClubScenarioLink,
-  ClubScenariosResponse,
-  // Trade
-  TradeMemo,
-  TradeMemosResponse,
-  TradeMemoInput,
-  TradeRecord,
-  TradeRecordsResponse,
-  TradeRecordInput,
-  // User
-  User,
-  UserRole,
-  AdminUser,
-  UserCreateInput,
-  UserUpdateInput,
-  LoginResponse,
-  // Organization
-  Organization,
-  // KPI
-  KpiTradesResponse,
-  KpiTradesParams,
-  KpiConsultationsResponse,
-  KpiConsultationsParams,
-  Employee,
-} from "@heritage-dx/types";
-
-// Back-office aliases
-export type { ClubContact as Contact } from "@heritage-dx/types";
-
-// Back-office specific types
+// Back-office specific types — imports for local interface definitions
+import type { AdminUserEntity } from "@heritage-dx/store";
 import type {
-  AdminUser as _AdminUser,
-  Pagination as _Pagination,
+  Pagination,
+  ClubScenarioOptions,
+  ScenarioWithDocuments,
+  GlobalDocument as _GlobalDocument,
   Membership as _Membership,
+  CustomerDocument as _CustomerDocument,
   ClubContact as _ClubContact,
   BankAccount as _BankAccount,
-  ClubScenarioOptions as _ClubScenarioOptions,
-  ScenarioWithDocuments as _ScenarioWithDocuments,
-  GlobalDocument as _GlobalDocument,
-  CustomerDocument as _CustomerDocument,
 } from "@heritage-dx/types";
 
 // 사용자 목록 응답
 export interface UsersResponse {
-  users: _AdminUser[];
-  pagination: _Pagination;
+  users: AdminUserEntity[];
+  pagination: Pagination;
 }
 
 // 골프장 상세 응답 (back-office 전용 - 시나리오 옵션 포함)
@@ -148,8 +96,8 @@ export interface ClubDetailResponse {
   externalUrl?: string;
   website?: string;
   scenariosCount?: number;
-  scenarioOptions?: _ClubScenarioOptions;
-  scenarios?: _ScenarioWithDocuments[];
+  scenarioOptions?: ClubScenarioOptions;
+  scenarios?: ScenarioWithDocuments[];
   documentsGlobal?: _GlobalDocument[];
   documentsCustomer?: _CustomerDocument[];
   memberships?: _Membership[];

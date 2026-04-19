@@ -10,8 +10,6 @@ import {
   normalizeInitial,
   getRegionGroup,
   REGION_GROUPS,
-  extractRegionFromAddress,
-  getEffectiveRegion,
 } from "@heritage-dx/utils";
 import { useData } from "@/contexts/DataContext";
 
@@ -30,7 +28,7 @@ export default function ClubDirectoryPage() {
   const availableRegionGroups = useMemo(() => {
     const set = new Set<string>();
     clubs.forEach((club) => {
-      const effective = getEffectiveRegion(club.region || "", club.address || "");
+      const effective = club.region || "";
       if (effective) {
         const group = getRegionGroup(effective);
         if (group) set.add(group);
@@ -63,7 +61,7 @@ export default function ClubDirectoryPage() {
 
     if (filterMode === "region" && activeRegion) {
       result = result.filter(
-        (club) => getRegionGroup(getEffectiveRegion(club.region || "", club.address || "")) === activeRegion
+        (club) => getRegionGroup(club.region || "") === activeRegion
       );
     }
 
@@ -73,8 +71,7 @@ export default function ClubDirectoryPage() {
         (club) =>
           club.name.toLowerCase().includes(term) ||
           club.code.toLowerCase().includes(term) ||
-          (club.region && club.region.toLowerCase().includes(term)) ||
-          (club.address && club.address.toLowerCase().includes(term))
+          (club.region && club.region.toLowerCase().includes(term))
       );
     }
 
@@ -281,10 +278,10 @@ export default function ClubDirectoryPage() {
                   ))}
                 </div>
                 <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
-                  {(club.region || club.address) && (
+                  {club.region && (
                     <span className="flex items-center gap-1">
                       <MapPin className="w-3.5 h-3.5" />
-                      {club.region || extractRegionFromAddress(club.address!)}
+                      {club.region}
                     </span>
                   )}
                   {club.holes && (

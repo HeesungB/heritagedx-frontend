@@ -4,15 +4,15 @@ import { useMemo } from "react";
 import { useGeneralRepositories } from "@heritage-dx/api";
 import {
   createClubStore,
-  createTradeMemoStore,
-  createTradeRecordStore,
+  createConsultationStore,
+  createMembershipTradeStore,
 } from "@heritage-dx/store";
-import type { ClubStore, TradeMemoStore, TradeRecordStore } from "@heritage-dx/store";
+import type { ClubStore, ConsultationStore, MembershipTradeStore } from "@heritage-dx/store";
 
 interface AppStores {
   club: ClubStore;
-  tradeMemo: TradeMemoStore;
-  tradeRecord: TradeRecordStore;
+  tradeMemo: ConsultationStore;
+  tradeRecord: MembershipTradeStore;
 }
 
 let cachedStores: AppStores | null = null;
@@ -24,8 +24,8 @@ export function useAppStores(): AppStores {
     if (!cachedStores) {
       cachedStores = {
         club: createClubStore(repos),
-        tradeMemo: createTradeMemoStore(repos),
-        tradeRecord: createTradeRecordStore(repos),
+        tradeMemo: createConsultationStore(repos),
+        tradeRecord: createMembershipTradeStore(repos),
       };
     }
     return cachedStores;

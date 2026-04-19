@@ -26,7 +26,7 @@ const emptyForm: MembershipTradeRecordForm = {
   marketProfit: 0,
   expense: 0,
   description: "",
-  contractFee: 0,
+  depositAmount: 0,
   balanceDate: "",
   balanceCompleted: false,
   manager: "",
@@ -38,15 +38,7 @@ const emptyForm: MembershipTradeRecordForm = {
   actualTransactionDate: "",
 };
 
-const formatNumberWithComma = (value: number | undefined): string => {
-  if (!value) return "";
-  return value.toLocaleString();
-};
-
-const parseNumberInput = (value: string): number => {
-  const num = parseInt(value.replace(/[^0-9]/g, ""), 10);
-  return isNaN(num) ? 0 : num;
-};
+import { formatKrwWithComma, parseNumber } from "@heritage-dx/utils";
 
 export default function MembershipTradesSection() {
   const clubsRepo = useClubRepository();
@@ -201,7 +193,7 @@ export default function MembershipTradesSection() {
         marketProfit: form.marketProfit || null,
         expense: form.expense || null,
         description: form.description || null,
-        contractFee: form.contractFee || null,
+        depositAmount: form.depositAmount || null,
         balanceDate: form.balanceDate || null,
         balanceCompleted: form.balanceCompleted,
         manager: form.manager || null,
@@ -256,7 +248,7 @@ export default function MembershipTradesSection() {
       marketProfit: trade.financials.marketProfit ?? 0,
       expense: trade.financials.expense ?? 0,
       description: trade.description || "",
-      contractFee: trade.trade.contractFee ?? 0,
+      depositAmount: trade.trade.depositAmount ?? 0,
       balanceDate: trade.balance.balanceDate || "",
       balanceCompleted: trade.balance.balanceCompleted ?? false,
       manager: trade.manager || "",
@@ -555,8 +547,8 @@ export default function MembershipTradesSection() {
                   <label className="block text-xs font-medium text-gray-700 mb-1">매매대금 (원)</label>
                   <input
                     type="text"
-                    value={formatNumberWithComma(form.amount)}
-                    onChange={(e) => setForm((f) => ({ ...f, amount: parseNumberInput(e.target.value) }))}
+                    value={formatKrwWithComma(form.amount)}
+                    onChange={(e) => setForm((f) => ({ ...f, amount: parseNumber(e.target.value) }))}
                     className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs focus:outline-none focus:border-gray-500"
                     placeholder="150,000,000"
                   />
@@ -565,8 +557,8 @@ export default function MembershipTradesSection() {
                   <label className="block text-xs font-medium text-gray-700 mb-1">거래금액 (원)</label>
                   <input
                     type="text"
-                    value={formatNumberWithComma(form.tradeAmount)}
-                    onChange={(e) => setForm((f) => ({ ...f, tradeAmount: parseNumberInput(e.target.value) }))}
+                    value={formatKrwWithComma(form.tradeAmount)}
+                    onChange={(e) => setForm((f) => ({ ...f, tradeAmount: parseNumber(e.target.value) }))}
                     className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs focus:outline-none focus:border-gray-500"
                     placeholder="160,000,000"
                   />
@@ -575,8 +567,8 @@ export default function MembershipTradesSection() {
                   <label className="block text-xs font-medium text-gray-700 mb-1">수수료 (원)</label>
                   <input
                     type="text"
-                    value={formatNumberWithComma(form.commission)}
-                    onChange={(e) => setForm((f) => ({ ...f, commission: parseNumberInput(e.target.value) }))}
+                    value={formatKrwWithComma(form.commission)}
+                    onChange={(e) => setForm((f) => ({ ...f, commission: parseNumber(e.target.value) }))}
                     className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs focus:outline-none focus:border-gray-500"
                     placeholder="2,000,000"
                   />
@@ -585,8 +577,8 @@ export default function MembershipTradesSection() {
                   <label className="block text-xs font-medium text-gray-700 mb-1">시세차익 (원)</label>
                   <input
                     type="text"
-                    value={formatNumberWithComma(form.marketProfit)}
-                    onChange={(e) => setForm((f) => ({ ...f, marketProfit: parseNumberInput(e.target.value) }))}
+                    value={formatKrwWithComma(form.marketProfit)}
+                    onChange={(e) => setForm((f) => ({ ...f, marketProfit: parseNumber(e.target.value) }))}
                     className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs focus:outline-none focus:border-gray-500"
                     placeholder="5,000,000"
                   />
@@ -595,8 +587,8 @@ export default function MembershipTradesSection() {
                   <label className="block text-xs font-medium text-gray-700 mb-1">경비 (원)</label>
                   <input
                     type="text"
-                    value={formatNumberWithComma(form.expense)}
-                    onChange={(e) => setForm((f) => ({ ...f, expense: parseNumberInput(e.target.value) }))}
+                    value={formatKrwWithComma(form.expense)}
+                    onChange={(e) => setForm((f) => ({ ...f, expense: parseNumber(e.target.value) }))}
                     className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs focus:outline-none focus:border-gray-500"
                     placeholder="1,000,000"
                   />
@@ -605,8 +597,8 @@ export default function MembershipTradesSection() {
                   <label className="block text-xs font-medium text-gray-700 mb-1">계약금 (원)</label>
                   <input
                     type="text"
-                    value={formatNumberWithComma(form.contractFee)}
-                    onChange={(e) => setForm((f) => ({ ...f, contractFee: parseNumberInput(e.target.value) }))}
+                    value={formatKrwWithComma(form.depositAmount)}
+                    onChange={(e) => setForm((f) => ({ ...f, depositAmount: parseNumber(e.target.value) }))}
                     className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs focus:outline-none focus:border-gray-500"
                     placeholder="300,000"
                   />
@@ -683,8 +675,8 @@ export default function MembershipTradesSection() {
                 <label className="block text-xs font-medium text-gray-700 mb-1">매출세금계산서 (원)</label>
                 <input
                   type="text"
-                  value={formatNumberWithComma(form.invoiceSales)}
-                  onChange={(e) => setForm((f) => ({ ...f, invoiceSales: parseNumberInput(e.target.value) }))}
+                  value={formatKrwWithComma(form.invoiceSales)}
+                  onChange={(e) => setForm((f) => ({ ...f, invoiceSales: parseNumber(e.target.value) }))}
                   className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs focus:outline-none focus:border-gray-500"
                   placeholder="1,000,000"
                 />
@@ -693,8 +685,8 @@ export default function MembershipTradesSection() {
                 <label className="block text-xs font-medium text-gray-700 mb-1">매입세금계산서 (원)</label>
                 <input
                   type="text"
-                  value={formatNumberWithComma(form.invoicePurchase)}
-                  onChange={(e) => setForm((f) => ({ ...f, invoicePurchase: parseNumberInput(e.target.value) }))}
+                  value={formatKrwWithComma(form.invoicePurchase)}
+                  onChange={(e) => setForm((f) => ({ ...f, invoicePurchase: parseNumber(e.target.value) }))}
                   className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs focus:outline-none focus:border-gray-500"
                   placeholder="500,000"
                 />

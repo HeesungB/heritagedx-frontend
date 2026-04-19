@@ -1,20 +1,25 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import Header from "@/components/Header";
 import {
   MembershipTradeRecord,
   MembershipTradeRecordForm,
   Club,
 } from "@/types";
-import { useClubRepository, useMembershipTradeRepository } from "@heritage-dx/api";
-import { mapTradeRecordDtoToEntity } from "@heritage-dx/store";
 import { trackEvent } from "@/lib/gtag";
 import { ClubSearchSelect, Button, Loading } from "@heritage-dx/ui";
+import { useAppStores } from "@/stores";
+import { useClubs, useClubDetail, useMembershipTrades, canDeleteTrade } from "@heritage-dx/store";
+import { StatusBadge } from "@/components/approval/StatusBadge";
+import type { WorkflowStatus } from "@heritage-dx/store";
+import { useAuth } from "@/contexts/AuthContext";
 
 type FormMembershipOption = { id: string; name: string };
 type TradeFilter = "전체" | "매수" | "매도";
 type SortField = "contractDate" | "createdAt" | "membershipName" | "amount" | "tradeAmount";
+type WorkflowFilter = "" | WorkflowStatus;
 
 const emptyForm: MembershipTradeRecordForm = {
   clubName: "",
@@ -30,7 +35,7 @@ const emptyForm: MembershipTradeRecordForm = {
   marketProfit: 0,
   expense: 0,
   description: "",
-  contractFee: 0,
+  depositAmount: 0,
   balanceDate: "",
   balanceCompleted: false,
   manager: "",
@@ -42,21 +47,16 @@ const emptyForm: MembershipTradeRecordForm = {
   actualTransactionDate: "",
 };
 
-const formatNumberWithComma = (value: number | undefined): string => {
-  if (!value) return "";
-  return value.toLocaleString();
-};
-
-const parseNumberInput = (value: string): number => {
-  const num = parseInt(value.replace(/[^0-9]/g, ""), 10);
-  return isNaN(num) ? 0 : num;
-};
+import { formatKrwWithComma, parseNumber } from "@heritage-dx/utils";
 
 export default function MembershipTradesClient() {
-  const clubsRepo = useClubRepository();
-  const membershipTradesRepo = useMembershipTradeRepository();
-  const [rawTrades, setRawTrades] = useState<MembershipTradeRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { club: clubStore, tradeRecord: tradeRecordStore } = useAppStores();
+  const { user } = useAuth();
+  const { clubs, isLoading: clubsLoading } = useClubs(clubStore);
+  const { items: rawTrades, fetch: fetchFromStore, create, update, remove, requestFinalReview, reopen, isLoading: loading } = useMembershipTrades(tradeRecordStore);
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
+  const highlightRef = useRef<HTMLTableRowElement | null>(null);
   const [filter, setFilter] = useState<TradeFilter>("전체");
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -70,13 +70,13 @@ export default function MembershipTradesClient() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [sortField, setSortField] = useState<SortField>("createdAt");
   const [sortOrder, setSortOrder] = useState<"DESC" | "ASC">("DESC");
-  const [clubs, setClubs] = useState<Club[]>([]);
   const [selectedClubCode, setSelectedClubCode] = useState<string>("");
   const [memberships, setMemberships] = useState<string[]>([]);
   const [selectedMembership, setSelectedMembership] = useState<string>("");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
-  const clubsRef = useRef<Club[]>([]);
+  const [filterWorkflow, setFilterWorkflow] = useState<WorkflowFilter>("");
+  const [finalReviewPendingId, setFinalReviewPendingId] = useState<string | null>(null);
 
   // 폼 전용 state (필터와 분리)
   const [formClubCode, setFormClubCode] = useState<string>("");
@@ -84,61 +84,25 @@ export default function MembershipTradesClient() {
   const [formMemberships, setFormMemberships] = useState<FormMembershipOption[]>([]);
   const [formManualMembership, setFormManualMembership] = useState(false);
 
-  // 골프장 목록 fetch
-  useEffect(() => {
-    clubsRepo.getAll({ limit: 100 })
-      .then((response) => {
-        if (response.data) {
-          const filtered = response.data.clubs.filter((c) => c.name?.trim()) as unknown as Club[];
-          clubsRef.current = filtered;
-          setClubs(filtered);
-        }
-      })
-      .catch(console.error);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // 골프장 상세 (필터 및 폼용 회원권 목록)
+  const { detail: selectedClubDetail } = useClubDetail(clubStore, selectedClubCode || null);
+  const { detail: formClubDetail } = useClubDetail(clubStore, formClubCode || null);
 
-  // 회원권 목록 fetch (골프장 선택 시)
+  // 회원권 목록 (골프장 필터 선택 시)
   useEffect(() => {
-    if (!selectedClubCode) {
-      setMemberships([]);
-      return;
-    }
-    clubsRepo.getOne(selectedClubCode)
-      .then((response) => {
-        if (response.data?.memberships) {
-          const names = response.data.memberships.map(
-            (m) => m.membershipName || m.membershipType
-          );
-          setMemberships(names);
-        }
-      })
-      .catch(console.error);
-  }, [selectedClubCode]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!selectedClubCode || !selectedClubDetail) { setMemberships([]); return; }
+    const names = selectedClubDetail.memberships.map((m) => m.membershipName || m.membershipType);
+    setMemberships(names);
+  }, [selectedClubCode, selectedClubDetail]);
 
-  // 폼용 회원권 목록 fetch (폼에서 골프장 선택 시)
+  // 폼용 회원권 목록 (폼에서 골프장 선택 시)
   useEffect(() => {
-    if (!formClubCode) {
-      setFormMemberships([]);
-      setFormClubId("");
-      return;
-    }
-    clubsRepo.getOne(formClubCode)
-      .then((response) => {
-        if (response.data) {
-          setFormClubId(response.data.id);
-          setFormMemberships(
-            (response.data.memberships ?? []).map((m) => ({
-              id: m.id,
-              name: m.membershipName || m.membershipType,
-            }))
-          );
-        } else {
-          setFormClubId("");
-          setFormMemberships([]);
-        }
-      })
-      .catch(() => { setFormClubId(""); setFormMemberships([]); });
-  }, [formClubCode]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!formClubCode || !formClubDetail) { setFormMemberships([]); setFormClubId(""); return; }
+    setFormClubId(formClubDetail.id);
+    setFormMemberships(
+      (formClubDetail.memberships ?? []).map((m) => ({ id: m.id, name: m.membershipName || m.membershipType }))
+    );
+  }, [formClubCode, formClubDetail]);
 
   // 수정 모드에서 직접 입력 판단
   useEffect(() => {
@@ -156,38 +120,28 @@ export default function MembershipTradesClient() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  const fetchTrades = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await membershipTradesRepo.getAll({
-        page,
-        limit: 20,
-        sort: sortField,
-        order: sortOrder,
-        tradeType: filter !== "전체" ? filter : undefined,
-        search: searchQuery.trim() || undefined,
-      });
-      if (response.data) {
-        setRawTrades((response.data.trades || []).map(mapTradeRecordDtoToEntity));
-        if (response.data.pagination) {
-          setTotalPages(response.data.pagination.totalPages);
-        }
-      }
-    } catch (err) {
-      console.error("거래 내역 로딩 실패:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, filter, searchQuery, sortField, sortOrder]); // eslint-disable-line react-hooks/exhaustive-deps
-
   useEffect(() => {
-    fetchTrades();
-  }, [fetchTrades]);
+    fetchFromStore({
+      page,
+      limit: 20,
+      sort: sortField,
+      order: sortOrder,
+      tradeType: filter !== "전체" ? filter : undefined,
+      search: searchQuery.trim() || undefined,
+      workflowStatus: filterWorkflow || undefined,
+    });
+  }, [page, filter, searchQuery, sortField, sortOrder, filterWorkflow]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ?highlight=<id> 지원: 해당 행을 스크롤/강조
+  useEffect(() => {
+    if (!highlightId || !highlightRef.current) return;
+    highlightRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightId, rawTrades.length]);
 
   // 클라이언트 필터링: 골프장/회원권/기간 선택 시 네트워크 요청 없이 즉시 필터
   const trades = useMemo(() => {
-    let filtered = rawTrades;
-    const selectedClubName = clubsRef.current.find((c) => c.code === selectedClubCode)?.name;
+    let filtered = rawTrades as MembershipTradeRecord[];
+    const selectedClubName = clubs.find((c) => c.code === selectedClubCode)?.name;
     if (selectedClubName) {
       filtered = filtered.filter((t) => t.clubName === selectedClubName);
     }
@@ -201,19 +155,19 @@ export default function MembershipTradesClient() {
       filtered = filtered.filter((t) => (t.trade.contractDate || "") <= dateTo);
     }
     return filtered;
-  }, [rawTrades, selectedClubCode, selectedMembership, dateFrom, dateTo]);
+  }, [rawTrades, clubs, selectedClubCode, selectedMembership, dateFrom, dateTo]);
 
   // 거래 데이터에 있는 골프장만 필터 드롭다운에 표시
   const availableClubs = useMemo(() => {
-    const tradeClubNames = new Set(rawTrades.map((t) => t.clubName).filter(Boolean));
-    if (tradeClubNames.size === 0) return clubs;
-    return clubs.filter((c) => tradeClubNames.has(c.name));
+    const tradeClubNames = new Set(rawTrades.map((t) => (t as MembershipTradeRecord).clubName).filter(Boolean));
+    if (tradeClubNames.size === 0) return clubs as unknown as Club[];
+    return (clubs as unknown as Club[]).filter((c) => tradeClubNames.has(c.name));
   }, [rawTrades, clubs]);
 
   const handleFormClubChange = (code: string) => {
     setFormClubCode(code);
     setFormClubId("");
-    const club = clubsRef.current.find((c) => c.code === code);
+    const club = (clubs as unknown as Club[]).find((c) => c.code === code);
     setForm((f) => ({ ...f, clubName: club?.name || "", membershipName: "" }));
     setFormManualMembership(false);
     setFormMemberships([]);
@@ -252,7 +206,7 @@ export default function MembershipTradesClient() {
         marketProfit: form.marketProfit || null,
         expense: form.expense || null,
         description: form.description || null,
-        contractFee: form.contractFee || null,
+        depositAmount: form.depositAmount || null,
         balanceDate: form.balanceDate || null,
         balanceCompleted: form.balanceCompleted,
         manager: form.manager || null,
@@ -264,23 +218,23 @@ export default function MembershipTradesClient() {
         actualTransactionDate: form.actualTransactionDate || null,
       };
 
-      let result;
+      const wasEditing = !!editingTrade;
+      let entity;
       if (editingTrade) {
-        result = await membershipTradesRepo.update(editingTrade.id, cleaned);
+        entity = await update(editingTrade.id, cleaned);
       } else {
-        result = await membershipTradesRepo.create(cleaned);
+        entity = await create(cleaned);
       }
 
-      if (!result.success) {
-        setErrorMessage(result.error || "오류가 발생했습니다.");
+      if (!entity) {
+        setErrorMessage("오류가 발생했습니다.");
         return;
       }
 
       setEditingTrade(null);
       setForm(emptyForm);
       setShowForm(false);
-      await fetchTrades();
-      if (!editingTrade) {
+      if (!wasEditing) {
         trackEvent("membership_trade_create", { club_name: form.clubName, trade_type: form.tradeType });
       }
     } catch (err) {
@@ -294,7 +248,7 @@ export default function MembershipTradesClient() {
   const handleEdit = (trade: MembershipTradeRecord) => {
     setEditingTrade(trade);
     setErrorMessage(null);
-    const matchedClub = clubsRef.current.find((c) => c.name === trade.clubName);
+    const matchedClub = (clubs as unknown as Club[]).find((c) => c.name === trade.clubName);
     setFormClubCode(matchedClub?.code || "");
     setFormManualMembership(false);
     setForm({
@@ -311,7 +265,7 @@ export default function MembershipTradesClient() {
       marketProfit: trade.financials.marketProfit ?? 0,
       expense: trade.financials.expense ?? 0,
       description: trade.description || "",
-      contractFee: trade.trade.contractFee ?? 0,
+      depositAmount: trade.trade.depositAmount ?? 0,
       balanceDate: trade.balance.balanceDate || "",
       balanceCompleted: trade.balance.balanceCompleted ?? false,
       manager: trade.manager || "",
@@ -328,13 +282,12 @@ export default function MembershipTradesClient() {
   const handleDelete = async (id: string) => {
     setErrorMessage(null);
     try {
-      const result = await membershipTradesRepo.delete(id);
-      if (!result.success) {
-        setErrorMessage(result.error || "삭제 실패");
+      const ok = await remove(id);
+      if (!ok) {
+        setErrorMessage("삭제 실패");
         return;
       }
       setDeleteConfirmId(null);
-      await fetchTrades();
     } catch (err) {
       console.error("거래 삭제 실패:", err);
       setErrorMessage("네트워크 오류가 발생했습니다.");
@@ -421,6 +374,20 @@ export default function MembershipTradesClient() {
                   </button>
                 ))}
               </div>
+
+              {/* 승인 상태 필터 */}
+              <select
+                value={filterWorkflow}
+                onChange={(e) => { setFilterWorkflow(e.target.value as WorkflowFilter); setPage(1); }}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
+              >
+                <option value="">승인 상태 전체</option>
+                <option value="DRAFT">작성중</option>
+                <option value="PENDING_APPROVAL">승인대기</option>
+                <option value="FIRST_APPROVED">승인</option>
+                <option value="ON_HOLD">보류</option>
+                <option value="REJECTED">반려</option>
+              </select>
 
               {/* 골프장 필터 */}
               <ClubSearchSelect
@@ -660,8 +627,8 @@ export default function MembershipTradesClient() {
                       <label className="block text-xs font-medium text-gray-700 mb-1">매매대금 (원)</label>
                       <input
                         type="text"
-                        value={formatNumberWithComma(form.amount)}
-                        onChange={(e) => setForm((f) => ({ ...f, amount: parseNumberInput(e.target.value) }))}
+                        value={formatKrwWithComma(form.amount)}
+                        onChange={(e) => setForm((f) => ({ ...f, amount: parseNumber(e.target.value) }))}
                         className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
                         placeholder="150,000,000"
                       />
@@ -670,8 +637,8 @@ export default function MembershipTradesClient() {
                       <label className="block text-xs font-medium text-gray-700 mb-1">거래금액 (원)</label>
                       <input
                         type="text"
-                        value={formatNumberWithComma(form.tradeAmount)}
-                        onChange={(e) => setForm((f) => ({ ...f, tradeAmount: parseNumberInput(e.target.value) }))}
+                        value={formatKrwWithComma(form.tradeAmount)}
+                        onChange={(e) => setForm((f) => ({ ...f, tradeAmount: parseNumber(e.target.value) }))}
                         className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
                         placeholder="160,000,000"
                       />
@@ -680,8 +647,8 @@ export default function MembershipTradesClient() {
                       <label className="block text-xs font-medium text-gray-700 mb-1">수수료 (원)</label>
                       <input
                         type="text"
-                        value={formatNumberWithComma(form.commission)}
-                        onChange={(e) => setForm((f) => ({ ...f, commission: parseNumberInput(e.target.value) }))}
+                        value={formatKrwWithComma(form.commission)}
+                        onChange={(e) => setForm((f) => ({ ...f, commission: parseNumber(e.target.value) }))}
                         className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
                         placeholder="2,000,000"
                       />
@@ -690,8 +657,8 @@ export default function MembershipTradesClient() {
                       <label className="block text-xs font-medium text-gray-700 mb-1">시세차익 (원)</label>
                       <input
                         type="text"
-                        value={formatNumberWithComma(form.marketProfit)}
-                        onChange={(e) => setForm((f) => ({ ...f, marketProfit: parseNumberInput(e.target.value) }))}
+                        value={formatKrwWithComma(form.marketProfit)}
+                        onChange={(e) => setForm((f) => ({ ...f, marketProfit: parseNumber(e.target.value) }))}
                         className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
                         placeholder="5,000,000"
                       />
@@ -700,8 +667,8 @@ export default function MembershipTradesClient() {
                       <label className="block text-xs font-medium text-gray-700 mb-1">경비 (원)</label>
                       <input
                         type="text"
-                        value={formatNumberWithComma(form.expense)}
-                        onChange={(e) => setForm((f) => ({ ...f, expense: parseNumberInput(e.target.value) }))}
+                        value={formatKrwWithComma(form.expense)}
+                        onChange={(e) => setForm((f) => ({ ...f, expense: parseNumber(e.target.value) }))}
                         className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
                         placeholder="1,000,000"
                       />
@@ -710,8 +677,8 @@ export default function MembershipTradesClient() {
                       <label className="block text-xs font-medium text-gray-700 mb-1">계약금 (원)</label>
                       <input
                         type="text"
-                        value={formatNumberWithComma(form.contractFee)}
-                        onChange={(e) => setForm((f) => ({ ...f, contractFee: parseNumberInput(e.target.value) }))}
+                        value={formatKrwWithComma(form.depositAmount)}
+                        onChange={(e) => setForm((f) => ({ ...f, depositAmount: parseNumber(e.target.value) }))}
                         className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
                         placeholder="300,000"
                       />
@@ -788,8 +755,8 @@ export default function MembershipTradesClient() {
                     <label className="block text-xs font-medium text-gray-700 mb-1">매출세금계산서 (원)</label>
                     <input
                       type="text"
-                      value={formatNumberWithComma(form.invoiceSales)}
-                      onChange={(e) => setForm((f) => ({ ...f, invoiceSales: parseNumberInput(e.target.value) }))}
+                      value={formatKrwWithComma(form.invoiceSales)}
+                      onChange={(e) => setForm((f) => ({ ...f, invoiceSales: parseNumber(e.target.value) }))}
                       className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
                       placeholder="1,000,000"
                     />
@@ -798,8 +765,8 @@ export default function MembershipTradesClient() {
                     <label className="block text-xs font-medium text-gray-700 mb-1">매입세금계산서 (원)</label>
                     <input
                       type="text"
-                      value={formatNumberWithComma(form.invoicePurchase)}
-                      onChange={(e) => setForm((f) => ({ ...f, invoicePurchase: parseNumberInput(e.target.value) }))}
+                      value={formatKrwWithComma(form.invoicePurchase)}
+                      onChange={(e) => setForm((f) => ({ ...f, invoicePurchase: parseNumber(e.target.value) }))}
                       className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
                       placeholder="500,000"
                     />
@@ -861,6 +828,7 @@ export default function MembershipTradesClient() {
                 <table className="w-full border-collapse min-w-[320px]">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">승인</th>
                       <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">유형</th>
                       <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">골프장</th>
                       <th className="hidden md:table-cell px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">회원권</th>
@@ -880,7 +848,61 @@ export default function MembershipTradesClient() {
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {trades.map((trade) => (
-                      <tr key={trade.id} className="hover:bg-gray-50 transition-colors">
+                      <tr
+                        key={trade.id}
+                        ref={trade.id === highlightId ? highlightRef : null}
+                        className={`transition-colors ${trade.id === highlightId ? "bg-amber-50" : "hover:bg-gray-50"}`}
+                      >
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <StatusBadge status={trade.workflowStatus} />
+                            {trade.workflowStatus === "DRAFT" && (
+                              <button
+                                type="button"
+                                disabled={finalReviewPendingId === trade.id}
+                                onClick={async () => {
+                                  setFinalReviewPendingId(trade.id);
+                                  try {
+                                    const updated = await requestFinalReview(trade.id);
+                                    if (!updated) setErrorMessage("최종 검토 요청 실패");
+                                  } finally {
+                                    setFinalReviewPendingId(null);
+                                  }
+                                }}
+                                className="text-xs px-2 py-0.5 rounded border border-amber-300 text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                              >
+                                최종 검토 요청
+                              </button>
+                            )}
+                            {(trade.workflowStatus === "ON_HOLD" || trade.workflowStatus === "REJECTED") && (
+                              <button
+                                type="button"
+                                disabled={finalReviewPendingId === trade.id}
+                                onClick={async () => {
+                                  setFinalReviewPendingId(trade.id);
+                                  try {
+                                    const updated = await reopen(trade.id);
+                                    if (!updated) setErrorMessage("다시 열기 요청 실패");
+                                  } finally {
+                                    setFinalReviewPendingId(null);
+                                  }
+                                }}
+                                className="text-xs px-2 py-0.5 rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                              >
+                                다시 열기
+                              </button>
+                            )}
+                            {trade.sourceConsultationId && (
+                              <a
+                                href={`/trades?highlight=${trade.sourceConsultationId}`}
+                                className="text-xs px-2 py-0.5 rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
+                                title="원본 상담으로 이동"
+                              >
+                                원본
+                              </a>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-3 py-3 whitespace-nowrap">
                           <span
                             className={`px-2 py-0.5 rounded text-xs font-medium ${
@@ -932,7 +954,7 @@ export default function MembershipTradesClient() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                               </svg>
                             </button>
-                            {deleteConfirmId === trade.id ? (
+                            {canDeleteTrade(user) && (deleteConfirmId === trade.id ? (
                               <div className="flex items-center gap-1">
                                 <button
                                   onClick={() => handleDelete(trade.id)}
@@ -957,7 +979,7 @@ export default function MembershipTradesClient() {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
                               </button>
-                            )}
+                            ))}
                           </div>
                         </td>
                       </tr>

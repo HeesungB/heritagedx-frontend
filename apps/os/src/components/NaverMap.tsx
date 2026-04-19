@@ -3,19 +3,14 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Script from "next/script";
 import cachedCoordinates from "@/constants/golfCourseCoordinates.json";
+import { useGeocode } from "@/hooks/useGeocode";
 
 interface NaverMapProps {
   address: string;
   name?: string;
 }
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-declare global {
-  interface Window {
-    naver: any;
-    navermap_authFailure?: () => void;
-  }
-}
+// 네이버 지도 SDK 타입: apps/os/src/types/naver-maps.d.ts 선언 파일에서 전역 Window.naver 정의
 
 const NAVER_CLIENT_ID = process.env.NEXT_PUBLIC_NAVER_CLIENT_ID || "pywcmzqls0";
 
@@ -29,7 +24,8 @@ export default function NaverMap({ address, name }: NaverMapProps) {
   );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const mapInstanceRef = useRef<any>(null);
+  const mapInstanceRef = useRef<naver.maps.Map | null>(null);
+  const { getCoords } = useGeocode();
 
   const initMap = useCallback(async () => {
     if (!mapRef.current || !address) return;
@@ -53,28 +49,14 @@ export default function NaverMap({ address, name }: NaverMapProps) {
         lng = cached.lng;
       } else {
         // 서버 API를 통해 geocoding (CORS 우회)
-        const response = await fetch(`/api/geocode?query=${address}`);
-        const data = await response.json();
-
-        if (data.error) {
-          const errorMsg =
-            typeof data.error === "string"
-              ? data.error
-              : data.error.message || "알 수 없는 오류가 발생했습니다.";
-          setError(errorMsg);
-          setLoading(false);
-          return;
-        }
-
-        const addresses = data.addresses;
-        if (!addresses || addresses.length === 0) {
+        const coords = await getCoords(address);
+        if (!coords) {
           setError("주소를 찾을 수 없습니다.");
           setLoading(false);
           return;
         }
-
-        lat = parseFloat(addresses[0].y);
-        lng = parseFloat(addresses[0].x);
+        lat = coords.lat;
+        lng = coords.lng;
       }
 
       const point = new naver.maps.LatLng(lat, lng);
@@ -101,7 +83,7 @@ export default function NaverMap({ address, name }: NaverMapProps) {
       setError("지도를 불러오는데 실패했습니다.");
       setLoading(false);
     }
-  }, [address]);
+  }, [address, getCoords]);
 
   useEffect(() => {
     // 인증 실패 처리

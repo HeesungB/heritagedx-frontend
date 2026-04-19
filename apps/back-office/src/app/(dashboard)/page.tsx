@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import {
   Building2,
   FileText,
@@ -10,7 +11,17 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import { Card, CardContent } from "@heritage-dx/ui";
-import KpiMiniDashboard from "@/components/kpi/KpiMiniDashboard";
+
+// recharts 는 초기 번들 분리 — dashboard 첫 화면 TTI 개선 (1-2)
+const KpiMiniDashboard = dynamic(
+  () => import("@/components/kpi/KpiMiniDashboard"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-48 bg-gray-100 rounded animate-pulse" aria-label="KPI 로딩 중" />
+    ),
+  },
+);
 
 interface QuickLink {
   title: string;

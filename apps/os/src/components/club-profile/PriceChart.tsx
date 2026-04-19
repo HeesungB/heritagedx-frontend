@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
 import {
   LineChart,
   Line,
@@ -10,88 +10,38 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-
-interface PriceDataPoint {
-  date: string;
-  price: number;
-}
+import { useMarketPrices } from "@heritage-dx/store";
+import type { MarketPricePeriod } from "@heritage-dx/store";
 
 interface PriceChartProps {
   membershipId: string;
 }
 
-type PeriodKey = "1w" | "1m" | "3m" | "1y";
-
-const PERIODS: { key: PeriodKey; label: string }[] = [
+const PERIODS: { key: MarketPricePeriod; label: string }[] = [
   { key: "1w", label: "1주" },
   { key: "1m", label: "1개월" },
   { key: "3m", label: "3개월" },
   { key: "1y", label: "1년" },
 ];
 
-const API_BASE = "https://api.heritage-dx.com/api";
-
-function getFromDate(period: PeriodKey): string {
-  const now = new Date();
-  switch (period) {
-    case "1w":
-      now.setDate(now.getDate() - 7);
-      break;
-    case "1m":
-      now.setMonth(now.getMonth() - 1);
-      break;
-    case "3m":
-      now.setMonth(now.getMonth() - 3);
-      break;
-    case "1y":
-      now.setFullYear(now.getFullYear() - 1);
-      break;
-  }
-  return now.toISOString().split("T")[0];
-}
-
-function formatToday(): string {
-  return new Date().toISOString().split("T")[0];
-}
-
 export default function PriceChart({ membershipId }: PriceChartProps) {
-  const [period, setPeriod] = useState<PeriodKey>("3m");
-  const [data, setData] = useState<PriceDataPoint[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [period, setPeriod] = useState<MarketPricePeriod>("3m");
+  const { prices, isLoading, isError } = useMarketPrices(membershipId, period);
 
-  const fetchData = useCallback(async (mId: string, p: PeriodKey) => {
-    setLoading(true);
-    setError(false);
-    try {
-      const from = getFromDate(p);
-      const to = formatToday();
-      const url = `${API_BASE}/clubs/memberships/${mId}/market-prices?from=${from}&to=${to}`;
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`API 요청 실패: ${response.status}`);
-      const res = await response.json();
-      const prices = (res.data?.prices ?? []).map((item: { date: string; marketPrice: number }) => ({
+  const data = useMemo(
+    () =>
+      prices.map((item) => ({
         date: item.date.slice(5).replace("-", "/"),
         price: Math.round(item.marketPrice / 10000),
-      }));
-      setData(prices);
-    } catch {
-      setError(true);
-      setData([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData(membershipId, period);
-  }, [membershipId, period, fetchData]);
+      })),
+    [prices],
+  );
 
   const { yMin, yMax } = useMemo(() => {
     if (data.length === 0) return { yMin: 0, yMax: 0 };
-    const prices = data.map((d) => d.price);
-    const min = Math.min(...prices);
-    const max = Math.max(...prices);
+    const vals = data.map((d) => d.price);
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
     const padding = Math.round((max - min) * 0.15) || 500;
     return {
       yMin: Math.floor((min - padding) / 1000) * 1000,
@@ -124,11 +74,11 @@ export default function PriceChart({ membershipId }: PriceChartProps) {
         </div>
       </div>
       <div className="p-3">
-        {loading ? (
+        {isLoading ? (
           <div className="flex items-center justify-center h-[280px] text-sm text-gray-500">
             시세 데이터 로딩 중...
           </div>
-        ) : error ? (
+        ) : isError ? (
           <div className="flex items-center justify-center h-[280px] text-sm text-gray-500">
             시세 데이터를 불러올 수 없습니다
           </div>
@@ -138,7 +88,10 @@ export default function PriceChart({ membershipId }: PriceChartProps) {
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+            <LineChart
+              data={data}
+              margin={{ top: 8, right: 12, left: 0, bottom: 4 }}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis
                 dataKey="date"

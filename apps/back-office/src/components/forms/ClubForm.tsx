@@ -2,8 +2,8 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Club } from "@/types";
+import { ClubDetailResponse } from "@/types";
+import { clubBaseSchema, type ClubFormValues } from "@heritage-dx/store/schemas";
 import {
   Button,
   Input,
@@ -14,26 +14,9 @@ import {
   CardContent,
 } from "@heritage-dx/ui";
 
-const clubSchema = z.object({
-  code: z.string().min(1, "골프장 코드를 입력하세요"),
-  name: z.string().min(1, "골프장명을 입력하세요"),
-  companyName: z.string().optional(),
-  region: z.string().optional(),
-  address: z.string().optional(),
-  openingDate: z.string().optional(),
-  holes: z.string().optional(),
-  memberCount: z.string().optional(),
-  cityAccessibility: z.string().optional(),
-  website: z.string().optional(),
-  memo: z.string().optional(),
-  dealerMemo: z.string().optional(),
-});
-
-type ClubFormData = z.infer<typeof clubSchema>;
-
 interface ClubFormProps {
-  initialData?: Club;
-  onSubmit: (data: ClubFormData) => Promise<void>;
+  initialData?: ClubDetailResponse;
+  onSubmit: (data: ClubFormValues) => Promise<void>;
   isLoading?: boolean;
 }
 
@@ -46,8 +29,8 @@ export default function ClubForm({
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<ClubFormData>({
-    resolver: zodResolver(clubSchema),
+  } = useForm<ClubFormValues>({
+    resolver: zodResolver(clubBaseSchema),
     defaultValues: initialData
       ? {
           code: initialData.code || "",

@@ -2,8 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { formatManwon, parseTransferFee } from "@heritage-dx/utils";
-import { EntityType, TransactionType, CalculatorInput } from "@/types/tax";
-import { calculateTax, getScenarioLabel, getResultLabel } from "@/utils/taxCalculator";
+import { type EntityType, type TransactionType, type CalculatorInput, calculateTax, getScenarioLabel, getResultLabel } from "@heritage-dx/store";
 import { useTaxSettings } from "@/hooks/useTaxSettings";
 import TaxSettingsModal from "./TaxSettingsModal";
 

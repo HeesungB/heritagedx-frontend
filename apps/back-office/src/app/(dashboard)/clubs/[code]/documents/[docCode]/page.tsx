@@ -3,7 +3,8 @@
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { ArrowLeft, Download, FileText } from "lucide-react";
-import { ClubDocument, ClubDetailResponse } from "@/types";
+import type { ClubDetailResponse } from "@/types";
+import type { ClubDocumentEntity as ClubDocument } from "@heritage-dx/store";
 import { useClubRepository, useAdminRepositories } from "@heritage-dx/api";
 import { PageContainer } from "@/components/layout";
 import {
@@ -13,7 +14,9 @@ import {
   CardTitle,
   CardContent,
 } from "@heritage-dx/ui";
-import DocumentForm from "@/components/forms/DocumentForm";
+import DocumentForm, {
+  type DocumentUploadData,
+} from "@/components/forms/DocumentForm";
 
 interface PageProps {
   params: Promise<{ code: string; docCode: string }>;
@@ -46,11 +49,8 @@ export default function ClubDocumentDetailPage({ params }: PageProps) {
           // clubId로 서류 목록 조회
           const response = await clubDocumentsAdmin.getByClub(clubId);
           if (response.success && response.data) {
-            // docCode(URL 파라미터)가 실제로는 문서 id일 수도 있음
-            const doc = response.data.documents.find(
-              (d) =>
-                d.id === docCode || d.docCode === docCode || d.code === docCode
-            );
+            // URL 파라미터는 문서 id (파일명은 [docCode] 이지만 실제 값은 id)
+            const doc = response.data.documents.find((d) => d.id === docCode);
             setDocument(doc || null);
           } else {
             setDocument(null);
@@ -70,8 +70,7 @@ export default function ClubDocumentDetailPage({ params }: PageProps) {
     setIsLoading(false);
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: DocumentUploadData) => {
     if (!club?.id || !document?.id) {
       console.error("Club ID or Document ID is missing");
       return;
@@ -163,7 +162,7 @@ export default function ClubDocumentDetailPage({ params }: PageProps) {
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>{document.name || document.cleanName}</CardTitle>
+          <CardTitle>{document.name}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex gap-4 text-sm text-gray-600">
@@ -210,7 +209,6 @@ export default function ClubDocumentDetailPage({ params }: PageProps) {
       <DocumentForm
         initialData={{
           id: document.id,
-          cleanName: document.name || document.cleanName || "",
           name: document.name,
           description: document.fileDescription,
         }}

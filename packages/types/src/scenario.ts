@@ -1,15 +1,14 @@
 import type { Pagination } from "./api";
 import type { Document, DocumentsSummary } from "./document";
 
-// 시나리오 Side/OwnerType 타입
+// 시나리오 Side/OwnerType 타입 (OpenAPI AdminScenarioDto enum)
 export type ScenarioSide = "Seller" | "Buyer";
 export type ScenarioOwnerType =
   | "Personal"
   | "Corporate"
   | "Family"
   | "Special"
-  | "All"
-  | "Individual";
+  | "All";
 
 // 시나리오
 export interface Scenario {

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { MembershipTrade, MembershipTradeForm, ClubDetail } from "@/types";
-import { useConsultationRepository } from "@heritage-dx/api";
 import { Button, Loading, Textarea } from "@heritage-dx/ui";
-import { mapTradMemoDtoToEntity } from "@heritage-dx/store";
+import { useAppStores } from "@/stores";
+import { useConsultations } from "@heritage-dx/store";
+import { useSendTradeNotification } from "@/hooks/useSendTradeNotification";
 import { trackEvent } from "@/lib/gtag";
 
 interface TradeMemoSidebarProps {
@@ -23,6 +24,7 @@ const initialForm: Omit<MembershipTradeForm, "clubId" | "clubName"> = {
   offerPriceNote: "",
   desiredPrice: 0,
   desiredPriceNote: "",
+  depositAmount: 0,
   notes: "",
   registrationDate: new Date().toISOString().split("T")[0],
   tradeDate: "",
@@ -31,10 +33,10 @@ const initialForm: Omit<MembershipTradeForm, "clubId" | "clubName"> = {
 };
 
 export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSidebarProps) {
-  const consultationsRepo = useConsultationRepository();
+  const { tradeMemo: tradeMemoStore } = useAppStores();
+  const { items: trades, fetch: fetchFromStore, create, update, remove, toggleDone, isLoading: loading } = useConsultations(tradeMemoStore);
+  const { send: sendNotification } = useSendTradeNotification();
   const [activeTab, setActiveTab] = useState<SidebarTab>("create");
-  const [trades, setTrades] = useState<MembershipTrade[]>([]);
-  const [loading, setLoading] = useState(false);
   const [form, setForm] = useState(initialForm);
   const [submitting, setSubmitting] = useState(false);
   const [editingTrade, setEditingTrade] = useState<MembershipTrade | null>(null);
@@ -46,31 +48,17 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
   const [filterDone, setFilterDone] = useState<"" | "done" | "progress">("progress");
   const [manualMembershipInput, setManualMembershipInput] = useState(false);
 
-  const fetchTrades = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await consultationsRepo.getAll({
-        page: 1,
-        limit: 50,
-        sort: "registrationDate",
-        order: "DESC",
-        search: searchQuery.trim() || undefined,
-        tradeType: filterType || undefined,
-        isDone: filterDone === "done" ? true : filterDone === "progress" ? false : undefined,
-      });
-      if (response.data) {
-        setTrades((response.data.trades || []).map(mapTradMemoDtoToEntity));
-      }
-    } catch (err) {
-      console.error("메모 로딩 실패:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [searchQuery, filterType, filterDone]); // eslint-disable-line react-hooks/exhaustive-deps
-
   useEffect(() => {
-    fetchTrades();
-  }, [fetchTrades]);
+    fetchFromStore({
+      page: 1,
+      limit: 50,
+      sort: "registrationDate",
+      order: "DESC",
+      search: searchQuery.trim() || undefined,
+      tradeType: filterType || undefined,
+      isDone: filterDone === "done" ? true : filterDone === "progress" ? false : undefined,
+    });
+  }, [searchQuery, filterType, filterDone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,6 +85,7 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
         offerPriceNote: cleaned.offerPriceNote,
         desiredPrice: cleaned.desiredPrice || null,
         desiredPriceNote: cleaned.desiredPriceNote,
+        depositAmount: cleaned.depositAmount || null,
         notes: cleaned.notes,
         registrationDate: cleaned.registrationDate,
         tradeDate: cleaned.tradeDate,
@@ -104,35 +93,30 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
         isDone: cleaned.isDone,
       };
 
-      let result;
+      const wasEditing = !!editingTrade;
+      let entity;
       if (editingTrade) {
-        result = await consultationsRepo.update(editingTrade.id, input);
+        entity = await update(editingTrade.id, input);
       } else {
-        result = await consultationsRepo.create(input);
+        entity = await create(input);
       }
 
-      if (!result.success) {
-        setErrorMessage(result.error || "오류가 발생했습니다.");
+      if (!entity) {
+        setErrorMessage("오류가 발생했습니다.");
         return;
       }
 
-      const wasEditing = !!editingTrade;
-
       // 신규 등록일 때만 Back Office에 푸시 알림 전송 (fire-and-forget)
-      if (!wasEditing && result.data) {
-        fetch("/api/notifications/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            tradeId: result.data.id,
-            clubName: clubDetail.name,
-            tradeType: form.tradeType,
-            customerName: form.customerName,
-            membershipType: form.membershipType,
-            offerPrice: form.offerPrice || null,
-            desiredPrice: form.desiredPrice || null,
-          }),
-        }).catch(() => {});
+      if (!wasEditing) {
+        sendNotification({
+          tradeId: entity.id,
+          clubName: clubDetail.name,
+          tradeType: form.tradeType,
+          customerName: form.customerName,
+          membershipType: form.membershipType,
+          offerPrice: form.offerPrice || null,
+          desiredPrice: form.desiredPrice || null,
+        });
       }
 
       setEditingTrade(null);
@@ -140,7 +124,6 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
       setActiveTab("list");
       setSuccessMessage(wasEditing ? "수정 완료" : "등록 완료");
       setTimeout(() => setSuccessMessage(null), 2500);
-      await fetchTrades();
       if (!wasEditing) {
         trackEvent("trade_memo_create", { club_name: clubDetail.name, trade_type: form.tradeType });
       }
@@ -155,15 +138,14 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
   const handleDelete = async (id: string) => {
     setErrorMessage(null);
     try {
-      const result = await consultationsRepo.delete(id);
-      if (!result.success) {
-        setErrorMessage(result.error || "삭제 실패");
+      const ok = await remove(id);
+      if (!ok) {
+        setErrorMessage("삭제 실패");
         return;
       }
       setDeleteConfirmId(null);
       setSuccessMessage("삭제 완료");
       setTimeout(() => setSuccessMessage(null), 2500);
-      await fetchTrades();
     } catch (err) {
       console.error("메모 삭제 실패:", err);
       setErrorMessage("네트워크 오류가 발생했습니다.");
@@ -185,6 +167,7 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
       offerPriceNote: trade.offerPriceNote || "",
       desiredPrice: trade.desiredPrice ? Number(trade.desiredPrice) : 0,
       desiredPriceNote: trade.desiredPriceNote || "",
+      depositAmount: trade.depositAmount ?? 0,
       notes: trade.notes || "",
       registrationDate: trade.registrationDate || new Date().toISOString().split("T")[0],
       tradeDate: trade.tradeDate || "",
@@ -217,17 +200,7 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
 
   const handleToggleDone = async (trade: MembershipTrade) => {
     try {
-      const result = await consultationsRepo.update(trade.id, {
-        club: trade.clubName,
-        membership: trade.membershipType,
-        tradeType: trade.tradeType,
-        customerName: trade.customerName,
-        contact: trade.contact,
-        isDone: !trade.isDone,
-      });
-      if (result.success) {
-        await fetchTrades();
-      }
+      await toggleDone(trade.id, !trade.isDone);
     } catch (err) {
       console.error("상태 변경 실패:", err);
     }
@@ -512,7 +485,7 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">거래유형 <span className="text-red-500">*</span></label>
               <div className="flex gap-2">
-                {["매수", "매도"].map((type) => (
+                {(["매수", "매도"] as const).map((type) => (
                   <button
                     key={type}
                     type="button"
@@ -646,6 +619,21 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
                   placeholder="비고"
                 />
               </div>
+            </div>
+
+            {/* 계약금 */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                계약금 (원)
+                <span className="ml-1 text-[11px] text-gray-400">— 입금 확인 시 승인 가능</span>
+              </label>
+              <input
+                type="number"
+                value={form.depositAmount || ""}
+                onChange={(e) => setForm((f) => ({ ...f, depositAmount: e.target.value === "" ? 0 : Number(e.target.value) }))}
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
+                placeholder="10000000"
+              />
             </div>
 
             {/* 메모 */}

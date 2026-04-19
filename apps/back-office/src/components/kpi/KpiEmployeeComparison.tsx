@@ -10,16 +10,10 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
-import { wonToManwon, formatManwon } from "@heritage-dx/utils";
-import type { KpiMetric } from "./KpiTrendChart";
+import { wonToManwon, formatManwon, formatProfitShort } from "@heritage-dx/utils";
+import type { KpiMetric, EmployeeKpiData } from "@heritage-dx/store";
 
-export interface EmployeeKpiData {
-  id: string;
-  name: string;
-  tradeCount: number;
-  consultationCount: number;
-  profit: number; // 원 단위
-}
+export type { EmployeeKpiData };
 
 interface KpiEmployeeComparisonProps {
   data: EmployeeKpiData[];
@@ -29,20 +23,11 @@ interface KpiEmployeeComparisonProps {
 
 type SortField = "profit" | "tradeCount" | "consultationCount";
 
-function formatProfitShort(value: number): string {
-  const manwon = wonToManwon(value);
-  if (manwon >= 10000) {
-    const eok = (manwon / 10000).toFixed(1);
-    return `${eok}억`;
-  }
-  if (manwon >= 1000) {
-    return `${(manwon / 1000).toFixed(1)}천만`;
-  }
-  return `${manwon}만`;
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload: EmployeeKpiData }>;
 }
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function CustomTooltip({ active, payload }: any) {
+function CustomTooltip({ active, payload }: CustomTooltipProps) {
   if (!active || !payload?.length) return null;
   const d = payload[0]?.payload as EmployeeKpiData | undefined;
   if (!d) return null;

@@ -1,50 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Building2, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useAdminRepositories } from "@heritage-dx/api";
-import { Organization } from "@/types";
+import { useMyOrganization, canManageOrg } from "@heritage-dx/store";
+import type { OrganizationEntity } from "@heritage-dx/store";
 
 export default function MyOrganizationPage() {
-  const { organizations: organizationsAdmin } = useAdminRepositories();
   const { user } = useAuth();
   const router = useRouter();
-  const [organization, setOrganization] = useState<Organization | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "ORG_ADMIN";
+  const isAdmin = canManageOrg(user);
+  const { data: organization, isLoading, error: orgError } = useMyOrganization(
+    isAdmin ? user?.organizationId : undefined
+  );
+  const error = orgError?.message ?? null;
 
   useEffect(() => {
     if (user && !isAdmin) {
       router.replace("/");
-      return;
     }
   }, [user, isAdmin, router]);
-
-  useEffect(() => {
-    async function fetchOrganization() {
-      if (!isAdmin) return;
-
-      if (!user?.organizationId) {
-        setError("조직 정보가 없습니다.");
-        setIsLoading(false);
-        return;
-      }
-
-      const response = await organizationsAdmin.getOne(user.organizationId);
-      if (response.success && response.data) {
-        setOrganization(response.data);
-      } else {
-        setError(response.error || "조직 정보를 불러올 수 없습니다.");
-      }
-      setIsLoading(false);
-    }
-
-    fetchOrganization();
-  }, [user?.organizationId, isAdmin]);
 
   if (isLoading) {
     return (

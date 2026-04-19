@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminRepositories } from "@heritage-dx/api";
+import type { ClubFormValues } from "@heritage-dx/store/schemas";
 import { PageContainer, PageHeader } from "@/components/layout";
 import ClubForm from "@/components/forms/ClubForm";
 
@@ -11,8 +12,7 @@ export default function NewClubPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: ClubFormValues) => {
     setIsLoading(true);
     try {
       const response = await clubsAdmin.create(data);

@@ -18,43 +18,25 @@ export function normalizeGreenFee(
   return val;
 }
 
-/** 3가지 페이지네이션 포맷 → PaginationState 통합 */
+/** Pagination (스펙) → PaginationState */
 export function normalizePagination(
-  p:
-    | Pagination
-    | { currentPage: number; totalPages: number; totalItems: number; itemsPerPage: number }
-    | null
-    | undefined,
+  p: Pagination | null | undefined,
 ): PaginationState {
   if (!p) {
     return {
-      currentPage: 1,
+      page: 1,
+      limit: 20,
+      total: 0,
       totalPages: 1,
-      totalItems: 0,
-      itemsPerPage: 20,
       hasNext: false,
       hasPrev: false,
     };
   }
-
-  // TradeMemosResponse / TradeRecordsResponse 형식
-  if ("currentPage" in p) {
-    return {
-      currentPage: p.currentPage,
-      totalPages: p.totalPages,
-      totalItems: p.totalItems,
-      itemsPerPage: p.itemsPerPage,
-      hasNext: p.currentPage < p.totalPages,
-      hasPrev: p.currentPage > 1,
-    };
-  }
-
-  // Pagination 형식 (from @heritage-dx/types)
   return {
-    currentPage: p.page,
+    page: p.page,
+    limit: p.limit,
+    total: p.total,
     totalPages: p.totalPages,
-    totalItems: p.total,
-    itemsPerPage: p.limit,
     hasNext: p.hasNext,
     hasPrev: p.hasPrev,
   };

@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { TaxRateSettings, TaxBracket } from "@/types/tax";
-import { DEFAULT_TAX_SETTINGS } from "@/constants/taxDefaults";
+import { type TaxRateSettings, type TaxBracket, DEFAULT_TAX_SETTINGS } from "@heritage-dx/store";
 import { Button } from "@heritage-dx/ui";
 
 interface TaxSettingsModalProps {

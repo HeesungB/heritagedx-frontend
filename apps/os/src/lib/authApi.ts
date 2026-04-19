@@ -1,5 +1,5 @@
 import type { AuthApiResponse } from "@heritage-dx/types";
-import type { Organization } from "@/types/organization";
+import type { OrganizationEntity } from "@/types/organization";
 import {
   setAuthExpiredHandler,
   tryRefreshToken,
@@ -20,7 +20,7 @@ export const authApi = {
 
   getOrganization: async (
     organizationId: string,
-  ): Promise<AuthApiResponse<Organization>> => {
+  ): Promise<AuthApiResponse<OrganizationEntity>> => {
     try {
       const response = await fetch(
         `${AUTH_BASE_URL}/api/admin/organizations/${organizationId}`,

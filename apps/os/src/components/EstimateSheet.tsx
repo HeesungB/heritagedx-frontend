@@ -2,7 +2,7 @@
 
 import { forwardRef } from "react";
 import { ClubDetail } from "@/types";
-import { Organization } from "@/types/organization";
+import { OrganizationEntity } from "@/types/organization";
 import { parseTransferFee } from "@heritage-dx/utils";
 
 const inlineInputCls =
@@ -25,7 +25,7 @@ interface EstimateSheetProps {
   stampDuty: number;
   otherCosts: number;
   deposit: number;
-  organization: Organization | null;
+  organization: OrganizationEntity | null;
   userName?: string;
   managerTitle?: string;
   tradeType?: "매수" | "매도";

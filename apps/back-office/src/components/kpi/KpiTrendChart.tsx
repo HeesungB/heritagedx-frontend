@@ -12,15 +12,9 @@ import {
   Legend,
 } from "recharts";
 import { wonToManwon } from "@heritage-dx/utils";
+import type { TrendDataPoint, KpiMetric } from "@heritage-dx/store";
 
-export interface TrendDataPoint {
-  label: string;
-  tradeCount: number;
-  consultationCount: number;
-  profit: number; // 원 단위
-}
-
-export type KpiMetric = "all" | "tradeCount" | "consultationCount" | "profit";
+export type { TrendDataPoint, KpiMetric };
 
 interface KpiTrendChartProps {
   data: TrendDataPoint[];
@@ -53,13 +47,23 @@ function formatTooltipProfit(value: number): string {
   return `${manwon.toLocaleString("ko-KR")}만원`;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function CustomTooltip({ active, payload, label }: any) {
+interface TooltipPayloadItem {
+  name: string;
+  value: number;
+  color: string;
+  dataKey: string;
+}
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: TooltipPayloadItem[];
+  label?: string;
+}
+function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-md text-sm">
       <p className="font-medium text-gray-900 mb-1">{label}</p>
-      {payload.map((entry: { name: string; value: number; color: string; dataKey: string }) => (
+      {payload.map((entry) => (
         <p key={entry.dataKey} className="flex items-center gap-1.5">
           <span
             className="inline-block w-2.5 h-2.5 rounded-sm"

@@ -1,13 +1,19 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { AvailableFilters, Scenario, TransactionFormData } from "@/types";
+import { TransactionFormData } from "@/types";
+import {
+  useScenarioOptions,
+  findMatchingScenario,
+  type ScenarioEntity,
+  type ScenarioMatchFilters,
+} from "@heritage-dx/store";
 
 interface TransactionTypeFormProps {
   clubCode: string;
   clubName: string;
   initialFormData?: TransactionFormData | null;
-  onConfirm: (formData: TransactionFormData, scenario: Scenario) => void;
+  onConfirm: (formData: TransactionFormData, scenario: ScenarioEntity) => void;
   onSaveDraft: (formData: TransactionFormData) => void;
   onPreviousStep: () => void;
   onReset: () => void;
@@ -30,52 +36,19 @@ export default function TransactionTypeForm({
   onPreviousStep,
   onReset,
 }: TransactionTypeFormProps) {
-  const [filters, setFilters] = useState<AvailableFilters | null>(null);
-  const [scenarios, setScenarios] = useState<Scenario[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: scenarioOptionsData, isLoading: loading } = useScenarioOptions(clubCode);
+  const filters = scenarioOptionsData.availableFilters;
+  const scenarios = scenarioOptionsData.scenarios;
 
   const [formData, setFormData] = useState<TransactionFormData>(
     initialFormData || defaultFormData
   );
 
-  useEffect(() => {
-    async function fetchScenarioOptions() {
-      try {
-        setLoading(true);
-        const res = await fetch(`/api-proxy/api/clubs/${clubCode}/scenario-options`, { credentials: "include" });
-        const json = await res.json();
-        const data = json.data || json;
-        setFilters(data.availableFilters);
-        setScenarios(data.scenarios);
-      } catch (err) {
-        console.error("시나리오 옵션 로딩 실패:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    if (clubCode) {
-      fetchScenarioOptions();
-    }
-  }, [clubCode]);
-
   // 선택된 조건에 맞는 시나리오 필터링
-  const matchedScenario = useMemo(() => {
-    if (!formData.side || !formData.ownerType || formData.hasProxy === null) {
-      return null;
-    }
-
-    return scenarios.find((scenario) => {
-      const sideMatch = scenario.side === formData.side;
-      const ownerMatch = scenario.ownerType === formData.ownerType;
-      const proxyMatch = scenario.hasProxy === formData.hasProxy;
-      const certMatch =
-        formData.isCertificateLost === null ||
-        scenario.isCertificateLost === formData.isCertificateLost;
-
-      return sideMatch && ownerMatch && proxyMatch && certMatch;
-    });
-  }, [formData, scenarios]);
+  const matchedScenario = useMemo(
+    () => findMatchingScenario(scenarios, formData as ScenarioMatchFilters),
+    [formData, scenarios],
+  );
 
   // 매칭된 시나리오가 변경되면 formData 업데이트
   useEffect(() => {

@@ -15,19 +15,16 @@ import type { DocumentsSummaryEntity } from "../entities/scenario";
 
 export function mapDocumentDtoToEntity(dto: Document): DocumentEntity {
   return {
-    id: dto.id ?? "",
+    id: dto.id,
     clubDocumentId: dto.clubDocumentId ?? null,
-    docCode: dto.docCode ?? null,
-    name: dto.name ?? dto.cleanName ?? "",
+    name: dto.name ?? "",
     fileName: dto.fileName ?? null,
     fileDescription: dto.fileDescription ?? null,
     minCount: dto.minCount ?? 1,
     unit: dto.unit ?? "부",
-    isMandatory: dto.isMandatory ?? dto.required ?? false,
+    isMandatory: dto.isMandatory ?? false,
     notes: Array.isArray(dto.notes) ? dto.notes.join(", ") : (dto.notes ?? ""),
     displayOrder: dto.displayOrder ?? 0,
-    condition: dto.condition ?? null,
-    clubRequirement: dto.clubRequirement ?? null,
     downloadUrl: dto.downloadUrl ?? null,
     downloadUrlExpiresAt: dto.downloadUrlExpiresAt ?? null,
   };
@@ -47,7 +44,7 @@ export function mapGlobalDocumentDtoToEntity(dto: GlobalDocument): GlobalDocumen
 export function mapCustomerDocumentDtoToEntity(dto: CustomerDocument): CustomerDocumentEntity {
   return {
     id: dto.id,
-    clubId: dto.clubId ?? null,
+    clubId: dto.clubId,
     name: dto.name,
     description: dto.description ?? null,
     createdAt: dto.createdAt ?? null,

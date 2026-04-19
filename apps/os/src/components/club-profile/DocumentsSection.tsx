@@ -1,9 +1,18 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { PDFDocument } from "pdf-lib";
 import { ClubDetail, Document, GlobalDocument } from "@/types";
 import { trackEvent } from "@/lib/gtag";
+import {
+  downloadDocument,
+  mergePdfUrls,
+} from "@/utils/documentDownload";
+import {
+  isDocumentExpired,
+  isDocumentDownloadable,
+  getScenarioBasicLabel,
+  getScenarioBasicAccent,
+} from "@heritage-dx/store";
 
 interface DocumentsSectionProps {
   detail: ClubDetail;
@@ -53,12 +62,6 @@ export default function DocumentsSection({
     [selectedDocIds, onSelectedDocIdsChange]
   );
 
-  const isUrlExpired = useCallback((doc: Document | GlobalDocument): boolean => {
-    if (!doc.downloadUrlExpiresAt) return false;
-    const expiresAt = new Date(doc.downloadUrlExpiresAt).getTime();
-    return Date.now() > expiresAt;
-  }, []);
-
   const getSelectedDocuments = useCallback((): (Document | GlobalDocument)[] => {
     const allDocs: (Document | GlobalDocument)[] = [];
     detail?.scenarios?.forEach((scenario) => {
@@ -97,7 +100,7 @@ export default function DocumentsSection({
         return;
       }
 
-      if (isUrlExpired(doc)) {
+      if (isDocumentExpired(doc)) {
         alert("다운로드 링크가 만료되었습니다. 페이지를 새로고침해주세요.");
         return;
       }
@@ -105,18 +108,10 @@ export default function DocumentsSection({
       setDownloadingIds((prev) => new Set(prev).add(doc.id));
 
       try {
-        const response = await fetch(doc.downloadUrl);
-        if (!response.ok) throw new Error(`다운로드 실패: ${response.status}`);
-
-        const blob = await response.blob();
-        const blobUrl = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = blobUrl;
-        link.download = doc.fileName || doc.name || "document.pdf";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(blobUrl);
+        await downloadDocument(
+          doc.downloadUrl,
+          doc.fileName || doc.name || "document.pdf",
+        );
         trackEvent("document_download", { document_name: doc.name });
       } catch (error) {
         console.error("다운로드 에러:", error);
@@ -129,14 +124,12 @@ export default function DocumentsSection({
         });
       }
     },
-    [isUrlExpired]
+    []
   );
 
   const handlePrintAllDocuments = useCallback(
     async (docs: (Document | GlobalDocument)[]) => {
-      const docsWithUrl = docs.filter(
-        (doc) => doc.downloadUrl && !isUrlExpired(doc)
-      );
+      const docsWithUrl = docs.filter((doc) => isDocumentDownloadable(doc));
 
       if (docsWithUrl.length === 0) {
         alert("인쇄할 서류가 없습니다.");
@@ -146,65 +139,27 @@ export default function DocumentsSection({
       setPrintAllLoading(true);
 
       try {
-        const mergedPdf = await PDFDocument.create();
-
-        for (const doc of docsWithUrl) {
-          try {
-            const response = await fetch(doc.downloadUrl!);
-            if (!response.ok) continue;
-
-            const pdfBytes = await response.arrayBuffer();
-            const pdfDoc = await PDFDocument.load(pdfBytes);
-            const pages = await mergedPdf.copyPages(
-              pdfDoc,
-              pdfDoc.getPageIndices()
-            );
-            pages.forEach((page) => mergedPdf.addPage(page));
-          } catch (error) {
-            console.error(`${doc.name} PDF 로드 실패:`, error);
-          }
-        }
-
-        if (mergedPdf.getPageCount() === 0) {
-          alert("합칠 수 있는 PDF가 없습니다.");
-          return;
-        }
-
-        const mergedPdfBytes = await mergedPdf.save();
-        const blob = new Blob([new Uint8Array(mergedPdfBytes)], {
-          type: "application/pdf",
-        });
+        const urls = docsWithUrl.map((doc) => doc.downloadUrl!);
+        const blob = await mergePdfUrls(urls);
         const blobUrl = window.URL.createObjectURL(blob);
-
         const printWindow = window.open(blobUrl, "_blank");
         if (printWindow) {
           printWindow.onload = () => {
             printWindow.print();
           };
         }
-
-        setTimeout(() => {
-          window.URL.revokeObjectURL(blobUrl);
-        }, 60000);
+        setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60000);
       } catch (error) {
         console.error("PDF 합치기 실패:", error);
-        alert("PDF 합치기에 실패했습니다.");
+        alert(
+          error instanceof Error ? error.message : "PDF 합치기에 실패했습니다.",
+        );
       } finally {
         setPrintAllLoading(false);
       }
     },
-    [isUrlExpired]
+    []
   );
-
-  const getScenarioDisplayName = (code: string) => {
-    const mapping: Record<string, string> = {
-      PS_BASIC: "개인 양도",
-      PB_BASIC: "개인 양수",
-      CS_BASIC: "법인 양도",
-      CB_BASIC: "법인 양수",
-    };
-    return mapping[code] || code;
-  };
 
   const totalMembershipDocs =
     detail?.memberships?.reduce(
@@ -297,53 +252,15 @@ export default function DocumentsSection({
                   selectedScenarioCode ===
                   scenarioItem.scenario.scenarioCode;
                 const code = scenarioItem.scenario.scenarioCode || "";
-                const getColors = () => {
-                  if (code.includes("PS"))
-                    return {
-                      border: "border-orange-300",
-                      bg: "bg-orange-50",
-                      hoverBg: "hover:bg-orange-100",
-                      selected: "bg-orange-500 border-orange-500",
-                      text: "text-orange-700",
-                      selectedText: "text-white",
-                    };
-                  if (code.includes("PB"))
-                    return {
-                      border: "border-blue-300",
-                      bg: "bg-blue-50",
-                      hoverBg: "hover:bg-blue-100",
-                      selected: "bg-blue-500 border-blue-500",
-                      text: "text-blue-700",
-                      selectedText: "text-white",
-                    };
-                  if (code.includes("CS"))
-                    return {
-                      border: "border-green-300",
-                      bg: "bg-green-50",
-                      hoverBg: "hover:bg-green-100",
-                      selected: "bg-green-500 border-green-500",
-                      text: "text-green-700",
-                      selectedText: "text-white",
-                    };
-                  if (code.includes("CB"))
-                    return {
-                      border: "border-purple-300",
-                      bg: "bg-purple-50",
-                      hoverBg: "hover:bg-purple-100",
-                      selected: "bg-purple-500 border-purple-500",
-                      text: "text-purple-700",
-                      selectedText: "text-white",
-                    };
-                  return {
-                    border: "border-gray-300",
-                    bg: "bg-gray-50",
-                    hoverBg: "hover:bg-gray-100",
-                    selected: "bg-gray-500 border-gray-500",
-                    text: "text-gray-700",
-                    selectedText: "text-white",
-                  };
+                const colors = getScenarioBasicAccent(code) ?? {
+                  border: "border-gray-300",
+                  bg: "bg-gray-50",
+                  hoverBg: "hover:bg-gray-100",
+                  selected: "bg-gray-500 border-gray-500",
+                  text: "text-gray-700",
+                  selectedText: "text-white",
+                  borderTop: "",
                 };
-                const colors = getColors();
 
                 return (
                   <button
@@ -370,7 +287,7 @@ export default function DocumentsSection({
                               : colors.text
                           }`}
                         >
-                          {getScenarioDisplayName(
+                          {getScenarioBasicLabel(
                             scenarioItem.scenario.scenarioCode || ""
                           )}
                         </span>
@@ -414,7 +331,7 @@ export default function DocumentsSection({
                     <div className="flex items-center justify-between mb-4">
                       <div>
                         <h4 className="font-medium text-gray-900">
-                          {getScenarioDisplayName(selectedScenarioCode)}{" "}
+                          {getScenarioBasicLabel(selectedScenarioCode)}{" "}
                           - 기본
                         </h4>
                         <p className="text-sm text-gray-500">
@@ -456,12 +373,12 @@ export default function DocumentsSection({
                           }`}
                           onClick={() =>
                             doc.downloadUrl &&
-                            !isUrlExpired(doc) &&
+                            !isDocumentExpired(doc) &&
                             toggleDocSelection(doc.id)
                           }
                         >
                           <div className="flex items-center gap-3">
-                            {doc.downloadUrl && !isUrlExpired(doc) ? (
+                            {isDocumentDownloadable(doc) ? (
                               <div
                                 className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                                   selectedDocIds.has(doc.id)
@@ -517,12 +434,12 @@ export default function DocumentsSection({
                                 <span
                                   className={`text-xs ${
                                     doc.downloadUrl &&
-                                    !isUrlExpired(doc)
+                                    !isDocumentExpired(doc)
                                       ? "text-green-600"
                                       : "text-gray-400"
                                   }`}
                                 >
-                                  {doc.downloadUrl && !isUrlExpired(doc)
+                                  {isDocumentDownloadable(doc)
                                     ? "연결됨"
                                     : "미연결"}
                                 </span>
@@ -751,12 +668,12 @@ export default function DocumentsSection({
                   }`}
                   onClick={() =>
                     doc.downloadUrl &&
-                    !isUrlExpired(doc) &&
+                    !isDocumentExpired(doc) &&
                     toggleDocSelection(doc.id)
                   }
                 >
                   <div className="flex items-center gap-3">
-                    {doc.downloadUrl && !isUrlExpired(doc) ? (
+                    {isDocumentDownloadable(doc) ? (
                       <div
                         className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                           selectedDocIds.has(doc.id)
@@ -810,12 +727,12 @@ export default function DocumentsSection({
                         </div>
                         <span
                           className={`text-xs ${
-                            doc.downloadUrl && !isUrlExpired(doc)
+                            isDocumentDownloadable(doc)
                               ? "text-green-600"
                               : "text-gray-400"
                           }`}
                         >
-                          {doc.downloadUrl && !isUrlExpired(doc)
+                          {isDocumentDownloadable(doc)
                             ? "연결됨"
                             : "미연결"}
                         </span>

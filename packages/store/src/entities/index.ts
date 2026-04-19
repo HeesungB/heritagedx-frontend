@@ -5,13 +5,35 @@ export type {
   ClubContactEntity,
   BankAccountEntity,
 } from "./club";
-export type { TradeMemoEntity } from "./trade-memo";
-export type { TradeRecordEntity } from "./trade-record";
+export type { ConsultationEntity } from "./consultation";
+export type { MembershipTradeEntity } from "./membership-trade";
 export type { MembershipEntity } from "./membership";
-export type { ScenarioWithDocsEntity, DocumentsSummaryEntity } from "./scenario";
+export type {
+  ScenarioEntity,
+  ScenarioSide,
+  ScenarioOwnerType,
+  ScenarioWithDocsEntity,
+  DocumentsSummaryEntity,
+  ScenarioMatchFilters,
+  ScenarioBasicCode,
+  ScenarioAccentTokens,
+} from "./scenario";
+export {
+  scenarioMatchesFilters,
+  findMatchingScenario,
+  SCENARIO_BASIC_LABEL,
+  SCENARIO_BASIC_ACCENT,
+  getScenarioBasicLabel,
+  getScenarioBasicAccent,
+} from "./scenario";
 export type {
   DocumentEntity,
   GlobalDocumentEntity,
   CustomerDocumentEntity,
   MembershipDocumentEntity,
 } from "./document";
+export { isDocumentExpired, isDocumentDownloadable } from "./document";
+export type { OrganizationEntity } from "./organization";
+export type { UserRole, UserEntity, AdminUserEntity } from "./user";
+export type { EmployeeEntity } from "./employee";
+export type { ClubDocumentEntity, ClubScenarioDocumentEntity } from "./club-document";

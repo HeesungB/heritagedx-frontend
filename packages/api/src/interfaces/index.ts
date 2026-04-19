@@ -4,6 +4,11 @@ export type {
   IConsultationRepository,
   IMembershipTradeRepository,
   IClaimRepository,
+  IMarketPriceRepository,
+  INoticeRepository,
+  NoticeListParams,
+  ICustomerRepository,
+  CustomerListParams,
 } from "./general";
 
 export type {
@@ -20,6 +25,8 @@ export type {
   IOrganizationAdminRepository,
   IMembershipAdminRepository,
   IKpiAdminRepository,
+  IConsultationAdminRepository,
+  IMembershipTradeAdminRepository,
 } from "./admin";
 
 import type {
@@ -28,6 +35,9 @@ import type {
   IConsultationRepository,
   IMembershipTradeRepository,
   IClaimRepository,
+  IMarketPriceRepository,
+  INoticeRepository,
+  ICustomerRepository,
 } from "./general";
 
 import type {
@@ -44,6 +54,8 @@ import type {
   IOrganizationAdminRepository,
   IMembershipAdminRepository,
   IKpiAdminRepository,
+  IConsultationAdminRepository,
+  IMembershipTradeAdminRepository,
 } from "./admin";
 
 export interface GeneralRepositories {
@@ -52,6 +64,9 @@ export interface GeneralRepositories {
   consultations: IConsultationRepository;
   membershipTrades: IMembershipTradeRepository;
   claims: IClaimRepository;
+  marketPrices: IMarketPriceRepository;
+  notices: INoticeRepository;
+  customers: ICustomerRepository;
 }
 
 export interface AdminRepositories {
@@ -68,6 +83,8 @@ export interface AdminRepositories {
   organizations: IOrganizationAdminRepository;
   memberships: IMembershipAdminRepository;
   kpi: IKpiAdminRepository;
+  consultations: IConsultationAdminRepository;
+  membershipTrades: IMembershipTradeAdminRepository;
 }
 
 export interface ServerRepositories {

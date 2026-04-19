@@ -24,45 +24,24 @@ import {
   Drawer,
   Badge,
 } from "@heritage-dx/ui";
-import { useAdminRepositories } from "@heritage-dx/api";
+import {
+  useUsers,
+  useUserMutations,
+  ROLE_LABELS,
+  ROLE_BADGE_VARIANTS,
+  getAssignableRoles,
+  canAccessUsersPage,
+} from "@heritage-dx/store";
 import { useAuth } from "@/contexts/AuthContext";
-import { AdminUser, UserRole } from "@/types";
+import type { AdminUserEntity as AdminUser, UserRole } from "@heritage-dx/store";
 
 const DEFAULT_ORGANIZATION_ID = "00000000-0000-0000-0000-000000000001";
 
-const roleLabels: Record<UserRole, string> = {
-  SUPER_ADMIN: "최고 관리자",
-  ORG_ADMIN: "관리자",
-  EDITOR: "편집자",
-};
-
-const roleBadgeVariant: Record<
-  UserRole,
-  "default" | "success" | "info" | "warning"
-> = {
-  SUPER_ADMIN: "default",
-  ORG_ADMIN: "info",
-  EDITOR: "warning",
-};
-
-function getRoleOptions(currentUserRole: UserRole) {
-  if (currentUserRole === "SUPER_ADMIN") {
-    return [
-      { value: "EDITOR", label: "편집자" },
-      { value: "ORG_ADMIN", label: "관리자" },
-      { value: "SUPER_ADMIN", label: "최고 관리자" },
-    ];
-  }
-  // ORG_ADMIN은 EDITOR만 생성 가능
-  return [{ value: "EDITOR", label: "편집자" }];
-}
-
 export default function UsersPage() {
-  const { users: usersAdmin } = useAdminRepositories();
+  const { data: users, isLoading, refetch: loadUsers } = useUsers({ limit: 100 });
+  const { create: createUser, update: updateUser, remove: deleteUser, resetPassword: resetUserPassword } = useUserMutations();
   const { user: currentUser } = useAuth();
-  const [users, setUsers] = useState<AdminUser[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<AdminUser[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
   // Drawer 상태
@@ -91,10 +70,6 @@ export default function UsersPage() {
   const [isResettingPassword, setIsResettingPassword] = useState(false);
 
   useEffect(() => {
-    loadUsers();
-  }, []);
-
-  useEffect(() => {
     if (searchTerm) {
       setFilteredUsers(
         users.filter(
@@ -116,22 +91,6 @@ export default function UsersPage() {
     }
   }, [selectedUser]);
 
-  const loadUsers = async () => {
-    setIsLoading(true);
-    try {
-      const response = await usersAdmin.getAll({ limit: 100 });
-      if (response.success && response.data) {
-        setUsers(response.data.users || []);
-      } else {
-        setUsers([]);
-      }
-    } catch (error) {
-      console.error("Failed to load users:", error);
-      setUsers([]);
-    }
-    setIsLoading(false);
-  };
-
   const handleAddUser = async () => {
     if (!newEmail.trim()) {
       alert("이메일을 입력해주세요.");
@@ -143,26 +102,16 @@ export default function UsersPage() {
     }
     setIsSaving(true);
     try {
-      const response = await usersAdmin.create({
+      await createUser({
         email: newEmail,
         name: newName,
         role: newRole,
         organizationId: currentUser?.organizationId || DEFAULT_ORGANIZATION_ID,
       });
-      console.log("create response", {
-        email: newEmail,
-        name: newName,
-        role: newRole,
-        organizationId: currentUser?.organizationId || DEFAULT_ORGANIZATION_ID,
-      });
-      if (response.success) {
-        alert("사용자가 등록되었습니다. 임시 비밀번호가 이메일로 발송됩니다.");
-        setShowAddDrawer(false);
-        resetAddForm();
-        loadUsers();
-      } else {
-        alert(response.error || "사용자 등록에 실패했습니다.");
-      }
+      alert("사용자가 등록되었습니다. 임시 비밀번호가 이메일로 발송됩니다.");
+      setShowAddDrawer(false);
+      resetAddForm();
+      loadUsers();
     } catch {
       alert("사용자 등록 중 오류가 발생했습니다.");
     }
@@ -177,23 +126,19 @@ export default function UsersPage() {
     }
     setIsEditing(true);
     try {
-      const response = await usersAdmin.update(selectedUser.id, {
+      await updateUser(selectedUser.id, {
         name: editName,
         role: editRole,
         isActive: editIsActive,
       });
-      if (response.success) {
-        alert("사용자 정보가 수정되었습니다.");
-        loadUsers();
-        setSelectedUser({
-          ...selectedUser,
-          name: editName,
-          role: editRole,
-          isActive: editIsActive,
-        });
-      } else {
-        alert(response.error || "사용자 수정에 실패했습니다.");
-      }
+      alert("사용자 정보가 수정되었습니다.");
+      loadUsers();
+      setSelectedUser({
+        ...selectedUser,
+        name: editName,
+        role: editRole,
+        isActive: editIsActive,
+      });
     } catch {
       alert("사용자 수정 중 오류가 발생했습니다.");
     }
@@ -204,15 +149,11 @@ export default function UsersPage() {
     if (!deleteTarget?.id) return;
     setIsDeleting(true);
     try {
-      const response = await usersAdmin.delete(deleteTarget.id);
-      if (response.success) {
-        setUsers(users.filter((u) => u.id !== deleteTarget.id));
-        if (selectedUser?.id === deleteTarget.id) {
-          setSelectedUser(null);
-        }
-      } else {
-        alert(response.error || "삭제에 실패했습니다.");
+      await deleteUser(deleteTarget.id);
+      if (selectedUser?.id === deleteTarget.id) {
+        setSelectedUser(null);
       }
+      loadUsers();
     } catch {
       alert("삭제 중 오류가 발생했습니다.");
     }
@@ -224,14 +165,10 @@ export default function UsersPage() {
     if (!resetPasswordTarget?.id) return;
     setIsResettingPassword(true);
     try {
-      const response = await usersAdmin.resetPassword(resetPasswordTarget.id);
-      if (response.success) {
-        alert(
-          "비밀번호가 초기화되었습니다. 임시 비밀번호가 이메일로 발송됩니다.",
-        );
-      } else {
-        alert(response.error || "비밀번호 초기화에 실패했습니다.");
-      }
+      await resetUserPassword(resetPasswordTarget.id);
+      alert(
+        "비밀번호가 초기화되었습니다. 임시 비밀번호가 이메일로 발송됩니다.",
+      );
     } catch {
       alert("비밀번호 초기화 중 오류가 발생했습니다.");
     }
@@ -246,7 +183,7 @@ export default function UsersPage() {
   };
 
   // 권한 체크: EDITOR는 접근 불가
-  if (currentUser && currentUser.role === "EDITOR") {
+  if (currentUser && !canAccessUsersPage(currentUser)) {
     return (
       <PageContainer>
         <div className="flex items-center justify-center min-h-[400px]">
@@ -266,7 +203,7 @@ export default function UsersPage() {
     return <PageLoading />;
   }
 
-  const roleOptions = currentUser ? getRoleOptions(currentUser.role) : [];
+  const roleOptions = currentUser ? getAssignableRoles(currentUser.role) : [];
 
   return (
     <PageContainer>
@@ -351,8 +288,8 @@ export default function UsersPage() {
                         <span className="font-medium text-gray-900">
                           {u.name}
                         </span>
-                        <Badge variant={roleBadgeVariant[u.role]}>
-                          {roleLabels[u.role] || u.role}
+                        <Badge variant={ROLE_BADGE_VARIANTS[u.role]}>
+                          {ROLE_LABELS[u.role]}
                         </Badge>
                         {u.isActive === false && (
                           <Badge variant="error">비활성</Badge>

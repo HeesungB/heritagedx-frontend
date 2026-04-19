@@ -5,6 +5,9 @@ import { ScenarioRepository } from "../repositories/general/scenario.repository.
 import { ConsultationRepository } from "../repositories/general/consultation.repository.impl";
 import { MembershipTradeRepository } from "../repositories/general/membership-trade.repository.impl";
 import { ClaimRepository } from "../repositories/general/claim.repository.impl";
+import { MarketPriceRepository } from "../repositories/general/market-price.repository.impl";
+import { NoticeRepository } from "../repositories/general/notice.repository.impl";
+import { CustomerRepository } from "../repositories/general/customer.repository.impl";
 
 export function createGeneralRepositories(
   apiClient: ApiClient,
@@ -15,5 +18,8 @@ export function createGeneralRepositories(
     consultations: new ConsultationRepository(apiClient),
     membershipTrades: new MembershipTradeRepository(apiClient),
     claims: new ClaimRepository(apiClient),
+    marketPrices: new MarketPriceRepository(apiClient),
+    notices: new NoticeRepository(apiClient),
+    customers: new CustomerRepository(apiClient),
   };
 }

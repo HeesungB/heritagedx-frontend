@@ -1,6 +1,9 @@
+// 거래 KPI 응답 (OpenAPI TradeKpiDataDto)
 export interface KpiTradesResponse {
   totalCount: number;
   totalNetProfit: number;
+  userId?: string;
+  managerName?: string;
 }
 
 export interface KpiTradesParams {
@@ -12,8 +15,16 @@ export interface KpiTradesParams {
   managerName?: string;
 }
 
+// 상담 KPI 응답 (OpenAPI ConsultationKpiDataDto)
 export interface KpiConsultationsResponse {
   totalCount: number;
+  consultationCreatedCount: number;
+  approvalRequestedCount: number;
+  depositBasedFirstApprovedCount: number;
+  tradeConvertedCount: number;
+  finalCompletedCount: number;
+  destroyedCount: number;
+  userId?: string;
 }
 
 export interface KpiConsultationsParams {
@@ -23,6 +34,7 @@ export interface KpiConsultationsParams {
   userId?: string;
 }
 
+// 조직원 (OpenAPI EmployeeItemDto)
 export interface Employee {
   id: string;
   name: string;

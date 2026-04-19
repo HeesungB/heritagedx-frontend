@@ -1,4 +1,7 @@
-// 회원권별 서류
+// 회원권 유형 (OpenAPI 스펙 enum)
+export type MembershipType = "개인" | "법인";
+
+// 회원권별 서류 (MembershipDocumentResponseDto)
 export interface MembershipDocument {
   id: string;
   membershipId: string;
@@ -11,23 +14,22 @@ export interface MembershipDocument {
   updatedAt: string;
 }
 
-// 회원권 (Membership)
+// 회원권 (OpenAPI MembershipResponseDto / AdminMembershipDto)
 export interface Membership {
   id: string;
   clubId: string;
-  membershipType: string;
+  membershipType: MembershipType;
   membershipName?: string;
 
   // 비용 정보
   weekdayGreenFee?: Record<string, number>;
   weekendGreenFee?: Record<string, number>;
-  caddyFee?: number;
-  cartFee?: number;
 
   // 예약 정보
   reservationNotes?: string;
-  weekendReservationDifficulty?: number | string;
+  weekendReservationDifficulty?: number;
   memberDaySchedule?: string;
+  reservationSystem?: unknown;
 
   // 시세 정보
   recentMarketPrice?: string;
@@ -40,31 +42,13 @@ export interface Membership {
   transactionTendency?: string;
   recentTransactionType?: string;
   tradableTypeSummary?: string;
-  registrationDifficulty?: string;
-  additionalDocumentFrequency?: string;
-  balanceRisk?: string;
+  registrationDifficulty?: number;
+  additionalDocumentFrequency?: number;
+  balanceRisk?: number;
   transactionRiskMemo?: string;
-
-  // 준회원 정보
-  hasAssociateMember?: boolean;
-  associateMemberCondition?: string;
-  associateMemberWeekdayFee?: number;
-  associateMemberWeekendFee?: number;
-
-  // 가족회원 정보
-  hasFamilyMember?: boolean;
-  familyMemberCondition?: string;
-  familyMemberWeekdayFee?: number;
-  familyMemberWeekendFee?: number;
 
   // 기명인
   registeredPersonCount?: number;
-
-  // 위임 정보
-  canDelegate?: boolean;
-  delegationWeekdayRule?: string;
-  delegationWeekendRule?: string;
-  delegationRestriction?: string;
 
   // 분양/입회 정보
   initialSalePrice?: string;
@@ -72,7 +56,6 @@ export interface Membership {
   initialSaleMethod?: string;
   estimatedSalePrice?: string;
   estimatedPriceDate?: string;
-  admissionAge?: number;
 
   // 회원 혜택/특이사항
   memberBenefits?: string;
@@ -88,6 +71,6 @@ export interface Membership {
   isActive: boolean;
   displayOrder: number;
   documents?: MembershipDocument[];
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
 }

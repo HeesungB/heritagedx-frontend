@@ -1,6 +1,9 @@
 export type {
   ApiResponse,
   AuthApiResponse,
+  ServerEnvelope,
+  ServerErrorEnvelope,
+  ErrorDto,
   Pagination,
   SearchParams,
 } from "./api";
@@ -17,6 +20,7 @@ export type {
 export type {
   Membership,
   MembershipDocument,
+  MembershipType,
 } from "./membership";
 
 export type {
@@ -51,13 +55,27 @@ export type {
 } from "./scenario";
 
 export type {
-  TradeMemo,
-  TradeMemosResponse,
-  TradeMemoInput,
-  TradeRecord,
-  TradeRecordsResponse,
-  TradeRecordInput,
+  Consultation,
+  ConsultationsResponse,
+  ConsultationInput,
+  MembershipTrade,
+  MembershipTradesResponse,
+  MembershipTradeInput,
+  TradeType,
 } from "./trade";
+
+export {
+  APPROVAL_STATUS,
+  APPROVAL_ACTIONS,
+} from "./approval";
+export type {
+  ApprovalStatus,
+  WorkflowStatus,
+  ApprovalAction,
+  UserApprovalAction,
+  AdminApprovalAction,
+  ApprovalActionInput,
+} from "./approval";
 
 export type {
   User,
@@ -71,6 +89,19 @@ export type {
 export type { Organization } from "./organization";
 
 export type { Claim, ClaimInput } from "./claim";
+
+export type {
+  Customer,
+  CustomerInput,
+  CustomerUpdateInput,
+  CustomersListData,
+  CustomerHistory,
+  CustomerHistorySummary,
+  CustomerHistoryRecentConsultation,
+  CustomerHistoryRecentMembershipTrade,
+} from "./customer";
+
+export type { Notice, NoticeFile, NoticeInput, NoticesData } from "./notice";
 
 export type {
   KpiTradesResponse,

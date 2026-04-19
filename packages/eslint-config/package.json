@@ -1,0 +1,14 @@
+{
+  "name": "@heritage-dx/eslint-config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.mjs"
+  },
+  "peerDependencies": {
+    "@eslint/eslintrc": ">=3",
+    "eslint": "^9",
+    "eslint-config-next": "^15"
+  }
+}

@@ -2,11 +2,17 @@
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import { ChevronDown, X, Search } from "lucide-react";
-import type { Club } from "@heritage-dx/types";
-import { extractRegionFromAddress } from "@heritage-dx/utils";
+
+export interface ClubSearchItem {
+  code: string;
+  name: string;
+  region?: string;
+  operationTypes?: string[] | null;
+  holes?: string;
+}
 
 interface ClubSearchSelectProps {
-  clubs: Club[];
+  clubs: ClubSearchItem[];
   selectedClubCode: string;
   onChange: (code: string) => void;
   compact?: boolean;
@@ -168,9 +174,9 @@ export default function ClubSearchSelect({
                     </span>
                   ))}
                 </div>
-                {(c.region || c.address) && (
+                {c.region && (
                   <div className="text-xs text-gray-400">
-                    {c.region || (c.address ? extractRegionFromAddress(c.address) : "")}{c.holes ? ` · ${c.holes}` : ""}
+                    {c.region}{c.holes ? ` · ${c.holes}` : ""}
                   </div>
                 )}
               </button>

@@ -3,9 +3,13 @@
 import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { Upload, X, FileText } from "lucide-react";
-import { Document } from "@/types";
+interface DocumentInitialData {
+  id?: string;
+  name?: string;
+  description?: string;
+}
+import { documentSchema, type DocumentFormValues } from "@heritage-dx/store/schemas";
 import {
   Button,
   Input,
@@ -15,19 +19,12 @@ import {
   CardContent,
 } from "@heritage-dx/ui";
 
-const documentSchema = z.object({
-  name: z.string().min(1, "서류명을 입력하세요"),
-  fileDescription: z.string().optional(),
-});
-
-type DocumentFormData = z.infer<typeof documentSchema>;
-
-export interface DocumentUploadData extends DocumentFormData {
+export interface DocumentUploadData extends DocumentFormValues {
   file?: File;
 }
 
 interface DocumentFormProps {
-  initialData?: Document;
+  initialData?: DocumentInitialData;
   onSubmit: (data: DocumentUploadData) => Promise<void>;
   onCancel?: () => void;
   isLoading?: boolean;
@@ -49,11 +46,11 @@ export default function DocumentForm({
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<DocumentFormData>({
+  } = useForm<DocumentFormValues>({
     resolver: zodResolver(documentSchema),
     defaultValues: initialData
       ? {
-          name: initialData.cleanName || initialData.name || "",
+          name: initialData.name || "",
           fileDescription: initialData.description || "",
         }
       : {
@@ -96,7 +93,7 @@ export default function DocumentForm({
     }
   };
 
-  const onFormSubmit = (data: DocumentFormData) => {
+  const onFormSubmit = (data: DocumentFormValues) => {
     onSubmit({
       ...data,
       file: selectedFile || undefined,
@@ -118,10 +115,10 @@ export default function DocumentForm({
           <CardTitle>기본 정보</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {initialData && (
+          {initialData?.id && (
             <Input
-              label="서류 코드"
-              value={initialData.docCode || initialData.code || ""}
+              label="서류 ID"
+              value={initialData.id}
               disabled
             />
           )}

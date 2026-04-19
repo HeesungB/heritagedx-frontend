@@ -1,10 +1,11 @@
 export type FetchStatus = "idle" | "loading" | "refreshing" | "success" | "error";
 
+// 스펙 PaginationMetaDto 와 동일 키셋
 export interface PaginationState {
-  currentPage: number;
+  page: number;
+  limit: number;
+  total: number;
   totalPages: number;
-  totalItems: number;
-  itemsPerPage: number;
   hasNext: boolean;
   hasPrev: boolean;
 }

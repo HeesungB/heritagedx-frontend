@@ -1,5 +1,3 @@
-import { toCanvas } from "html-to-image";
-
 // JPEG 출력 상수 (논리 크기 × 2배 해상도)
 const JPEG_PAGE_WIDTH = 1050;
 const JPEG_PAGE_HEIGHT = 1480;
@@ -32,6 +30,8 @@ export async function captureSheetAsJpeg(
   const renderHeight = element.scrollHeight;
 
   // 3. 확장 상태 유지한 채 toCanvas 호출 → 자식까지 올바른 폭으로 클론
+  //    html-to-image 는 초기 번들 미포함 — 인쇄/캡처 호출 시점에만 로드 (1-2)
+  const { toCanvas } = await import("html-to-image");
   let canvas: HTMLCanvasElement;
   try {
     canvas = await toCanvas(element, {

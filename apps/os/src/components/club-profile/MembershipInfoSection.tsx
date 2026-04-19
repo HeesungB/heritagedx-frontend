@@ -1,8 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { Club, Membership } from "@/types";
-import PriceChart from "./PriceChart";
+
+// recharts 는 무거우므로 초기 번들 분리 — 클라이언트에서만 로드 (1-2)
+const PriceChart = dynamic(() => import("./PriceChart"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-64 bg-gray-100 rounded animate-pulse" aria-label="차트 로딩 중" />
+  ),
+});
 
 interface MembershipInfoSectionProps {
   memberships: Membership[];

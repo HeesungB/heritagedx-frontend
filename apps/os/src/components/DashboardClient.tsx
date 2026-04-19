@@ -1,31 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Header from "@/components/Header";
 import { Button, Loading, Modal } from "@heritage-dx/ui";
-import { Notice, NoticeForm, NoticesResponse } from "@/types";
-import { tryRefreshToken, redirectToLogin } from "@/lib/authApi";
+import { Notice, NoticeForm } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
-
-const API_BASE_READ = "/api-proxy/api/notices";
-const API_BASE_ADMIN = "/api-proxy/api/admin/notices";
-
-async function fetchWithAuth(
-  url: string,
-  options: RequestInit = {},
-  isRetry = false,
-): Promise<Response> {
-  const res = await fetch(url, { ...options, credentials: "include" });
-  if (res.status === 401 && !isRetry) {
-    const refreshed = await tryRefreshToken();
-    if (refreshed) {
-      return fetchWithAuth(url, options, true);
-    }
-    redirectToLogin();
-  }
-  return res;
-}
+import { useNotices, useNoticeMutations, canManageOrg } from "@heritage-dx/store";
 
 const emptyForm: NoticeForm = {
   title: "",
@@ -34,17 +15,13 @@ const emptyForm: NoticeForm = {
 
 export default function DashboardClient() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "ORG_ADMIN";
+  const isAdmin = canManageOrg(user);
 
-  const [notices, setNotices] = useState<Notice[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<NoticeForm>(emptyForm);
-  const [submitting, setSubmitting] = useState(false);
   const [editingNotice, setEditingNotice] = useState<Notice | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null);
@@ -60,75 +37,31 @@ export default function DashboardClient() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  const fetchNotices = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: "20",
-        order: sortOrder,
-      });
-      if (searchQuery.trim()) {
-        params.set("search", searchQuery.trim());
-      }
+  const { data: notices, pagination, isLoading: loading, refetch: fetchNotices } = useNotices({
+    page,
+    limit: 20,
+    order: sortOrder,
+    ...(searchQuery.trim() ? { search: searchQuery.trim() } : {}),
+  });
+  const totalPages = pagination?.totalPages ?? 1;
 
-      const res = await fetchWithAuth(`${API_BASE_READ}?${params}`);
-      const data: NoticesResponse = await res.json();
-      if (data.success) {
-        setNotices(data.data?.notices || []);
-        if (data.data?.pagination) {
-          setTotalPages(data.data.pagination.totalPages);
-        }
-      }
-    } catch (err) {
-      console.error("공지사항 로딩 실패:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, searchQuery, sortOrder]);
-
-  useEffect(() => {
-    fetchNotices();
-  }, [fetchNotices]);
+  const { create: createNotice, update: updateNotice, remove: removeNotice, isSubmitting: submitting } = useNoticeMutations();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
     setErrorMessage(null);
     try {
-      let res: Response;
       if (editingNotice) {
-        res = await fetchWithAuth(`${API_BASE_ADMIN}/${editingNotice.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
-        });
+        await updateNotice(editingNotice.id, form);
       } else {
-        res = await fetchWithAuth(API_BASE_ADMIN, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
-        });
+        await createNotice(form);
       }
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => null);
-        const msg = errData?.message
-          ? Array.isArray(errData.message) ? errData.message.join(", ") : errData.message
-          : `오류 발생 (${res.status})`;
-        setErrorMessage(msg);
-        return;
-      }
-
       setEditingNotice(null);
       setForm(emptyForm);
       setShowForm(false);
       await fetchNotices();
     } catch (err) {
-      console.error("공지사항 저장 실패:", err);
-      setErrorMessage("네트워크 오류가 발생했습니다.");
-    } finally {
-      setSubmitting(false);
+      setErrorMessage(err instanceof Error ? err.message : "오류가 발생했습니다.");
     }
   };
 
@@ -145,17 +78,11 @@ export default function DashboardClient() {
   const handleDelete = async (id: string) => {
     setErrorMessage(null);
     try {
-      const res = await fetchWithAuth(`${API_BASE_ADMIN}/${id}`, { method: "DELETE" });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => null);
-        setErrorMessage(errData?.message || `삭제 실패 (${res.status})`);
-        return;
-      }
+      await removeNotice(id);
       setDeleteConfirmId(null);
       await fetchNotices();
     } catch (err) {
-      console.error("공지사항 삭제 실패:", err);
-      setErrorMessage("네트워크 오류가 발생했습니다.");
+      setErrorMessage(err instanceof Error ? err.message : "삭제에 실패했습니다.");
     }
   };
 

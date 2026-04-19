@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { TaxRateSettings, TaxBracket } from "@/types/tax";
-import { DEFAULT_TAX_SETTINGS } from "@/constants/taxDefaults";
+import { type TaxRateSettings, type TaxBracket, DEFAULT_TAX_SETTINGS } from "@heritage-dx/store";
 
 const STORAGE_KEY = "membership-calculator-tax-settings";
 

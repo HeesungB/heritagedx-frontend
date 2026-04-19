@@ -1,13 +1,18 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import {
   Document,
   DocumentsScenario,
   DocumentsClub,
   DocumentsSummary,
 } from "@/types";
-import { useScenarioRepository } from "@heritage-dx/api";
+import { useScenarioDocuments, isDocumentExpired, isDocumentDownloadable } from "@heritage-dx/store";
+import {
+  downloadDocument,
+  downloadDocuments,
+  printDocumentInIframe,
+} from "@/utils/documentDownload";
 
 // 다운로드 아이콘 컴포넌트
 function DownloadIcon() {
@@ -68,45 +73,14 @@ export default function RequiredDocuments({
   onPreviousStep,
   onReset,
 }: RequiredDocumentsProps) {
-  const scenarioRepo = useScenarioRepository();
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [scenario, setScenario] = useState<DocumentsScenario | null>(null);
-  const [club, setClub] = useState<DocumentsClub | null>(null);
-  const [summary, setSummary] = useState<DocumentsSummary | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: docsData, isLoading: loading } = useScenarioDocuments(scenarioCode, clubCode, ownerType);
+  const documents = docsData.documents as unknown as Document[];
+  const scenario = docsData.scenario as DocumentsScenario | null;
+  const club = docsData.club as DocumentsClub | null;
+  const summary = docsData.summary as unknown as DocumentsSummary | null;
   const [sortBy, setSortBy] = useState<string>("mandatory");
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
   const [downloadAllLoading, setDownloadAllLoading] = useState(false);
-
-  useEffect(() => {
-    async function fetchDocuments() {
-      try {
-        setLoading(true);
-        const response = await scenarioRepo.getDocuments(scenarioCode, clubCode, ownerType);
-        if (response.data) {
-          setDocuments(response.data.documents as unknown as Document[]);
-          setScenario(response.data.scenario as unknown as DocumentsScenario);
-          setClub(response.data.club as unknown as DocumentsClub);
-          setSummary(response.data.summary as unknown as DocumentsSummary);
-        }
-      } catch (err) {
-        console.error("서류 목록 로딩 실패:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    if (clubCode && scenarioCode && ownerType) {
-      fetchDocuments();
-    }
-  }, [clubCode, scenarioCode, ownerType]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // URL 만료 여부 체크
-  const isUrlExpired = useCallback((doc: Document): boolean => {
-    if (!doc.downloadUrlExpiresAt) return false;
-    const expiresAt = new Date(doc.downloadUrlExpiresAt).getTime();
-    return Date.now() > expiresAt;
-  }, []);
 
   // 파일 다운로드 핸들러 - blob 방식으로 실제 다운로드
   const handleDownload = useCallback(
@@ -117,7 +91,7 @@ export default function RequiredDocuments({
       }
 
       // URL 만료 체크
-      if (isUrlExpired(doc)) {
+      if (isDocumentExpired(doc)) {
         alert("다운로드 링크가 만료되었습니다. 페이지를 새로고침해주세요.");
         return;
       }
@@ -125,29 +99,12 @@ export default function RequiredDocuments({
       setDownloadingIds((prev) => new Set(prev).add(doc.id));
 
       try {
-        // fetch로 파일 데이터를 blob으로 받기
-        const response = await fetch(doc.downloadUrl);
-
-        if (!response.ok) {
-          throw new Error(`다운로드 실패: ${response.status}`);
-        }
-
-        const blob = await response.blob();
-
-        // blob URL 생성하여 다운로드
-        const blobUrl = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = blobUrl;
-        link.download = doc.fileName || doc.name || "document.pdf";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        // blob URL 해제
-        window.URL.revokeObjectURL(blobUrl);
+        await downloadDocument(
+          doc.downloadUrl,
+          doc.fileName || doc.name || "document.pdf",
+        );
       } catch (error) {
         console.error("다운로드 에러:", error);
-        // fetch 실패 시 새 탭에서 열기로 폴백
         window.open(doc.downloadUrl, "_blank");
       } finally {
         setDownloadingIds((prev) => {
@@ -157,7 +114,7 @@ export default function RequiredDocuments({
         });
       }
     },
-    [isUrlExpired]
+    []
   );
 
   // 파일 프린트 핸들러 - iframe 사용
@@ -169,51 +126,21 @@ export default function RequiredDocuments({
       }
 
       // URL 만료 체크
-      if (isUrlExpired(doc)) {
+      if (isDocumentExpired(doc)) {
         alert("프린트 링크가 만료되었습니다. 페이지를 새로고침해주세요.");
         return;
       }
 
-      // iframe을 생성하여 PDF 로드 후 프린트
-      const iframe = document.createElement("iframe");
-      iframe.style.position = "fixed";
-      iframe.style.right = "0";
-      iframe.style.bottom = "0";
-      iframe.style.width = "0";
-      iframe.style.height = "0";
-      iframe.style.border = "none";
-      iframe.src = doc.downloadUrl;
-
-      iframe.onload = () => {
-        try {
-          iframe.contentWindow?.focus();
-          iframe.contentWindow?.print();
-        } catch {
-          // cross-origin 에러 시 새 탭에서 열기
-          window.open(doc.downloadUrl ?? undefined, "_blank");
-        }
-        // 프린트 다이얼로그 닫힌 후 iframe 제거
-        setTimeout(() => {
-          document.body.removeChild(iframe);
-        }, 1000);
-      };
-
-      iframe.onerror = () => {
-        // 로드 실패 시 새 탭에서 열기
-        window.open(doc.downloadUrl ?? undefined, "_blank");
-        document.body.removeChild(iframe);
-      };
-
-      document.body.appendChild(iframe);
+      printDocumentInIframe(doc.downloadUrl, () =>
+        window.open(doc.downloadUrl ?? undefined, "_blank"),
+      );
     },
-    [isUrlExpired]
+    []
   );
 
   // 전체 다운로드 핸들러 - blob 방식으로 순차 다운로드
   const handleDownloadAll = useCallback(async () => {
-    const downloadableDocs = documents.filter(
-      (doc) => doc.downloadUrl && !isUrlExpired(doc)
-    );
+    const downloadableDocs = documents.filter((doc) => isDocumentDownloadable(doc));
     if (downloadableDocs.length === 0) {
       alert("다운로드할 문서가 없습니다.");
       return;
@@ -221,31 +148,15 @@ export default function RequiredDocuments({
 
     setDownloadAllLoading(true);
 
-    // 순차적으로 다운로드 (팝업 차단 방지)
-    for (const doc of downloadableDocs) {
-      try {
-        const response = await fetch(doc.downloadUrl!);
-        if (!response.ok) continue;
-
-        const blob = await response.blob();
-        const blobUrl = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = blobUrl;
-        link.download = doc.fileName || doc.name || "document.pdf";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(blobUrl);
-
-        // 브라우저가 다운로드를 처리할 시간 확보
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      } catch (error) {
-        console.error(`${doc.name} 다운로드 실패:`, error);
-      }
-    }
+    await downloadDocuments(
+      downloadableDocs.map((doc) => ({
+        downloadUrl: doc.downloadUrl!,
+        filename: doc.fileName || doc.name || "document.pdf",
+      })),
+    );
 
     setDownloadAllLoading(false);
-  }, [documents, isUrlExpired]);
+  }, [documents]);
 
   // 정렬된 서류 목록
   const sortedDocuments = [...documents].sort((a, b) => {
@@ -360,11 +271,8 @@ export default function RequiredDocuments({
           <thead>
             <tr className="bg-gray-100 border-b border-gray-300">
               <th className="w-10 px-2 py-3"></th>
-              <th className="text-left px-4 py-3 font-semibold">코드</th>
               <th className="text-left px-4 py-3 font-semibold">서류명</th>
               <th className="text-center px-4 py-3 font-semibold">필수여부</th>
-              <th className="text-left px-4 py-3 font-semibold">조건</th>
-              <th className="text-left px-4 py-3 font-semibold">클럽별 요건</th>
               <th className="text-center px-4 py-3 font-semibold">
                 다운로드/프린트
               </th>
@@ -379,7 +287,6 @@ export default function RequiredDocuments({
                 <td className="px-2 py-4 text-center text-gray-400">
                   <span className="cursor-pointer">›</span>
                 </td>
-                <td className="px-4 py-4 font-mono text-sm">{doc.docCode}</td>
                 <td className="px-4 py-4">
                   {doc.name} {doc.minCount}
                   {doc.unit}
@@ -395,20 +302,10 @@ export default function RequiredDocuments({
                     {doc.isMandatory ? "필수" : "조건부"}
                   </span>
                 </td>
-                <td className="px-4 py-4 text-sm text-gray-600">
-                  {doc.condition || "모든 건"}
-                </td>
-                <td className="px-4 py-4">
-                  {doc.clubRequirement && (
-                    <span className="px-3 py-1 border border-gray-300 text-sm">
-                      {doc.clubRequirement}
-                    </span>
-                  )}
-                </td>
                 <td className="px-4 py-4">
                   <div className="flex items-center justify-center gap-2">
                     {doc.downloadUrl ? (
-                      isUrlExpired(doc) ? (
+                      isDocumentExpired(doc) ? (
                         <span className="text-red-500 text-xs">만료됨</span>
                       ) : (
                         <>

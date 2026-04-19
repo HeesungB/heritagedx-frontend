@@ -2,14 +2,10 @@
 
 import { useMarketPriceSummary } from "@/hooks/useMarketPriceSummary";
 import type { MembershipListing } from "@/types";
+import { toManwon } from "@heritage-dx/utils";
 
 interface MarketPriceSummaryProps {
   clubId?: string;
-}
-
-function toManwon(price: number | null): string {
-  if (price == null || price <= 0) return "—";
-  return Math.round(price / 10000).toLocaleString();
 }
 
 function formatTimestamp(ts: string | null): string | null {

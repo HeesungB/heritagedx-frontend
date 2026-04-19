@@ -2,8 +2,15 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Scenario } from "@/types";
+import type { ScenarioEntity } from "@heritage-dx/store";
+import {
+  createScenarioSchema,
+  updateScenarioSchema,
+  normalizeSide,
+  normalizeOwnerType,
+  type CreateScenarioFormValues,
+  type ScenarioFormValues,
+} from "@heritage-dx/store/schemas";
 import {
   Button,
   Input,
@@ -14,57 +21,9 @@ import {
   CardContent,
 } from "@heritage-dx/ui";
 
-// API 값을 폼 값으로 정규화 (API → Form)
-const normalizeSide = (side: string | undefined): "Seller" | "Buyer" => {
-  if (!side) return "Seller";
-  const upper = side.toUpperCase();
-  return upper === "SELLER" ? "Seller" : "Buyer";
-};
-
-const normalizeOwnerType = (
-  ownerType: string | undefined
-): "Personal" | "Corporate" => {
-  if (!ownerType) return "Personal";
-  const upper = ownerType.toUpperCase();
-  if (upper === "CORPORATE") return "Corporate";
-  if (upper === "PERSONAL" || upper === "INDIVIDUAL") return "Personal";
-  return "Personal";
-};
-
-const createScenarioSchema = z.object({
-  scenarioCode: z.string().min(1, "시나리오 코드를 입력하세요"),
-  name: z.string().min(1, "시나리오명을 입력하세요"),
-  description: z.string().optional(),
-  side: z.enum(["Seller", "Buyer"]),
-  ownerType: z.enum(["Personal", "Corporate"]),
-  hasProxy: z.boolean(),
-  isCertificateLost: z.boolean(),
-  isFamily: z.boolean(),
-  requiresTaxInvoice: z.boolean(),
-  displayOrder: z.coerce.number().optional(),
-  isActive: z.boolean(),
-});
-
-const updateScenarioSchema = z.object({
-  name: z.string().min(1, "시나리오명을 입력하세요"),
-  description: z.string().optional(),
-  side: z.enum(["Seller", "Buyer"]),
-  ownerType: z.enum(["Personal", "Corporate"]),
-  hasProxy: z.boolean(),
-  isCertificateLost: z.boolean(),
-  isFamily: z.boolean(),
-  requiresTaxInvoice: z.boolean(),
-  displayOrder: z.coerce.number().optional(),
-  isActive: z.boolean(),
-});
-
-type CreateScenarioFormData = z.infer<typeof createScenarioSchema>;
-type UpdateScenarioFormData = z.infer<typeof updateScenarioSchema>;
-type ScenarioFormData = CreateScenarioFormData | UpdateScenarioFormData;
-
 interface ScenarioFormProps {
-  initialData?: Scenario;
-  onSubmit: (data: ScenarioFormData) => Promise<void>;
+  initialData?: ScenarioEntity;
+  onSubmit: (data: ScenarioFormValues) => Promise<void>;
   isLoading?: boolean;
   isSimple?: boolean;
 }
@@ -83,7 +42,7 @@ export default function ScenarioForm({
     watch,
     setValue,
     formState: { errors },
-  } = useForm<CreateScenarioFormData>({
+  } = useForm<CreateScenarioFormValues>({
     resolver: zodResolver(
       isEditMode ? updateScenarioSchema : createScenarioSchema
     ),
@@ -122,13 +81,14 @@ export default function ScenarioForm({
   const isActive = watch("isActive");
 
   // 폼 데이터를 API 형식으로 제출
-  const handleFormSubmit = (data: CreateScenarioFormData) => {
+  const handleFormSubmit = (data: CreateScenarioFormValues) => {
     const apiData = {
       ...data,
       displayOrder: data.displayOrder || 0,
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return onSubmit(apiData as any);
+    // CreateScenarioFormValues 는 ScenarioFormValues 의 super-set (create 전용 필드 포함).
+    // onSubmit 은 공통 ScenarioFormValues 계약으로 수용.
+    return onSubmit(apiData as unknown as ScenarioFormValues);
   };
 
   // 간단한 등록 폼

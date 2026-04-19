@@ -55,11 +55,19 @@ interface PaginationParams {
   search?: string;
 }
 
+export interface ApiClientOptions {
+  timeoutMs?: number;
+}
+
+const DEFAULT_TIMEOUT_MS = 10_000;
+
 export class ApiClient {
   private baseUrl: string;
+  private timeoutMs: number;
 
-  constructor(baseUrl: string) {
+  constructor(baseUrl: string, options?: ApiClientOptions) {
     this.baseUrl = baseUrl;
+    this.timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
 
   private async request<T>(
@@ -72,11 +80,15 @@ export class ApiClient {
       ...options.headers,
     };
 
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+
     try {
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         ...options,
         headers,
         credentials: "include",
+        signal: controller.signal,
       });
 
       // 401 처리: refresh 시도 → 재요청 → 실패 시 로그인 이동
@@ -118,6 +130,12 @@ export class ApiClient {
         data: json,
       };
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return {
+          success: false,
+          error: "요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.",
+        };
+      }
       return {
         success: false,
         error:
@@ -125,6 +143,8 @@ export class ApiClient {
             ? error.message
             : "네트워크 오류가 발생했습니다.",
       };
+    } finally {
+      clearTimeout(timer);
     }
   }
 
@@ -176,11 +196,15 @@ export class ApiClient {
     formData: FormData,
     isRetry = false,
   ): Promise<ApiResponse<T>> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+
     try {
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         method: "POST",
         body: formData,
         credentials: "include",
+        signal: controller.signal,
       });
 
       // 401 처리
@@ -214,6 +238,12 @@ export class ApiClient {
         data: json,
       };
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return {
+          success: false,
+          error: "요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.",
+        };
+      }
       return {
         success: false,
         error:
@@ -221,6 +251,8 @@ export class ApiClient {
             ? error.message
             : "네트워크 오류가 발생했습니다.",
       };
+    } finally {
+      clearTimeout(timer);
     }
   }
 }

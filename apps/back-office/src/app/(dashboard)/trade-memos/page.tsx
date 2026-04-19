@@ -9,6 +9,10 @@ import {
   Loader2,
   MessageSquare,
   Edit3,
+  CheckCircle2,
+  PauseCircle,
+  XCircle,
+  ExternalLink,
 } from "lucide-react";
 import {
   PageLoading,
@@ -24,9 +28,14 @@ import {
   Badge,
   ClubSearchSelect,
 } from "@heritage-dx/ui";
-import { useConsultationRepository, useClubRepository } from "@heritage-dx/api";
-import { TradeMemo, Club } from "@/types";
+import { useConsultationAdminRepository, useClubRepository } from "@heritage-dx/api";
+import type { Consultation, Club, Pagination } from "@heritage-dx/types";
+import type { ApprovalStatus } from "@heritage-dx/store";
+import { canDeleteConsultation } from "@heritage-dx/store";
+import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
+import { StatusBadge } from "@/components/approval/StatusBadge";
+import { ActionReasonModal, type ReasonAction } from "@/components/approval/ActionReasonModal";
 
 const formatPrice = (price: string | number | null) => {
   if (!price) return "-";
@@ -43,21 +52,27 @@ const formatPrice = (price: string | number | null) => {
   return `${num.toLocaleString()}원`;
 };
 
-export default function TradeMemosPage() {
-  const consultationsRepo = useConsultationRepository();
+export default function ConsultationsPage() {
+  const consultationsRepo = useConsultationAdminRepository();
   const clubsRepo = useClubRepository();
+  const { user } = useAuth();
   const { preloadedMemos, clearPreloadedMemos, clubs } = useData();
   const searchParams = useSearchParams();
   const memoIdParam = searchParams.get("memoId");
   const usedPreloadRef = useRef(false);
   const autoOpenedRef = useRef(false);
 
-  const [rawMemos, setRawMemos] = useState<TradeMemo[]>([]);
+  const [rawMemos, setRawMemos] = useState<Consultation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"" | "매수" | "매도">("");
   const [filterDone, setFilterDone] = useState<"" | "done" | "notDone">("notDone");
+  const [filterApproval, setFilterApproval] = useState<"" | ApprovalStatus>("");
+  const [showConverted, setShowConverted] = useState(false);
+  const [approvalBusyId, setApprovalBusyId] = useState<string | null>(null);
+  const [reasonModal, setReasonModal] = useState<{ action: ReasonAction; memoId: string } | null>(null);
+  const [reasonSubmitting, setReasonSubmitting] = useState(false);
 
   // 골프장/회원권/기간 필터
   const [selectedClubCode, setSelectedClubCode] = useState("");
@@ -67,22 +82,17 @@ export default function TradeMemosPage() {
   const [dateTo, setDateTo] = useState("");
   const clubsRef = useRef<Club[]>(clubs);
   const [page, setPage] = useState(1);
-  const [pagination, setPagination] = useState<{
-    currentPage: number;
-    totalPages: number;
-    totalItems: number;
-    itemsPerPage: number;
-  } | null>(null);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
 
   const [showAddDrawer, setShowAddDrawer] = useState(false);
-  const [editingMemo, setEditingMemo] = useState<TradeMemo | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<TradeMemo | null>(null);
+  const [editingMemo, setEditingMemo] = useState<Consultation | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Consultation | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // 반대매매 사이드바 상태
-  const [selectedMemo, setSelectedMemo] = useState<TradeMemo | null>(null);
-  const [relatedMemos, setRelatedMemos] = useState<TradeMemo[]>([]);
+  const [selectedMemo, setSelectedMemo] = useState<Consultation | null>(null);
+  const [relatedMemos, setRelatedMemos] = useState<Consultation[]>([]);
   const [isLoadingRelated, setIsLoadingRelated] = useState(false);
   const [relatedSort, setRelatedSort] = useState<"date" | "price">("date");
   const [relatedFilterDone, setRelatedFilterDone] = useState<"" | "done" | "notDone">("notDone");
@@ -161,13 +171,14 @@ export default function TradeMemosPage() {
     membershipId: "",
     membershipName: "",
     membershipType: "",
-    tradeType: "매수" as string,
+    tradeType: "매수" as "매도" | "매수",
     customerName: "",
     contact: "",
     offerPrice: "",
     offerPriceNote: "",
     desiredPrice: "",
     desiredPriceNote: "",
+    depositAmount: "",
     notes: "",
     registrationDate: new Date().toISOString().split("T")[0],
     tradeDate: "",
@@ -191,6 +202,7 @@ export default function TradeMemosPage() {
       offerPriceNote: "",
       desiredPrice: "",
       desiredPriceNote: "",
+      depositAmount: "",
       notes: "",
       registrationDate: new Date().toISOString().split("T")[0],
       tradeDate: "",
@@ -267,6 +279,8 @@ export default function TradeMemosPage() {
         sort: "registrationDate",
         order: "DESC",
         isDone: filterDone === "done" ? true : filterDone === "notDone" ? false : undefined,
+        approvalStatus: filterApproval || undefined,
+        isConverted: showConverted ? undefined : false,
       });
       if (response.success && response.data) {
         setRawMemos(response.data.trades || []);
@@ -279,7 +293,7 @@ export default function TradeMemosPage() {
       setRawMemos([]);
     }
     setIsLoading(false);
-  }, [page, searchQuery, filterType, filterDone, preloadedMemos, clearPreloadedMemos]);
+  }, [page, searchQuery, filterType, filterDone, filterApproval, showConverted, preloadedMemos, clearPreloadedMemos]);
 
   useEffect(() => {
     loadMemos();
@@ -302,6 +316,7 @@ export default function TradeMemosPage() {
         offerPriceNote: form.offerPriceNote || null,
         desiredPrice: form.desiredPrice ? Number(form.desiredPrice) : null,
         desiredPriceNote: form.desiredPriceNote || null,
+        depositAmount: form.depositAmount ? Number(form.depositAmount) : null,
         notes: form.notes || null,
         registrationDate: form.registrationDate || null,
         tradeDate: form.tradeDate || null,
@@ -340,6 +355,7 @@ export default function TradeMemosPage() {
         offerPriceNote: form.offerPriceNote || null,
         desiredPrice: form.desiredPrice ? Number(form.desiredPrice) : null,
         desiredPriceNote: form.desiredPriceNote || null,
+        depositAmount: form.depositAmount ? Number(form.depositAmount) : null,
         notes: form.notes || null,
         registrationDate: form.registrationDate || null,
         tradeDate: form.tradeDate || null,
@@ -377,7 +393,7 @@ export default function TradeMemosPage() {
     setDeleteTarget(null);
   };
 
-  const handleEdit = (trade: TradeMemo) => {
+  const handleEdit = (trade: Consultation) => {
     setEditingMemo(trade);
     setForm({
       clubId: trade.clubId || "",
@@ -385,13 +401,14 @@ export default function TradeMemosPage() {
       membershipId: trade.membershipId || "",
       membershipName: trade.membershipName || "",
       membershipType: trade.membershipName || "",
-      tradeType: trade.tradeType || "매수",
+      tradeType: (trade.tradeType as "매도" | "매수") || "매수",
       customerName: trade.customerName || "",
       contact: trade.contact || "",
       offerPrice: trade.offerPrice ? String(trade.offerPrice) : "",
       offerPriceNote: trade.offerPriceNote || "",
       desiredPrice: trade.desiredPrice ? String(trade.desiredPrice) : "",
       desiredPriceNote: trade.desiredPriceNote || "",
+      depositAmount: trade.depositAmount ? String(trade.depositAmount) : "",
       notes: trade.notes || "",
       registrationDate: trade.registrationDate || new Date().toISOString().split("T")[0],
       tradeDate: trade.tradeDate || "",
@@ -410,7 +427,7 @@ export default function TradeMemosPage() {
     setManualMembershipInput(false);
   };
 
-  const handleToggleDone = async (memo: TradeMemo) => {
+  const handleToggleDone = async (memo: Consultation) => {
     const newIsDone = !memo.isDone;
     // 낙관적 업데이트
     setRawMemos(prev => prev.map(m => m.id === memo.id ? { ...m, isDone: newIsDone } : m));
@@ -427,6 +444,7 @@ export default function TradeMemosPage() {
         offerPriceNote: memo.offerPriceNote || null,
         desiredPrice: memo.desiredPrice ? Number(memo.desiredPrice) : null,
         desiredPriceNote: memo.desiredPriceNote || null,
+        depositAmount: memo.depositAmount ?? null,
         notes: memo.notes || null,
         registrationDate: memo.registrationDate || null,
         tradeDate: memo.tradeDate || null,
@@ -441,7 +459,31 @@ export default function TradeMemosPage() {
     }
   };
 
-  const handleRowClick = async (memo: TradeMemo) => {
+  const runApprovalAction = async (
+    memo: Consultation,
+    action: "APPROVE_FIRST" | "HOLD" | "REJECT" | "REQUEST_APPROVAL",
+    reason?: string,
+  ) => {
+    setApprovalBusyId(memo.id);
+    try {
+      const response = await consultationsRepo.approvalAction(memo.id, { action, reason });
+      if (response.success && response.data) {
+        const updated = response.data;
+        setRawMemos((prev) => prev.map((m) => (m.id === memo.id ? updated : m)));
+        setSelectedMemo((prev) => (prev && prev.id === memo.id ? updated : prev));
+        return true;
+      }
+      alert(response.error || "처리에 실패했습니다.");
+      return false;
+    } catch {
+      alert("처리 중 오류가 발생했습니다.");
+      return false;
+    } finally {
+      setApprovalBusyId(null);
+    }
+  };
+
+  const handleRowClick = async (memo: Consultation) => {
     setSelectedMemo(memo);
     setRelatedMemos([]);
     setIsLoadingRelated(true);
@@ -459,7 +501,7 @@ export default function TradeMemosPage() {
 
       const filtered =
         response.data?.trades?.filter(
-          (t: TradeMemo) => t.clubName === memo.clubName
+          (t: Consultation) => t.clubName === memo.clubName
         ) || [];
 
       setRelatedMemos(filtered);
@@ -512,7 +554,7 @@ export default function TradeMemosPage() {
           <MessageSquare className="w-6 h-6 text-primary" />
           <h1 className="text-xl font-bold text-gray-900">상담일지</h1>
           {pagination && (
-            <Badge variant="default">총 {pagination.totalItems}건</Badge>
+            <Badge variant="default">총 {pagination.total}건</Badge>
           )}
         </div>
         <p className="text-sm text-gray-500">모든 상담일지를 관리합니다.</p>
@@ -565,6 +607,27 @@ export default function TradeMemosPage() {
               <option value="notDone">진행중</option>
               <option value="done">완료</option>
             </select>
+            <select
+              value={filterApproval}
+              onChange={(e) => { setFilterApproval(e.target.value as "" | ApprovalStatus); setPage(1); }}
+              className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 bg-white w-[140px] h-[34px]"
+            >
+              <option value="">승인 상태 전체</option>
+              <option value="DRAFT">작성중</option>
+              <option value="PENDING_APPROVAL">승인대기</option>
+              <option value="ON_HOLD">보류</option>
+              <option value="REJECTED">반려</option>
+              {showConverted && <option value="FIRST_APPROVED">승인</option>}
+            </select>
+            <label className="flex items-center gap-1.5 text-xs text-gray-600 select-none cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showConverted}
+                onChange={(e) => { setShowConverted(e.target.checked); setPage(1); }}
+                className="w-3.5 h-3.5 rounded border-gray-300"
+              />
+              거래 전환 완료 포함
+            </label>
             <ClubSearchSelect
               clubs={availableClubs}
               selectedClubCode={selectedClubCode}
@@ -627,6 +690,7 @@ export default function TradeMemosPage() {
               <table className="min-w-[400px] w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs text-gray-500">
+                    <th className="py-2 pr-3 font-medium">승인</th>
                     <th className="py-2 pr-3 font-medium">유형</th>
                     <th className="py-2 pr-3 font-medium">골프장</th>
                     <th className="hidden md:table-cell py-2 pr-3 font-medium">회원권</th>
@@ -643,6 +707,65 @@ export default function TradeMemosPage() {
                 <tbody>
                   {displayMemos.map((trade) => (
                     <tr key={trade.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors group cursor-pointer ${trade.isDone ? "opacity-50" : ""}`} onClick={() => handleRowClick(trade)}>
+                      <td className="py-2.5 pr-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1.5">
+                          <StatusBadge status={trade.approvalStatus} />
+                          {trade.approvalStatus === "PENDING_APPROVAL" && (
+                            <>
+                              {(() => {
+                                const hasDeposit = !!trade.depositAmount && trade.depositAmount > 0;
+                                return (
+                                  <button
+                                    type="button"
+                                    disabled={approvalBusyId === trade.id || !hasDeposit}
+                                    onClick={() => runApprovalAction(trade, "APPROVE_FIRST")}
+                                    className="p-1 rounded hover:bg-emerald-50 text-emerald-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                                    title={hasDeposit ? "승인" : "계약금 입력 후 승인 가능"}
+                                  >
+                                    <CheckCircle2 className="w-4 h-4" />
+                                  </button>
+                                );
+                              })()}
+                              <button
+                                type="button"
+                                disabled={approvalBusyId === trade.id}
+                                onClick={() => setReasonModal({ action: "HOLD", memoId: trade.id })}
+                                className="p-1 rounded hover:bg-orange-50 text-orange-600 disabled:opacity-50"
+                                title="보류"
+                              >
+                                <PauseCircle className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={approvalBusyId === trade.id}
+                                onClick={() => setReasonModal({ action: "REJECT", memoId: trade.id })}
+                                className="p-1 rounded hover:bg-rose-50 text-rose-600 disabled:opacity-50"
+                                title="반려"
+                              >
+                                <XCircle className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                          {(trade.approvalStatus === "ON_HOLD" || trade.approvalStatus === "REJECTED") && (
+                            <span
+                              className="text-[11px] text-gray-400"
+                              title="딜러의 다시 열기 요청 대기"
+                            >
+                              딜러 요청 대기
+                            </span>
+                          )}
+                          {trade.approvalStatus === "FIRST_APPROVED" && trade.linkedTradeId && (
+                            <a
+                              href={`/trade-records?highlight=${trade.linkedTradeId}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="p-1 rounded hover:bg-emerald-50 text-emerald-700"
+                              title="거래 초안 보기"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          )}
+                        </div>
+                      </td>
                       <td className="py-2.5 pr-3 whitespace-nowrap">
                         <Badge variant={trade.tradeType === "매수" ? "info" : "error"}>{trade.tradeType}</Badge>
                       </td>
@@ -660,9 +783,11 @@ export default function TradeMemosPage() {
                           <button onClick={(e) => { e.stopPropagation(); handleEdit(trade); }} className="p-1 hover:bg-gray-200 rounded" title="수정">
                             <Edit3 className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
                           </button>
-                          <button onClick={(e) => { e.stopPropagation(); setDeleteTarget(trade); }} className="p-1 hover:bg-gray-200 rounded" title="삭제">
-                            <Trash2 className="w-3.5 h-3.5 text-gray-400 hover:text-error" />
-                          </button>
+                          {canDeleteConsultation(user, trade) && (
+                            <button onClick={(e) => { e.stopPropagation(); setDeleteTarget(trade); }} className="p-1 hover:bg-gray-200 rounded" title="삭제">
+                              <Trash2 className="w-3.5 h-3.5 text-gray-400 hover:text-error" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -673,7 +798,7 @@ export default function TradeMemosPage() {
               {pagination && pagination.totalPages > 1 && (
                 <div className="flex items-center justify-center gap-2 mt-6 pt-4 border-t">
                   <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>이전</Button>
-                  <span className="text-sm text-gray-600">{pagination.currentPage} / {pagination.totalPages}</span>
+                  <span className="text-sm text-gray-600">{pagination.page} / {pagination.totalPages}</span>
                   <Button variant="outline" size="sm" disabled={page >= pagination.totalPages} onClick={() => setPage((p) => p + 1)}>다음</Button>
                 </div>
               )}
@@ -748,7 +873,7 @@ export default function TradeMemosPage() {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">거래유형 <span className="text-red-500">*</span></label>
             <div className="flex gap-2">
-              {["매수", "매도"].map((type) => (
+              {(["매수", "매도"] as const).map((type) => (
                 <button key={type} type="button" onClick={() => setForm((f) => ({ ...f, tradeType: type }))}
                   className={`flex-1 py-2 text-sm rounded-lg border transition-colors ${
                     form.tradeType === type
@@ -837,6 +962,19 @@ export default function TradeMemosPage() {
               <Input value={form.desiredPriceNote} onChange={(e) => setForm((f) => ({ ...f, desiredPriceNote: e.target.value }))} placeholder="비고" className="w-24" />
             </div>
             {form.desiredPrice && <p className="mt-1 text-xs text-gray-500">{formatPrice(form.desiredPrice)}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              계약금 (원)
+              <span className="ml-1 text-xs text-gray-400">— 입금 확인 후 승인 가능</span>
+            </label>
+            <Input
+              type="number"
+              value={form.depositAmount}
+              onChange={(e) => setForm((f) => ({ ...f, depositAmount: e.target.value }))}
+              placeholder="10000000"
+            />
+            {form.depositAmount && <p className="mt-1 text-xs text-gray-500">{formatPrice(form.depositAmount)}</p>}
           </div>
           <div>
             <Textarea
@@ -1088,6 +1226,23 @@ export default function TradeMemosPage() {
         confirmText="삭제"
         variant="danger"
         isLoading={isDeleting}
+      />
+
+      <ActionReasonModal
+        open={!!reasonModal}
+        action={reasonModal?.action ?? null}
+        submitting={reasonSubmitting}
+        onCancel={() => setReasonModal(null)}
+        onConfirm={async (reason) => {
+          if (!reasonModal) return;
+          setReasonSubmitting(true);
+          const target = rawMemos.find((m) => m.id === reasonModal.memoId);
+          if (target) {
+            const ok = await runApprovalAction(target, reasonModal.action, reason);
+            if (ok) setReasonModal(null);
+          }
+          setReasonSubmitting(false);
+        }}
       />
     </div>
   );

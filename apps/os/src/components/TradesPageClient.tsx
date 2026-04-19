@@ -1,14 +1,19 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import Header from "@/components/Header";
 import { MembershipTrade, MembershipTradeForm, Club } from "@/types";
-import { useClubRepository, useConsultationRepository } from "@heritage-dx/api";
 import { ClubSearchSelect, Button, Loading } from "@heritage-dx/ui";
-import { mapTradMemoDtoToEntity } from "@heritage-dx/store";
+import { useAppStores } from "@/stores";
+import { useClubs, useClubDetail, useConsultations, canDeleteConsultation } from "@heritage-dx/store";
+import { useSendTradeNotification } from "@/hooks/useSendTradeNotification";
 import { trackEvent } from "@/lib/gtag";
+import { StatusBadge } from "@/components/approval/StatusBadge";
+import type { ApprovalStatus } from "@heritage-dx/store";
+import { useAuth } from "@/contexts/AuthContext";
 
 type TradeFilter = "전체" | "매수" | "매도";
+type ApprovalFilter = "" | ApprovalStatus;
 
 const emptyForm: MembershipTradeForm = {
   clubId: "",
@@ -21,6 +26,7 @@ const emptyForm: MembershipTradeForm = {
   offerPriceNote: "",
   desiredPrice: 0,
   desiredPriceNote: "",
+  depositAmount: 0,
   notes: "",
   registrationDate: new Date().toISOString().split("T")[0],
   tradeDate: "",
@@ -29,10 +35,11 @@ const emptyForm: MembershipTradeForm = {
 };
 
 export default function TradesPageClient() {
-  const clubsRepo = useClubRepository();
-  const consultationsRepo = useConsultationRepository();
-  const [rawTrades, setRawTrades] = useState<MembershipTrade[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { club: clubStore, tradeMemo: tradeMemoStore } = useAppStores();
+  const { user } = useAuth();
+  const { clubs, isLoading: clubsLoading } = useClubs(clubStore);
+  const { items: rawTrades, fetch: fetchFromStore, create, update, remove, toggleDone, requestApproval, reopen, isLoading: loading } = useConsultations(tradeMemoStore);
+  const { send: sendNotification } = useSendTradeNotification();
   const [filter, setFilter] = useState<TradeFilter>("전체");
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -46,14 +53,15 @@ export default function TradesPageClient() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [sortField, setSortField] = useState<"registrationDate" | "tradeDate">("registrationDate");
   const [sortOrder, setSortOrder] = useState<"DESC" | "ASC">("DESC");
-  const [clubs, setClubs] = useState<Club[]>([]);
   const [selectedClubCode, setSelectedClubCode] = useState<string>("");
   const [memberships, setMemberships] = useState<string[]>([]);
   const [selectedMembership, setSelectedMembership] = useState<string>("");
   const [filterDone, setFilterDone] = useState<"전체" | "완료" | "진행중">("진행중");
+  const [filterApproval, setFilterApproval] = useState<ApprovalFilter>("");
+  const [showConverted, setShowConverted] = useState(false);
+  const [approvalPendingId, setApprovalPendingId] = useState<string | null>(null);
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
-  const clubsRef = useRef<Club[]>([]);
   const [formClubCode, setFormClubCode] = useState<string>("");
   const [formMemberships, setFormMemberships] = useState<string[]>([]);
   const [manualClubInput, setManualClubInput] = useState(false);
@@ -61,73 +69,36 @@ export default function TradesPageClient() {
   const formRef = useRef(form);
   formRef.current = form;
 
-  // 골프장 목록 fetch (전체 페이지 순회)
-  useEffect(() => {
-    (async () => {
-      try {
-        const allClubs: Club[] = [];
-        let p = 1;
-        while (true) {
-          const response = await clubsRepo.getAll({ page: p, limit: 100 });
-          if (response.data) {
-            allClubs.push(...(response.data.clubs as unknown as Club[]));
-            if (!response.data.pagination.hasNext) break;
-          } else {
-            break;
-          }
-          p++;
-        }
-        clubsRef.current = allClubs;
-        setClubs(allClubs);
-      } catch (err) {
-        console.error("골프장 목록 로딩 실패:", err);
-      }
-    })();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // 골프장 상세 (필터 및 폼용 회원권 목록)
+  const { detail: selectedClubDetail } = useClubDetail(clubStore, selectedClubCode || null);
+  const { detail: formClubDetail } = useClubDetail(
+    clubStore,
+    formClubCode && formClubCode !== "__manual__" ? formClubCode : null
+  );
 
-  // 필터용 회원권 목록 fetch (골프장 필터 선택 시)
+  // 필터용 회원권 목록 (골프장 필터 선택 시)
   useEffect(() => {
-    if (!selectedClubCode) {
-      setMemberships([]);
-      return;
-    }
-    clubsRepo.getOne(selectedClubCode)
-      .then((response) => {
-        if (response.data?.memberships) {
-          const names = response.data.memberships.map(
-            (m) => m.membershipName || m.membershipType
-          );
-          setMemberships(names);
-        }
-      })
-      .catch(console.error);
-  }, [selectedClubCode]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!selectedClubCode || !selectedClubDetail) { setMemberships([]); return; }
+    const names = selectedClubDetail.memberships.map((m) => m.membershipName || m.membershipType);
+    setMemberships(names);
+  }, [selectedClubCode, selectedClubDetail]);
 
-  // 폼용 회원권 목록 fetch (폼에서 골프장 선택 시)
+  // 폼용 회원권 목록 (폼에서 골프장 선택 시)
   useEffect(() => {
-    if (!formClubCode || formClubCode === "__manual__") {
+    if (!formClubCode || formClubCode === "__manual__" || !formClubDetail) {
       setFormMemberships([]);
       return;
     }
-    clubsRepo.getOne(formClubCode)
-      .then((response) => {
-        if (response.data) {
-          setForm((f) => ({ ...f, clubId: response.data!.id || "", clubName: response.data!.name }));
-          const names = response.data.memberships?.map(
-            (m) => m.membershipName || m.membershipType
-          ) || [];
-          setFormMemberships(names);
-          // 수정 모드에서 기존 회원권이 목록에 없으면 직접입력 모드 유지
-          const currentType = formRef.current.membershipType;
-          if (currentType && !names.includes(currentType)) {
-            setManualMembershipInput(true);
-          } else {
-            setManualMembershipInput(false);
-          }
-        }
-      })
-      .catch(console.error);
-  }, [formClubCode]); // eslint-disable-line react-hooks/exhaustive-deps
+    setForm((f) => ({ ...f, clubId: formClubDetail.id || "", clubName: formClubDetail.name }));
+    const names = formClubDetail.memberships?.map((m) => m.membershipName || m.membershipType) || [];
+    setFormMemberships(names);
+    const currentType = formRef.current.membershipType;
+    if (currentType && !names.includes(currentType)) {
+      setManualMembershipInput(true);
+    } else {
+      setManualMembershipInput(false);
+    }
+  }, [formClubCode, formClubDetail]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 검색 디바운스 (300ms)
   useEffect(() => {
@@ -138,39 +109,24 @@ export default function TradesPageClient() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  const fetchTrades = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await consultationsRepo.getAll({
-        page,
-        limit: 20,
-        sort: sortField,
-        order: sortOrder,
-        tradeType: filter !== "전체" ? filter : undefined,
-        search: searchQuery.trim() || undefined,
-        isDone: filterDone === "완료" ? true : filterDone === "진행중" ? false : undefined,
-      });
-      if (response.data) {
-        setRawTrades((response.data.trades || []).map(mapTradMemoDtoToEntity));
-        if (response.data.pagination) {
-          setTotalPages(response.data.pagination.totalPages);
-        }
-      }
-    } catch (err) {
-      console.error("메모 로딩 실패:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, filter, searchQuery, sortField, sortOrder, filterDone]); // eslint-disable-line react-hooks/exhaustive-deps
-
   useEffect(() => {
-    fetchTrades();
-  }, [fetchTrades]);
+    fetchFromStore({
+      page,
+      limit: 20,
+      sort: sortField,
+      order: sortOrder,
+      tradeType: filter !== "전체" ? filter : undefined,
+      search: searchQuery.trim() || undefined,
+      isDone: filterDone === "완료" ? true : filterDone === "진행중" ? false : undefined,
+      approvalStatus: filterApproval || undefined,
+      isConverted: showConverted ? undefined : false,
+    });
+  }, [page, filter, searchQuery, sortField, sortOrder, filterDone, filterApproval, showConverted]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 클라이언트 필터링: 골프장/회원권/기간 선택 시 네트워크 요청 없이 즉시 필터
   const trades = useMemo(() => {
-    let filtered = rawTrades;
-    const selectedClubName = clubsRef.current.find((c) => c.code === selectedClubCode)?.name;
+    let filtered = rawTrades as MembershipTrade[];
+    const selectedClubName = clubs.find((c) => c.code === selectedClubCode)?.name;
     if (selectedClubName) {
       filtered = filtered.filter((t) => t.clubName === selectedClubName);
     }
@@ -184,12 +140,12 @@ export default function TradesPageClient() {
       filtered = filtered.filter((t) => (t.registrationDate || "") <= dateTo);
     }
     return filtered;
-  }, [rawTrades, selectedClubCode, selectedMembership, dateFrom, dateTo]);
+  }, [rawTrades, clubs, selectedClubCode, selectedMembership, dateFrom, dateTo]);
 
   // 거래 데이터에 있는 골프장만 필터 드롭다운에 표시
   const availableClubs = useMemo(() => {
-    const tradeClubNames = new Set(rawTrades.map((t) => t.clubName).filter(Boolean));
-    if (tradeClubNames.size === 0) return clubs;
+    const tradeClubNames = new Set(rawTrades.map((t) => (t as MembershipTrade).clubName).filter(Boolean));
+    if (tradeClubNames.size === 0) return clubs as unknown as Club[];
     return clubs.filter((c) => tradeClubNames.has(c.name));
   }, [rawTrades, clubs]);
 
@@ -208,6 +164,7 @@ export default function TradesPageClient() {
         offerPriceNote: form.offerPriceNote || null,
         desiredPrice: form.desiredPrice || null,
         desiredPriceNote: form.desiredPriceNote || null,
+        depositAmount: form.depositAmount || null,
         notes: form.notes || null,
         registrationDate: form.registrationDate || null,
         tradeDate: form.tradeDate || null,
@@ -215,33 +172,30 @@ export default function TradesPageClient() {
         isDone: form.isDone,
       };
 
-      let result;
+      const wasEditing = !!editingTrade;
+      let entity;
       if (editingTrade) {
-        result = await consultationsRepo.update(editingTrade.id, input);
+        entity = await update(editingTrade.id, input);
       } else {
-        result = await consultationsRepo.create(input);
+        entity = await create(input);
       }
 
-      if (!result.success) {
-        setErrorMessage(result.error || "오류가 발생했습니다.");
+      if (!entity) {
+        setErrorMessage("오류가 발생했습니다.");
         return;
       }
 
       // 신규 등록일 때만 Back Office에 푸시 알림 전송 (fire-and-forget)
-      if (!editingTrade && result.data) {
-        fetch("/api/notifications/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            tradeId: result.data.id,
-            clubName: form.clubName,
-            tradeType: form.tradeType,
-            customerName: form.customerName,
-            membershipType: form.membershipType,
-            offerPrice: form.offerPrice || null,
-            desiredPrice: form.desiredPrice || null,
-          }),
-        }).catch(() => {});
+      if (!wasEditing) {
+        sendNotification({
+          tradeId: entity.id,
+          clubName: form.clubName,
+          tradeType: form.tradeType,
+          customerName: form.customerName,
+          membershipType: form.membershipType,
+          offerPrice: form.offerPrice || null,
+          desiredPrice: form.desiredPrice || null,
+        });
       }
 
       setEditingTrade(null);
@@ -251,8 +205,7 @@ export default function TradesPageClient() {
       setFormMemberships([]);
       setManualClubInput(false);
       setManualMembershipInput(false);
-      await fetchTrades();
-      if (!editingTrade) {
+      if (!wasEditing) {
         trackEvent("trade_memo_create", { club_name: form.clubName, trade_type: form.tradeType });
       }
     } catch (err) {
@@ -277,6 +230,7 @@ export default function TradesPageClient() {
       offerPriceNote: trade.offerPriceNote || "",
       desiredPrice: trade.desiredPrice ? Number(trade.desiredPrice) : 0,
       desiredPriceNote: trade.desiredPriceNote || "",
+      depositAmount: trade.depositAmount ?? 0,
       notes: trade.notes || "",
       registrationDate: trade.registrationDate || new Date().toISOString().split("T")[0],
       tradeDate: trade.tradeDate || "",
@@ -298,13 +252,12 @@ export default function TradesPageClient() {
   const handleDelete = async (id: string) => {
     setErrorMessage(null);
     try {
-      const result = await consultationsRepo.delete(id);
-      if (!result.success) {
-        setErrorMessage(result.error || "삭제 실패");
+      const ok = await remove(id);
+      if (!ok) {
+        setErrorMessage("삭제 실패");
         return;
       }
       setDeleteConfirmId(null);
-      await fetchTrades();
     } catch (err) {
       console.error("메모 삭제 실패:", err);
       setErrorMessage("네트워크 오류가 발생했습니다.");
@@ -313,17 +266,7 @@ export default function TradesPageClient() {
 
   const handleToggleDone = async (trade: MembershipTrade) => {
     try {
-      const result = await consultationsRepo.update(trade.id, {
-        club: trade.clubName,
-        membership: trade.membershipType,
-        tradeType: trade.tradeType,
-        customerName: trade.customerName,
-        contact: trade.contact,
-        isDone: !trade.isDone,
-      });
-      if (result.success) {
-        await fetchTrades();
-      }
+      await toggleDone(trade.id, !trade.isDone);
     } catch (err) {
       console.error("상태 변경 실패:", err);
     }
@@ -420,6 +363,37 @@ export default function TradesPageClient() {
                 <option value="완료">완료</option>
                 <option value="진행중">진행중</option>
               </select>
+
+              {/* 승인 상태 필터 */}
+              <select
+                value={filterApproval}
+                onChange={(e) => { setFilterApproval(e.target.value as ApprovalFilter); setPage(1); }}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
+              >
+                <option value="">승인 상태 전체</option>
+                <option value="DRAFT">작성중</option>
+                <option value="PENDING_APPROVAL">승인대기</option>
+                <option value="ON_HOLD">보류</option>
+                <option value="REJECTED">반려</option>
+                {showConverted && <option value="FIRST_APPROVED">승인</option>}
+              </select>
+
+              {/* 승인내역 포함 토글 */}
+              <label className="flex items-center gap-1.5 text-xs text-gray-600 select-none cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showConverted}
+                  onChange={(e) => {
+                    setShowConverted(e.target.checked);
+                    if (!e.target.checked && filterApproval === "FIRST_APPROVED") {
+                      setFilterApproval("");
+                    }
+                    setPage(1);
+                  }}
+                  className="w-3.5 h-3.5 rounded border-gray-300"
+                />
+                승인내역 포함
+              </label>
 
               {/* 골프장 필터 */}
               <ClubSearchSelect
@@ -520,7 +494,7 @@ export default function TradesPageClient() {
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">거래유형 <span className="text-red-500">*</span></label>
                     <div className="flex gap-2">
-                      {["매수", "매도"].map((type) => (
+                      {(["매수", "매도"] as const).map((type) => (
                         <button
                           key={type}
                           type="button"
@@ -719,6 +693,18 @@ export default function TradesPageClient() {
                   </div>
                 </div>
 
+                {/* 계약금 */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">계약금 (원)</label>
+                  <input
+                    type="number"
+                    value={form.depositAmount}
+                    onChange={(e) => setForm((f) => ({ ...f, depositAmount: e.target.value === "" ? 0 : Number(e.target.value) }))}
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
+                    placeholder="10000000"
+                  />
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* 메모 */}
                   <div>
@@ -806,6 +792,7 @@ export default function TradesPageClient() {
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
                       <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">상태</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">승인</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">유형</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">골프장</th>
                       <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">회원권</th>
@@ -830,6 +817,55 @@ export default function TradesPageClient() {
                             className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 cursor-pointer"
                             title={trade.isDone ? "완료 → 진행중" : "진행중 → 완료"}
                           />
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <StatusBadge status={trade.approvalStatus} />
+                            {(trade.approvalStatus === "DRAFT" || trade.approvalStatus === "ON_HOLD") && (
+                              <button
+                                type="button"
+                                disabled={approvalPendingId === trade.id}
+                                onClick={async () => {
+                                  setApprovalPendingId(trade.id);
+                                  try {
+                                    const updated = await requestApproval(trade.id);
+                                    if (!updated) setErrorMessage("승인 요청 실패");
+                                  } finally {
+                                    setApprovalPendingId(null);
+                                  }
+                                }}
+                                className="text-xs px-2 py-0.5 rounded border border-amber-300 text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                              >
+                                승인 요청
+                              </button>
+                            )}
+                            {trade.approvalStatus === "REJECTED" && (
+                              <button
+                                type="button"
+                                disabled={approvalPendingId === trade.id}
+                                onClick={async () => {
+                                  setApprovalPendingId(trade.id);
+                                  try {
+                                    const updated = await reopen(trade.id);
+                                    if (!updated) setErrorMessage("다시 열기 요청 실패");
+                                  } finally {
+                                    setApprovalPendingId(null);
+                                  }
+                                }}
+                                className="text-xs px-2 py-0.5 rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                              >
+                                다시 열기
+                              </button>
+                            )}
+                            {trade.approvalStatus === "FIRST_APPROVED" && trade.linkedTradeId && (
+                              <a
+                                href={`/membership-trades?highlight=${trade.linkedTradeId}`}
+                                className="text-xs px-2 py-0.5 rounded border border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                              >
+                                거래 보기
+                              </a>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <span
@@ -876,7 +912,7 @@ export default function TradesPageClient() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                               </svg>
                             </button>
-                            {deleteConfirmId === trade.id ? (
+                            {canDeleteConsultation(user, trade) && (deleteConfirmId === trade.id ? (
                               <div className="flex items-center gap-1">
                                 <button
                                   onClick={() => handleDelete(trade.id)}
@@ -901,7 +937,7 @@ export default function TradesPageClient() {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
                               </button>
-                            )}
+                            ))}
                           </div>
                         </td>
                       </tr>

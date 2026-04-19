@@ -1,10 +1,10 @@
-import type { Organization } from "@heritage-dx/types";
+import type { OrganizationEntity } from "@heritage-dx/store";
 
-export type { Organization } from "@heritage-dx/types";
+export type { OrganizationEntity } from "@heritage-dx/store";
 
 // OS-specific API response wrapper
 export interface OrganizationResponse {
   success: boolean;
-  data: Organization;
+  data: OrganizationEntity;
   timestamp: string;
 }

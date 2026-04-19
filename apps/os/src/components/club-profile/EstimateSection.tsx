@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/hooks/useOrganization";
 import EstimateSheet from "../EstimateSheet";
 import { trackEvent } from "@/lib/gtag";
+import { parseTransferFeeToWon } from "@heritage-dx/utils";
 
 interface EstimateSectionProps {
   detail: ClubDetail;
@@ -165,25 +166,3 @@ export default function EstimateSection({
   );
 }
 
-// 명의개서료 문자열 -> 원 단위 변환
-function parseTransferFeeToWon(feeStr: string | null | undefined): number {
-  if (!feeStr) return 990000;
-
-  if (feeStr.includes("만원")) {
-    const match = feeStr.match(/([0-9,]+)/);
-    if (match) {
-      const num = parseInt(match[1].replace(/,/g, ""), 10);
-      return isNaN(num) ? 990000 : num * 10000;
-    }
-  }
-
-  const match = feeStr.match(/([0-9,]+)/);
-  if (match) {
-    const won = parseInt(match[1].replace(/,/g, ""), 10);
-    if (!isNaN(won)) {
-      return won >= 10000 ? won : won * 10000;
-    }
-  }
-
-  return 990000;
-}

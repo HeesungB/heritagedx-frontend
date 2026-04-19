@@ -12,29 +12,19 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import {
   useClubRepository,
-  useConsultationRepository,
-  useMembershipTradeRepository,
+  useConsultationAdminRepository,
+  useMembershipTradeAdminRepository,
 } from "@heritage-dx/api";
-import { Club, TradeMemo, TradeRecord } from "@/types";
+import type { Club, Consultation, MembershipTrade, Pagination } from "@heritage-dx/types";
 
 interface PreloadedMemos {
-  trades: TradeMemo[];
-  pagination: {
-    currentPage: number;
-    totalPages: number;
-    totalItems: number;
-    itemsPerPage: number;
-  };
+  trades: Consultation[];
+  pagination: Pagination;
 }
 
 interface PreloadedRecords {
-  trades: TradeRecord[];
-  pagination: {
-    currentPage: number;
-    totalPages: number;
-    totalItems: number;
-    itemsPerPage: number;
-  };
+  trades: MembershipTrade[];
+  pagination: Pagination;
 }
 
 interface DataContextType {
@@ -54,8 +44,8 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 export function DataProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const clubsRepo = useClubRepository();
-  const consultationsRepo = useConsultationRepository();
-  const membershipTradesRepo = useMembershipTradeRepository();
+  const consultationsRepo = useConsultationAdminRepository();
+  const membershipTradesRepo = useMembershipTradeAdminRepository();
 
   const [clubs, setClubs] = useState<Club[]>([]);
   const [isLoadingClubs, setIsLoadingClubs] = useState(true);
@@ -71,20 +61,36 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const loadAllClubs = useCallback(async () => {
     setIsLoadingClubs(true);
     try {
-      let allClubs: Club[] = [];
-      let page = 1;
-      let hasNext = true;
+      const LIMIT = 100;
 
-      while (hasNext) {
-        const response = await clubsRepo.getAll({ page, limit: 100 });
-        if (response.success && response.data) {
-          allClubs = [...allClubs, ...(response.data.clubs || [])];
-          hasNext = response.data.pagination?.hasNext ?? false;
-          page++;
-        } else {
-          break;
-        }
+      // 1. 첫 페이지 — totalPages 로 남은 페이지 수 계산 (1-6)
+      const first = await clubsRepo.getAll({ page: 1, limit: LIMIT });
+      if (!first.success || !first.data) {
+        setClubs([]);
+        return;
       }
+
+      const firstClubs = first.data.clubs || [];
+      const totalPages = first.data.pagination?.totalPages ?? 1;
+
+      if (totalPages <= 1) {
+        setClubs(firstClubs);
+        return;
+      }
+
+      // 2. 나머지 페이지를 병렬 fetch — 순차 waterfall 제거
+      const remaining = await Promise.all(
+        Array.from({ length: totalPages - 1 }, (_, i) =>
+          clubsRepo.getAll({ page: i + 2, limit: LIMIT }),
+        ),
+      );
+
+      const allClubs: Club[] = [
+        ...firstClubs,
+        ...remaining.flatMap((res) =>
+          res.success && res.data ? res.data.clubs || [] : [],
+        ),
+      ];
 
       setClubs(allClubs);
     } catch (error) {
@@ -138,10 +144,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setPreloadedMemos({
           trades: memosRes.value.data.trades || [],
           pagination: memosRes.value.data.pagination || {
-            currentPage: 1,
+            page: 1,
+            limit: 20,
+            total: 0,
             totalPages: 1,
-            totalItems: 0,
-            itemsPerPage: 20,
+            hasNext: false,
+            hasPrev: false,
           },
         });
       }
@@ -154,10 +162,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setPreloadedRecords({
           trades: recordsRes.value.data.trades || [],
           pagination: recordsRes.value.data.pagination || {
-            currentPage: 1,
+            page: 1,
+            limit: 20,
+            total: 0,
             totalPages: 1,
-            totalItems: 0,
-            itemsPerPage: 20,
+            hasNext: false,
+            hasPrev: false,
           },
         });
       }

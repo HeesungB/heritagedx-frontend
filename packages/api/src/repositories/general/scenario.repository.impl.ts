@@ -4,6 +4,7 @@ import type {
   Scenario,
   ScenarioConditions,
   ScenarioDocumentsResponse,
+  ScenarioOptions,
 } from "@heritage-dx/types";
 import type { IScenarioRepository } from "../../interfaces/general/scenario.repository";
 
@@ -12,6 +13,10 @@ export class ScenarioRepository implements IScenarioRepository {
 
   async getByClub(clubCode: string): Promise<ApiResponse<Scenario[]>> {
     return this.api.get<Scenario[]>(`/clubs/${clubCode}`);
+  }
+
+  async getOptions(clubCode: string): Promise<ApiResponse<ScenarioOptions>> {
+    return this.api.get<ScenarioOptions>(`/clubs/${clubCode}/scenario-options`);
   }
 
   async match(

@@ -9,6 +9,7 @@ import { useClubs, useClubDetail, useConsultations, canDeleteConsultation } from
 import { useSendTradeNotification } from "@/hooks/useSendTradeNotification";
 import { useCustomerEnsureFlow } from "@/hooks/useCustomerEnsureFlow";
 import CustomerAutocomplete from "@/components/CustomerAutocomplete";
+import DepositAmountModal from "@/components/DepositAmountModal";
 import { trackEvent } from "@/lib/gtag";
 import { StatusBadge } from "@/components/approval/StatusBadge";
 import type { ApprovalStatus } from "@heritage-dx/store";
@@ -20,6 +21,7 @@ type ApprovalFilter = "" | ApprovalStatus;
 const emptyForm: MembershipTradeForm = {
   clubId: "",
   clubName: "",
+  membershipId: null,
   membershipType: "",
   tradeType: "매수",
   customerId: null,
@@ -63,6 +65,8 @@ export default function TradesPageClient() {
   const [filterApproval, setFilterApproval] = useState<ApprovalFilter>("");
   const [showConverted, setShowConverted] = useState(false);
   const [approvalPendingId, setApprovalPendingId] = useState<string | null>(null);
+  const [depositPromptTrade, setDepositPromptTrade] = useState<MembershipTrade | null>(null);
+  const [depositSubmitting, setDepositSubmitting] = useState(false);
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [formClubCode, setFormClubCode] = useState<string>("");
@@ -93,10 +97,18 @@ export default function TradesPageClient() {
       setFormMemberships([]);
       return;
     }
-    setForm((f) => ({ ...f, clubId: formClubDetail.id || "", clubName: formClubDetail.name }));
     const names = formClubDetail.memberships?.map((m) => m.membershipName || m.membershipType) || [];
     setFormMemberships(names);
     const currentType = formRef.current.membershipType;
+    const matched = formClubDetail.memberships?.find(
+      (m) => (m.membershipName || m.membershipType) === currentType,
+    );
+    setForm((f) => ({
+      ...f,
+      clubId: formClubDetail.id || "",
+      clubName: formClubDetail.name,
+      membershipId: matched?.id ?? null,
+    }));
     if (currentType && !names.includes(currentType)) {
       setManualMembershipInput(true);
     } else {
@@ -155,8 +167,8 @@ export default function TradesPageClient() {
 
   const persistConsultation = async () => {
     const input = {
-      club: form.clubName,
-      membership: form.membershipType,
+      club: form.clubId || form.clubName,
+      membership: form.membershipId || form.membershipType,
       tradeType: form.tradeType,
       customerName: form.customerName,
       contact: form.contact,
@@ -257,6 +269,7 @@ export default function TradesPageClient() {
     setForm({
       clubId: trade.clubId || "",
       clubName: trade.clubName || "",
+      membershipId: null,
       membershipType: trade.membershipType || "",
       tradeType: trade.tradeType || "매수",
       customerId: trade.customerId ?? null,
@@ -557,7 +570,7 @@ export default function TradesPageClient() {
                         <input
                           type="text"
                           value={form.clubName}
-                          onChange={(e) => setForm((f) => ({ ...f, clubName: e.target.value, clubId: "" }))}
+                          onChange={(e) => setForm((f) => ({ ...f, clubName: e.target.value, clubId: "", membershipId: null }))}
                           className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
                           placeholder="골프장명 직접 입력"
                           required
@@ -567,7 +580,7 @@ export default function TradesPageClient() {
                           onClick={() => {
                             setManualClubInput(false);
                             setFormClubCode("");
-                            setForm((f) => ({ ...f, clubName: "", clubId: "", membershipType: "" }));
+                            setForm((f) => ({ ...f, clubName: "", clubId: "", membershipId: null, membershipType: "" }));
                             setFormMemberships([]);
                             setManualMembershipInput(false);
                           }}
@@ -584,7 +597,7 @@ export default function TradesPageClient() {
                           onChange={(code) => {
                             setFormClubCode(code);
                             if (!code) {
-                              setForm((f) => ({ ...f, clubName: "", clubId: "", membershipType: "" }));
+                              setForm((f) => ({ ...f, clubName: "", clubId: "", membershipId: null, membershipType: "" }));
                               setFormMemberships([]);
                               setManualMembershipInput(false);
                             }
@@ -595,7 +608,7 @@ export default function TradesPageClient() {
                           onClick={() => {
                             setManualClubInput(true);
                             setFormClubCode("__manual__");
-                            setForm((f) => ({ ...f, clubName: "", clubId: "", membershipType: "" }));
+                            setForm((f) => ({ ...f, clubName: "", clubId: "", membershipId: null, membershipType: "" }));
                             setFormMemberships([]);
                             setManualMembershipInput(true);
                           }}
@@ -616,9 +629,16 @@ export default function TradesPageClient() {
                         onChange={(e) => {
                           if (e.target.value === "__manual__") {
                             setManualMembershipInput(true);
-                            setForm((f) => ({ ...f, membershipType: "" }));
+                            setForm((f) => ({ ...f, membershipId: null, membershipType: "" }));
                           } else {
-                            setForm((f) => ({ ...f, membershipType: e.target.value }));
+                            const picked = formClubDetail?.memberships.find(
+                              (m) => (m.membershipName || m.membershipType) === e.target.value,
+                            );
+                            setForm((f) => ({
+                              ...f,
+                              membershipId: picked?.id ?? null,
+                              membershipType: e.target.value,
+                            }));
                           }
                         }}
                         className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
@@ -635,7 +655,7 @@ export default function TradesPageClient() {
                         <input
                           type="text"
                           value={form.membershipType}
-                          onChange={(e) => setForm((f) => ({ ...f, membershipType: e.target.value }))}
+                          onChange={(e) => setForm((f) => ({ ...f, membershipId: null, membershipType: e.target.value }))}
                           className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
                           placeholder="개인정회원"
                           required
@@ -645,7 +665,7 @@ export default function TradesPageClient() {
                             type="button"
                             onClick={() => {
                               setManualMembershipInput(false);
-                              setForm((f) => ({ ...f, membershipType: "" }));
+                              setForm((f) => ({ ...f, membershipId: null, membershipType: "" }));
                             }}
                             className="px-2.5 py-2 border border-gray-300 rounded text-xs text-gray-500 hover:bg-gray-50 whitespace-nowrap"
                           >
@@ -851,6 +871,10 @@ export default function TradesPageClient() {
                                 type="button"
                                 disabled={approvalPendingId === trade.id}
                                 onClick={async () => {
+                                  if (!trade.depositAmount || trade.depositAmount <= 0) {
+                                    setDepositPromptTrade(trade);
+                                    return;
+                                  }
                                   setApprovalPendingId(trade.id);
                                   try {
                                     const updated = await requestApproval(trade.id);
@@ -999,6 +1023,34 @@ export default function TradesPageClient() {
         confirmText="고객 등록 후 저장"
         cancelText="취소"
         isLoading={ensureFlow.processing || submitting}
+      />
+
+      <DepositAmountModal
+        isOpen={!!depositPromptTrade}
+        onClose={() => {
+          if (depositSubmitting) return;
+          setDepositPromptTrade(null);
+        }}
+        isSubmitting={depositSubmitting}
+        initialAmount={depositPromptTrade?.depositAmount ?? null}
+        onSubmit={async (amount) => {
+          if (!depositPromptTrade) return;
+          setDepositSubmitting(true);
+          setApprovalPendingId(depositPromptTrade.id);
+          try {
+            const updated = await requestApproval(depositPromptTrade.id, {
+              depositAmount: amount,
+            });
+            if (!updated) {
+              setErrorMessage("승인 요청 실패");
+              return;
+            }
+            setDepositPromptTrade(null);
+          } finally {
+            setDepositSubmitting(false);
+            setApprovalPendingId(null);
+          }
+        }}
       />
     </div>
   );

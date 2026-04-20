@@ -72,6 +72,7 @@ export interface DocumentsResponse {
 export interface MembershipTradeForm {
   clubId: string;
   clubName: string;
+  membershipId: string | null;
   membershipType: string;
   tradeType: "매도" | "매수";
   customerId: string | null;

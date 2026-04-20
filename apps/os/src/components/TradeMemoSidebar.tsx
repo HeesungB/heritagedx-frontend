@@ -18,6 +18,7 @@ interface TradeMemoSidebarProps {
 type SidebarTab = "list" | "create";
 
 const initialForm: Omit<MembershipTradeForm, "clubId" | "clubName"> = {
+  membershipId: null,
   membershipType: "",
   tradeType: "매수",
   customerId: null,
@@ -76,8 +77,8 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
     };
 
     const input = {
-      club: clubDetail.name,
-      membership: cleaned.membershipType,
+      club: clubDetail.id || clubDetail.name,
+      membership: cleaned.membershipId || cleaned.membershipType,
       tradeType: cleaned.tradeType,
       customerName: cleaned.customerName,
       contact: cleaned.contact,
@@ -193,7 +194,11 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
     const tradeType = trade.membershipType || "";
     const isInList = membershipTypes.includes(tradeType);
     setManualMembershipInput(membershipTypes.length > 0 && !isInList && tradeType !== "");
+    const matched = clubDetail.memberships?.find(
+      (m) => (m.membershipName || m.membershipType) === tradeType,
+    );
     setForm({
+      membershipId: matched?.id ?? null,
       membershipType: tradeType,
       tradeType: trade.tradeType || "매수",
       customerId: trade.customerId ?? null,
@@ -549,9 +554,16 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
                   onChange={(e) => {
                     if (e.target.value === "__manual__") {
                       setManualMembershipInput(true);
-                      setForm((f) => ({ ...f, membershipType: "" }));
+                      setForm((f) => ({ ...f, membershipId: null, membershipType: "" }));
                     } else {
-                      setForm((f) => ({ ...f, membershipType: e.target.value }));
+                      const picked = clubDetail.memberships?.find(
+                        (m) => (m.membershipName || m.membershipType) === e.target.value,
+                      );
+                      setForm((f) => ({
+                        ...f,
+                        membershipId: picked?.id ?? null,
+                        membershipType: e.target.value,
+                      }));
                     }
                   }}
                   className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
@@ -568,7 +580,7 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
                   <input
                     type="text"
                     value={form.membershipType}
-                    onChange={(e) => setForm((f) => ({ ...f, membershipType: e.target.value }))}
+                    onChange={(e) => setForm((f) => ({ ...f, membershipId: null, membershipType: e.target.value }))}
                     className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
                     placeholder="예: 개인정회원"
                     required
@@ -578,7 +590,7 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
                       type="button"
                       onClick={() => {
                         setManualMembershipInput(false);
-                        setForm((f) => ({ ...f, membershipType: "" }));
+                        setForm((f) => ({ ...f, membershipId: null, membershipType: "" }));
                       }}
                       className="px-2 py-1 border border-gray-300 rounded text-xs text-gray-500 hover:bg-gray-50 whitespace-nowrap"
                     >

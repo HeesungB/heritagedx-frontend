@@ -4,7 +4,10 @@ import type { ConsultationInput } from "@heritage-dx/types";
 import { APPROVAL_ACTIONS } from "@heritage-dx/types";
 import type { FetchStatus, PaginationState } from "../entities/common";
 import type { ConsultationEntity } from "../entities/consultation";
-import { mapConsultationDtoToEntity } from "../mappers/consultation.mapper";
+import {
+  mapConsultationDtoToEntity,
+  mapConsultationEntityToInput,
+} from "../mappers/consultation.mapper";
 import { normalizePagination } from "../mappers/helpers";
 
 export interface ConsultationStoreState {
@@ -18,7 +21,10 @@ export interface ConsultationStoreState {
   update: (id: string, data: ConsultationInput) => Promise<ConsultationEntity | null>;
   remove: (id: string) => Promise<boolean>;
   toggleDone: (id: string, isDone: boolean) => Promise<boolean>;
-  requestApproval: (id: string, reason?: string) => Promise<ConsultationEntity | null>;
+  requestApproval: (
+    id: string,
+    input?: { depositAmount?: number; reason?: string },
+  ) => Promise<ConsultationEntity | null>;
   reopen: (id: string, reason?: string) => Promise<ConsultationEntity | null>;
   hydrate: (items: ConsultationEntity[], pagination: PaginationState) => void;
 }
@@ -118,11 +124,7 @@ export function createConsultationStore(repos: GeneralRepositories) {
 
       try {
         const response = await repos.consultations.update(id, {
-          club: item.clubName,
-          membership: item.membershipType,
-          tradeType: item.tradeType,
-          customerName: item.customerName,
-          contact: item.contact,
+          ...mapConsultationEntityToInput(item),
           isDone,
         });
         if (!response.success) {
@@ -142,11 +144,28 @@ export function createConsultationStore(repos: GeneralRepositories) {
       }
     },
 
-    requestApproval: async (id: string, reason?: string) => {
+    requestApproval: async (
+      id: string,
+      input?: { depositAmount?: number; reason?: string },
+    ) => {
       try {
+        if (input?.depositAmount !== undefined) {
+          const current = get().items.find((i) => i.id === id);
+          if (!current) return null;
+          const updateResponse = await repos.consultations.update(id, {
+            ...mapConsultationEntityToInput(current),
+            depositAmount: input.depositAmount,
+          });
+          if (!updateResponse.success || !updateResponse.data) return null;
+          const updated = mapConsultationDtoToEntity(updateResponse.data);
+          set((s) => ({
+            items: s.items.map((item) => (item.id === id ? updated : item)),
+          }));
+        }
+
         const response = await repos.consultations.approvalAction(id, {
           action: APPROVAL_ACTIONS.REQUEST_APPROVAL,
-          reason,
+          reason: input?.reason,
         });
         if (response.success && response.data) {
           const entity = mapConsultationDtoToEntity(response.data);

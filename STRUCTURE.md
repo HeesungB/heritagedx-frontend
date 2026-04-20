@@ -330,7 +330,7 @@ packages/store/
 │   ├── stores/               # Zustand 스토어 (stale-while-revalidate)
 │   │   ├── index.ts
 │   │   ├── club.store.ts     # 목록 캐시 + 상세 캐시 (Map<code, detail>)
-│   │   ├── consultation.store.ts           # general — requestApproval
+│   │   ├── consultation.store.ts           # general — requestApproval(id, { depositAmount?, reason? })
 │   │   ├── membership-trade.store.ts       # general — requestFinalReview
 │   │   ├── consultation-admin.store.ts     # admin — approveFirst/hold/reject/reopen
 │   │   ├── membership-trade-admin.store.ts # admin — 동일한 4개 액션
@@ -374,7 +374,7 @@ packages/store/
 
 **Store (Zustand):**
 - `createClubStore(repos)` — 클럽 목록 + 상세 캐시, `hydrateClubs()`/`hydrateDetail()` (SSR→클라이언트)
-- `createConsultationStore(generalRepos)` — CRUD + 낙관적 업데이트 + `requestApproval`
+- `createConsultationStore(generalRepos)` — CRUD + 낙관적 업데이트 + `requestApproval(id, { depositAmount?, reason? })` (depositAmount 전달 시 내부에서 update → approvalAction 순차 실행)
 - `createMembershipTradeStore(generalRepos)` — CRUD + `requestFinalReview`
 - `createConsultationAdminStore(adminRepos)` — CRUD + `approvalAction`/`approveFirst`/`hold`/`reject`/`reopen`
 - `createMembershipTradeAdminStore(adminRepos)` — CRUD + `workflowAction`/`approveFirst`/`hold`/`reject`/`reopen`
@@ -529,7 +529,7 @@ ESLint 9 flat config 공유 패키지. `eslint-config-next`의 `core-web-vitals`
 `CustomersPageClient`, `CustomerAutocomplete` — `/customers` 페이지 CRUD + 상담/거래 폼에서 재사용되는 이름/연락처 자동완성. 미등록 고객 저장 시에는 `useCustomerEnsureFlow` 훅이 `ConfirmModal`을 띄워 `POST /customers` → `POST /consultations` 를 순차 실행한다.
 
 **모달/시트:**
-`PasswordChangeModal`, `TaxGuideModal`, `TaxSettingsModal`, `EstimateSheet`
+`PasswordChangeModal`, `TaxGuideModal`, `TaxSettingsModal`, `EstimateSheet`, `DepositAmountModal` — `TradesPageClient`에서 `depositAmount`가 비어 있는 상담의 "승인 요청" 클릭 시 계약금 입력을 받아 스토어 `requestApproval(id, { depositAmount })`으로 update+approvalAction을 순차 수행
 
 **유틸리티:**
 `HomeClient`, `DashboardClient`, `SearchInput`, `OperatorNotice`, `SystemNotice`

@@ -41,8 +41,8 @@ export function mapConsultationEntityToInput(
   entity: Partial<ConsultationEntity>,
 ): ConsultationInput {
   return {
-    club: entity.clubName ?? "",
-    membership: entity.membershipType ?? "",
+    club: entity.clubId || entity.clubName || "",
+    membership: entity.membershipId || entity.membershipType || "",
     tradeType: entity.tradeType ?? "매수",
     customerName: entity.customerName ?? "",
     contact: entity.contact ?? "",

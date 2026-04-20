@@ -5,7 +5,13 @@ export type {
   ClubContactEntity,
   BankAccountEntity,
 } from "./club";
-export type { ConsultationEntity } from "./consultation";
+export type {
+  ConsultationEntity,
+  ConsultationApprovalStructuralField,
+  ConsultationApprovalFillableField,
+  ConsultationApprovalMissingFields,
+} from "./consultation";
+export { collectMissingConsultationApprovalFields } from "./consultation";
 export type { MembershipTradeEntity } from "./membership-trade";
 export type { MembershipEntity } from "./membership";
 export type {

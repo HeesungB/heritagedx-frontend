@@ -104,9 +104,12 @@ export class ApiClient {
       const json = await response.json();
 
       if (!response.ok) {
+        const errorBody = json?.error ?? json;
         return {
           success: false,
-          error: json.message || "요청 처리 중 오류가 발생했습니다.",
+          error: errorBody?.message || json?.message || "요청 처리 중 오류가 발생했습니다.",
+          errorCode: errorBody?.code,
+          errorDetails: errorBody?.details ?? null,
         };
       }
 

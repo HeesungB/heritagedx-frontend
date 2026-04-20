@@ -7,6 +7,8 @@ export interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
+  errorCode?: string;
+  errorDetails?: Record<string, unknown> | null;
 }
 
 // 인증 API 응답 타입 (ApiResponse 와 동일 모양이지만 의도적으로 분리 유지)

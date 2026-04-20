@@ -301,7 +301,7 @@ packages/store/
 │   │   ├── index.ts
 │   │   ├── common.ts         # PaginationState, FetchStatus
 │   │   ├── club.ts           # ClubEntity, ClubDetailEntity (서브 객체 그룹핑)
-│   │   ├── consultation.ts        # ConsultationEntity (+ approvalStatus/linkedTradeId/depositAmount)
+│   │   ├── consultation.ts        # ConsultationEntity (+ approvalStatus/linkedTradeId/depositAmount) + collectMissingConsultationApprovalFields(entity) — 승인 요청 전 누락 필드 감지 (structural vs fillable 분리)
 │   │   ├── membership-trade.ts    # MembershipTradeEntity (+ workflowStatus/sourceConsultationId/depositAmount)
 │   │   ├── membership.ts     # MembershipEntity
 │   │   ├── scenario.ts       # ScenarioEntity, ScenarioSide, ScenarioOwnerType, ScenarioWithDocsEntity, ScenarioMatchFilters, ScenarioBasicCode, ScenarioAccentTokens + scenarioMatchesFilters, findMatchingScenario, SCENARIO_BASIC_LABEL, SCENARIO_BASIC_ACCENT, getScenarioBasicLabel, getScenarioBasicAccent
@@ -330,7 +330,7 @@ packages/store/
 │   ├── stores/               # Zustand 스토어 (stale-while-revalidate)
 │   │   ├── index.ts
 │   │   ├── club.store.ts     # 목록 캐시 + 상세 캐시 (Map<code, detail>)
-│   │   ├── consultation.store.ts           # general — requestApproval(id, { depositAmount?, reason? })
+│   │   ├── consultation.store.ts           # general — requestApproval(id, { depositAmount?, offerPrice?, customerName?, contact?, reason? }) → { entity, missingFillable?, errorMessage? }. 제공된 필드만 update 페이로드에 병합(문자열은 trim) 후 approvalAction. 서버가 CONSULTATION_APPROVAL_REQUIRED_FIELDS 로 거부하면 missingFields를 fillable로 필터해 로컬 엔티티를 서버 기준(null/빈문자열)으로 맞추고 missingFillable을 UI로 반환 → 드리프트 자동 복구
 │   │   ├── membership-trade.store.ts       # general — requestFinalReview
 │   │   ├── consultation-admin.store.ts     # admin — approveFirst/hold/reject/reopen
 │   │   ├── membership-trade-admin.store.ts # admin — 동일한 4개 액션
@@ -374,7 +374,7 @@ packages/store/
 
 **Store (Zustand):**
 - `createClubStore(repos)` — 클럽 목록 + 상세 캐시, `hydrateClubs()`/`hydrateDetail()` (SSR→클라이언트)
-- `createConsultationStore(generalRepos)` — CRUD + 낙관적 업데이트 + `requestApproval(id, { depositAmount?, reason? })` (depositAmount 전달 시 내부에서 update → approvalAction 순차 실행)
+- `createConsultationStore(generalRepos)` — CRUD + 낙관적 업데이트 + `requestApproval(id, patch?) → RequestApprovalResult`. patch가 하나라도 있으면 update → approvalAction 순차 실행(문자열은 trim 후 병합). `RequestApprovalResult = { entity, missingFillable?, errorMessage? }`. 서버가 `CONSULTATION_APPROVAL_REQUIRED_FIELDS` 로 missingFields를 내려주면 fillable 필드만 걸러 로컬 엔티티를 서버 기준으로 맞추고 `missingFillable`로 반환 → UI가 모달을 재오픈해 드리프트 자동 복구
 - `createMembershipTradeStore(generalRepos)` — CRUD + `requestFinalReview`
 - `createConsultationAdminStore(adminRepos)` — CRUD + `approvalAction`/`approveFirst`/`hold`/`reject`/`reopen`
 - `createMembershipTradeAdminStore(adminRepos)` — CRUD + `workflowAction`/`approveFirst`/`hold`/`reject`/`reopen`
@@ -529,7 +529,7 @@ ESLint 9 flat config 공유 패키지. `eslint-config-next`의 `core-web-vitals`
 `CustomersPageClient`, `CustomerAutocomplete` — `/customers` 페이지 CRUD + 상담/거래 폼에서 재사용되는 이름/연락처 자동완성. 미등록 고객 저장 시에는 `useCustomerEnsureFlow` 훅이 `ConfirmModal`을 띄워 `POST /customers` → `POST /consultations` 를 순차 실행한다.
 
 **모달/시트:**
-`PasswordChangeModal`, `TaxGuideModal`, `TaxSettingsModal`, `EstimateSheet`, `DepositAmountModal` — `TradesPageClient`에서 `depositAmount`가 비어 있는 상담의 "승인 요청" 클릭 시 계약금 입력을 받아 스토어 `requestApproval(id, { depositAmount })`으로 update+approvalAction을 순차 수행
+`PasswordChangeModal`, `TaxGuideModal`, `TaxSettingsModal`, `EstimateSheet`, `ApprovalRequirementsModal` — `TradesPageClient`에서 "승인 요청" 클릭 시 `collectMissingConsultationApprovalFields(trade)` 로 누락 필드를 감지해, 채울 수 있는 필드(`customerName`/`contact`/`offerPrice`/`depositAmount`)만 동적으로 입력받는다. 구조 필드(`tradeType`/`clubId`/`membershipId`)가 비면 승인을 차단하고 상담 편집을 유도. 제출된 patch는 스토어 `requestApproval(id, patch)`에 전달되어 update+approvalAction을 순차 수행
 
 **유틸리티:**
 `HomeClient`, `DashboardClient`, `SearchInput`, `OperatorNotice`, `SystemNotice`

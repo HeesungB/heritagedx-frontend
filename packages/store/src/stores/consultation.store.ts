@@ -3,7 +3,24 @@ import type { GeneralRepositories, TradeListParams } from "@heritage-dx/api";
 import type { ConsultationInput } from "@heritage-dx/types";
 import { APPROVAL_ACTIONS } from "@heritage-dx/types";
 import type { FetchStatus, PaginationState } from "../entities/common";
-import type { ConsultationEntity } from "../entities/consultation";
+import type {
+  ConsultationEntity,
+  ConsultationApprovalFillableField,
+} from "../entities/consultation";
+import { collectMissingConsultationApprovalFields } from "../entities/consultation";
+
+const FILLABLE_FIELD_SET: ReadonlySet<ConsultationApprovalFillableField> = new Set([
+  "customerName",
+  "contact",
+  "offerPrice",
+  "depositAmount",
+]);
+
+export interface RequestApprovalResult {
+  entity: ConsultationEntity | null;
+  missingFillable?: ConsultationApprovalFillableField[];
+  errorMessage?: string;
+}
 import {
   mapConsultationDtoToEntity,
   mapConsultationEntityToInput,
@@ -23,8 +40,14 @@ export interface ConsultationStoreState {
   toggleDone: (id: string, isDone: boolean) => Promise<boolean>;
   requestApproval: (
     id: string,
-    input?: { depositAmount?: number; reason?: string },
-  ) => Promise<ConsultationEntity | null>;
+    input?: {
+      depositAmount?: number;
+      offerPrice?: number;
+      customerName?: string;
+      contact?: string;
+      reason?: string;
+    },
+  ) => Promise<RequestApprovalResult>;
   reopen: (id: string, reason?: string) => Promise<ConsultationEntity | null>;
   hydrate: (items: ConsultationEntity[], pagination: PaginationState) => void;
 }
@@ -146,21 +169,50 @@ export function createConsultationStore(repos: GeneralRepositories) {
 
     requestApproval: async (
       id: string,
-      input?: { depositAmount?: number; reason?: string },
-    ) => {
+      input?: {
+        depositAmount?: number;
+        offerPrice?: number;
+        customerName?: string;
+        contact?: string;
+        reason?: string;
+      },
+    ): Promise<RequestApprovalResult> => {
       try {
-        if (input?.depositAmount !== undefined) {
+        const needsUpdate =
+          input?.depositAmount !== undefined ||
+          input?.offerPrice !== undefined ||
+          input?.customerName !== undefined ||
+          input?.contact !== undefined;
+        if (needsUpdate) {
           const current = get().items.find((i) => i.id === id);
-          if (!current) return null;
+          if (!current) return { entity: null };
+          const base = mapConsultationEntityToInput(current);
+          const patch: Partial<typeof base> = {};
+          if (input?.depositAmount !== undefined) patch.depositAmount = input.depositAmount;
+          if (input?.offerPrice !== undefined) patch.offerPrice = input.offerPrice;
+          if (input?.customerName !== undefined) patch.customerName = input.customerName.trim();
+          if (input?.contact !== undefined) patch.contact = input.contact.trim();
           const updateResponse = await repos.consultations.update(id, {
-            ...mapConsultationEntityToInput(current),
-            depositAmount: input.depositAmount,
+            ...base,
+            ...patch,
           });
-          if (!updateResponse.success || !updateResponse.data) return null;
+          if (!updateResponse.success || !updateResponse.data) {
+            return { entity: null, errorMessage: updateResponse.error };
+          }
           const updated = mapConsultationDtoToEntity(updateResponse.data);
           set((s) => ({
             items: s.items.map((item) => (item.id === id ? updated : item)),
           }));
+        }
+
+        const latest = get().items.find((i) => i.id === id);
+        if (!latest) return { entity: null };
+        const preCheck = collectMissingConsultationApprovalFields(latest);
+        if (preCheck.structural.length > 0) {
+          return { entity: null };
+        }
+        if (preCheck.fillable.length > 0) {
+          return { entity: null, missingFillable: preCheck.fillable };
         }
 
         const response = await repos.consultations.approvalAction(id, {
@@ -172,11 +224,41 @@ export function createConsultationStore(repos: GeneralRepositories) {
           set((s) => ({
             items: s.items.map((item) => (item.id === id ? entity : item)),
           }));
-          return entity;
+          return { entity };
         }
-        return null;
+
+        // 서버가 missingFields를 돌려줄 때(드리프트): 클라이언트 상태를 서버 기준으로 맞추고
+        // 채울 수 있는 필드 목록을 UI로 전달 → 모달 재오픈 유도
+        if (response.errorCode === "CONSULTATION_APPROVAL_REQUIRED_FIELDS") {
+          const rawMissing = response.errorDetails?.missingFields;
+          const serverMissing = Array.isArray(rawMissing)
+            ? (rawMissing.filter(
+                (f): f is ConsultationApprovalFillableField =>
+                  typeof f === "string" && FILLABLE_FIELD_SET.has(f as ConsultationApprovalFillableField),
+              ))
+            : [];
+          if (serverMissing.length > 0) {
+            set((s) => ({
+              items: s.items.map((item) => {
+                if (item.id !== id) return item;
+                const patched = { ...item };
+                for (const field of serverMissing) {
+                  if (field === "customerName" || field === "contact") {
+                    patched[field] = "";
+                  } else {
+                    patched[field] = null;
+                  }
+                }
+                return patched;
+              }),
+            }));
+            return { entity: null, missingFillable: serverMissing };
+          }
+        }
+
+        return { entity: null, errorMessage: response.error };
       } catch {
-        return null;
+        return { entity: null };
       }
     },
 

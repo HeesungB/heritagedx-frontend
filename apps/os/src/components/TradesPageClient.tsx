@@ -9,10 +9,15 @@ import { useClubs, useClubDetail, useConsultations, canDeleteConsultation } from
 import { useSendTradeNotification } from "@/hooks/useSendTradeNotification";
 import { useCustomerEnsureFlow } from "@/hooks/useCustomerEnsureFlow";
 import CustomerAutocomplete from "@/components/CustomerAutocomplete";
-import DepositAmountModal from "@/components/DepositAmountModal";
+import ApprovalRequirementsModal from "@/components/ApprovalRequirementsModal";
 import { trackEvent } from "@/lib/gtag";
 import { StatusBadge } from "@/components/approval/StatusBadge";
-import type { ApprovalStatus } from "@heritage-dx/store";
+import {
+  collectMissingConsultationApprovalFields,
+  type ApprovalStatus,
+  type ConsultationApprovalFillableField,
+  type ConsultationApprovalStructuralField,
+} from "@heritage-dx/store";
 import { useAuth } from "@/contexts/AuthContext";
 
 type TradeFilter = "전체" | "매수" | "매도";
@@ -65,8 +70,11 @@ export default function TradesPageClient() {
   const [filterApproval, setFilterApproval] = useState<ApprovalFilter>("");
   const [showConverted, setShowConverted] = useState(false);
   const [approvalPendingId, setApprovalPendingId] = useState<string | null>(null);
-  const [depositPromptTrade, setDepositPromptTrade] = useState<MembershipTrade | null>(null);
-  const [depositSubmitting, setDepositSubmitting] = useState(false);
+  const [requirementsPrompt, setRequirementsPrompt] = useState<{
+    trade: MembershipTrade;
+    fillable: ConsultationApprovalFillableField[];
+  } | null>(null);
+  const [requirementsSubmitting, setRequirementsSubmitting] = useState(false);
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [formClubCode, setFormClubCode] = useState<string>("");
@@ -170,8 +178,8 @@ export default function TradesPageClient() {
       club: form.clubId || form.clubName,
       membership: form.membershipId || form.membershipType,
       tradeType: form.tradeType,
-      customerName: form.customerName,
-      contact: form.contact,
+      customerName: form.customerName.trim(),
+      contact: form.contact.trim(),
       offerPrice: form.offerPrice || null,
       offerPriceNote: form.offerPriceNote || null,
       desiredPrice: form.desiredPrice || null,
@@ -871,14 +879,32 @@ export default function TradesPageClient() {
                                 type="button"
                                 disabled={approvalPendingId === trade.id}
                                 onClick={async () => {
-                                  if (!trade.depositAmount || trade.depositAmount <= 0) {
-                                    setDepositPromptTrade(trade);
+                                  const { structural, fillable } = collectMissingConsultationApprovalFields(trade);
+                                  if (structural.length > 0) {
+                                    const labels: Record<ConsultationApprovalStructuralField, string> = {
+                                      tradeType: "거래 유형",
+                                      clubId: "골프장",
+                                      membershipId: "회원권",
+                                    };
+                                    setErrorMessage(
+                                      `상담을 먼저 편집해서 ${structural.map((f) => labels[f]).join(", ")}를 선택해 주세요.`,
+                                    );
+                                    return;
+                                  }
+                                  if (fillable.length > 0) {
+                                    setRequirementsPrompt({ trade, fillable });
                                     return;
                                   }
                                   setApprovalPendingId(trade.id);
                                   try {
-                                    const updated = await requestApproval(trade.id);
-                                    if (!updated) setErrorMessage("승인 요청 실패");
+                                    const result = await requestApproval(trade.id);
+                                    if (result.entity) return;
+                                    if (result.missingFillable && result.missingFillable.length > 0) {
+                                      const refreshed = rawTrades.find((t) => t.id === trade.id) ?? trade;
+                                      setRequirementsPrompt({ trade: refreshed as MembershipTrade, fillable: result.missingFillable });
+                                      return;
+                                    }
+                                    setErrorMessage(result.errorMessage || "승인 요청 실패");
                                   } finally {
                                     setApprovalPendingId(null);
                                   }
@@ -1025,29 +1051,38 @@ export default function TradesPageClient() {
         isLoading={ensureFlow.processing || submitting}
       />
 
-      <DepositAmountModal
-        isOpen={!!depositPromptTrade}
+      <ApprovalRequirementsModal
+        isOpen={!!requirementsPrompt}
         onClose={() => {
-          if (depositSubmitting) return;
-          setDepositPromptTrade(null);
+          if (requirementsSubmitting) return;
+          setRequirementsPrompt(null);
         }}
-        isSubmitting={depositSubmitting}
-        initialAmount={depositPromptTrade?.depositAmount ?? null}
-        onSubmit={async (amount) => {
-          if (!depositPromptTrade) return;
-          setDepositSubmitting(true);
-          setApprovalPendingId(depositPromptTrade.id);
+        isSubmitting={requirementsSubmitting}
+        missingFillable={requirementsPrompt?.fillable ?? []}
+        initial={{
+          customerName: requirementsPrompt?.trade.customerName,
+          contact: requirementsPrompt?.trade.contact,
+          offerPrice: requirementsPrompt?.trade.offerPrice ?? null,
+          depositAmount: requirementsPrompt?.trade.depositAmount ?? null,
+        }}
+        onSubmit={async (patch) => {
+          if (!requirementsPrompt) return;
+          setRequirementsSubmitting(true);
+          setApprovalPendingId(requirementsPrompt.trade.id);
           try {
-            const updated = await requestApproval(depositPromptTrade.id, {
-              depositAmount: amount,
-            });
-            if (!updated) {
-              setErrorMessage("승인 요청 실패");
+            const result = await requestApproval(requirementsPrompt.trade.id, patch);
+            if (result.entity) {
+              setRequirementsPrompt(null);
               return;
             }
-            setDepositPromptTrade(null);
+            if (result.missingFillable && result.missingFillable.length > 0) {
+              const refreshed = rawTrades.find((t) => t.id === requirementsPrompt.trade.id) ?? requirementsPrompt.trade;
+              setRequirementsPrompt({ trade: refreshed as MembershipTrade, fillable: result.missingFillable });
+              return;
+            }
+            setErrorMessage(result.errorMessage || "승인 요청 실패");
           } finally {
-            setDepositSubmitting(false);
+            setRequirementsSubmitting(false);
             setApprovalPendingId(null);
           }
         }}

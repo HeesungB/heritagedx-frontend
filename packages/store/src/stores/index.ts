@@ -2,7 +2,11 @@ export { createClubStore } from "./club.store";
 export type { ClubStore, ClubStoreState } from "./club.store";
 
 export { createConsultationStore } from "./consultation.store";
-export type { ConsultationStore, ConsultationStoreState } from "./consultation.store";
+export type {
+  ConsultationStore,
+  ConsultationStoreState,
+  RequestApprovalResult,
+} from "./consultation.store";
 
 export { createMembershipTradeStore } from "./membership-trade.store";
 export type { MembershipTradeStore, MembershipTradeStoreState } from "./membership-trade.store";

@@ -32,3 +32,47 @@ export interface ConsultationEntity {
   createdAt: string;
   updatedAt: string;
 }
+
+export type ConsultationApprovalStructuralField =
+  | "tradeType"
+  | "clubId"
+  | "membershipId";
+
+export type ConsultationApprovalFillableField =
+  | "customerName"
+  | "contact"
+  | "offerPrice"
+  | "depositAmount";
+
+export interface ConsultationApprovalMissingFields {
+  structural: ConsultationApprovalStructuralField[];
+  fillable: ConsultationApprovalFillableField[];
+}
+
+type ApprovalCandidate = Pick<
+  ConsultationEntity,
+  | "tradeType"
+  | "clubId"
+  | "membershipId"
+  | "customerName"
+  | "contact"
+  | "offerPrice"
+  | "depositAmount"
+>;
+
+export function collectMissingConsultationApprovalFields(
+  entity: ApprovalCandidate,
+): ConsultationApprovalMissingFields {
+  const structural: ConsultationApprovalStructuralField[] = [];
+  if (!entity.tradeType) structural.push("tradeType");
+  if (!entity.clubId) structural.push("clubId");
+  if (!entity.membershipId) structural.push("membershipId");
+
+  const fillable: ConsultationApprovalFillableField[] = [];
+  if (!(entity.customerName ?? "").trim()) fillable.push("customerName");
+  if (!(entity.contact ?? "").trim()) fillable.push("contact");
+  if (entity.offerPrice == null || entity.offerPrice <= 0) fillable.push("offerPrice");
+  if (entity.depositAmount == null || entity.depositAmount <= 0) fillable.push("depositAmount");
+
+  return { structural, fillable };
+}

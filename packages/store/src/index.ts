@@ -7,6 +7,9 @@ export type {
   ClubContactEntity,
   BankAccountEntity,
   ConsultationEntity,
+  ConsultationApprovalStructuralField,
+  ConsultationApprovalFillableField,
+  ConsultationApprovalMissingFields,
   MembershipTradeEntity,
   MembershipEntity,
   ScenarioEntity,
@@ -42,6 +45,7 @@ export {
   getScenarioBasicAccent,
   isDocumentExpired,
   isDocumentDownloadable,
+  collectMissingConsultationApprovalFields,
 } from "./entities/index";
 
 // Stores
@@ -67,6 +71,7 @@ export type {
   CustomerStore,
   CustomerStoreState,
   CustomerCreateResult,
+  RequestApprovalResult,
 } from "./stores";
 
 // Hooks

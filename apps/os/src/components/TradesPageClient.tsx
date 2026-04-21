@@ -806,17 +806,6 @@ export default function TradesPageClient() {
                   />
                 </div>
 
-                {/* 완료 여부 */}
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.isDone}
-                    onChange={(e) => setForm((f) => ({ ...f, isDone: e.target.checked }))}
-                    className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                  />
-                  <span className="text-sm font-medium text-gray-700">거래 완료</span>
-                </label>
-
                 <div className="flex justify-end gap-2 pt-2">
                   <Button type="button" variant="outline" onClick={handleCancelForm}>취소</Button>
                   <Button type="submit" disabled={submitting} isLoading={submitting}>{editingTrade ? "수정" : "저장"}</Button>

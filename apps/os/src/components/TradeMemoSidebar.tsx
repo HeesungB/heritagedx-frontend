@@ -719,17 +719,6 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
               />
             </div>
 
-            {/* 완료 여부 */}
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.isDone}
-                onChange={(e) => setForm((f) => ({ ...f, isDone: e.target.checked }))}
-                className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-              />
-              <span className="text-xs font-medium text-gray-700">거래 완료</span>
-            </label>
-
             <Button type="submit" disabled={submitting} isLoading={submitting} className="w-full">
               {editingTrade ? "메모 수정" : "메모 저장"}
             </Button>

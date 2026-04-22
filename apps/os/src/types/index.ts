@@ -83,6 +83,7 @@ export interface MembershipTradeForm {
   desiredPrice: number;
   desiredPriceNote: string;
   depositAmount: number;
+  accountNumber: string;
   notes: string;
   registrationDate: string;
   tradeDate: string;

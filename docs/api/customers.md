@@ -1,6 +1,6 @@
 # 고객 관리 API
 
-> spec: `v1.0.0+15ac42bd` · captured: `2026-04-17`
+> spec: `v1.0.0+d8345ee2` · captured: `2026-04-22`
 > base URL: `https://api.heritage-dx.com`
 
 ## 엔드포인트 목록
@@ -355,6 +355,7 @@ Cookie: hdx_access_token=<JWT>
 | `desiredPrice` | number |  | 희망가 (원 단위) |
 | `desiredPriceNote` | string |  | 희망가 메모 |
 | `depositAmount` | number |  | 계약금 (원 단위) |
+| `accountNumber` | string |  | 계좌번호 |
 | `customFields` | object | ✓ | 상담별 자유형 커스텀 필드 _예: `{'희망지역': '제주', 'VIP': True}`_ |
 | `notes` | string |  | 특기사항 |
 | `registrationDate` | string (date-time) |  | 등록일자 |
@@ -378,6 +379,8 @@ Cookie: hdx_access_token=<JWT>
 |---|---|---|---|
 | `name` | string | ✓ | 고객명 _예: `홍길동`_ |
 | `contact` | string | ✓ | 연락처 _예: `010-1234-5678`_ |
+| `email` | string (email) |  | 이메일 _예: `hong@example.com`_ |
+| `address` | string |  | 주소 _예: `서울특별시 강남구 테헤란로 123, 101동 1203호`_ |
 | `memo` | string |  | 고객 메모 _예: `오전 통화 선호`_ |
 
 ### CustomerDeleteResponseDto
@@ -430,6 +433,7 @@ Cookie: hdx_access_token=<JWT>
 | `tradeType` | `매도` \| `매수` | ✓ | 거래 유형 |
 | `approvalStatus` | `DRAFT` \| `PENDING_APPROVAL` \| `FIRST_APPROVED` \| `ON_HOLD` \| `REJECTED` | ✓ | 상담 승인 상태 |
 | `isDone` | boolean | ✓ | 상담 완료 여부 |
+| `accountNumber` | string |  | 계좌번호 |
 | `createdAt` | string (date-time) | ✓ | 생성일시 |
 
 ### CustomerHistoryRecentMembershipTradeDto
@@ -511,6 +515,8 @@ Cookie: hdx_access_token=<JWT>
 | `createdByName` | string | ✓ | 작성자 이름 |
 | `name` | string | ✓ | 고객명 |
 | `contact` | string | ✓ | 연락처 |
+| `email` | string |  | 이메일 |
+| `address` | string |  | 주소 |
 | `memo` | string |  | 고객 메모 |
 | `createdAt` | string (date-time) | ✓ | 생성일시 |
 | `updatedAt` | string (date-time) | ✓ | 수정일시 |
@@ -573,4 +579,6 @@ Cookie: hdx_access_token=<JWT>
 |---|---|---|---|
 | `name` | string |  | 고객명 _예: `홍길동`_ |
 | `contact` | string |  | 연락처 _예: `010-1234-5678`_ |
+| `email` | string (email) |  | 이메일 _예: `hong@example.com`_ |
+| `address` | string |  | 주소 _예: `서울특별시 강남구 테헤란로 123, 101동 1203호`_ |
 | `memo` | string |  | 고객 메모 _예: `오전 통화 선호`_ |

@@ -174,6 +174,12 @@ export default function CustomersPage() {
                       연락처
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      이메일
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      주소
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       메모
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -196,6 +202,12 @@ export default function CustomersPage() {
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
                         {customer.contact}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700 max-w-[180px] truncate">
+                        {customer.email || "-"}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700 max-w-[220px] truncate">
+                        {customer.address || "-"}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">
                         {customer.memo ?? "-"}
@@ -274,6 +286,18 @@ export default function CustomersPage() {
                   <div className="text-gray-500 text-xs">등록일</div>
                   <div className="font-medium text-gray-900">
                     {new Date(selected.createdAt).toLocaleString("ko-KR")}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-gray-500 text-xs">이메일</div>
+                  <div className="font-medium text-gray-900">
+                    {selected.email || "-"}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-gray-500 text-xs">주소</div>
+                  <div className="font-medium text-gray-900 break-all">
+                    {selected.address || "-"}
                   </div>
                 </div>
                 {selected.memo && (

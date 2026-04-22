@@ -8,6 +8,8 @@ export interface Customer {
   createdByName: string;
   name: string;
   contact: string;
+  email?: string | null;
+  address?: string | null;
   memo?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -17,6 +19,8 @@ export interface Customer {
 export interface CustomerInput {
   name: string;
   contact: string;
+  email?: string | null;
+  address?: string | null;
   memo?: string;
 }
 
@@ -24,6 +28,8 @@ export interface CustomerInput {
 export interface CustomerUpdateInput {
   name?: string;
   contact?: string;
+  email?: string | null;
+  address?: string | null;
   memo?: string;
 }
 
@@ -51,6 +57,7 @@ export interface CustomerHistoryRecentConsultation {
   tradeType: "매도" | "매수";
   registrationDate: string | null;
   approvalStatus: string;
+  accountNumber?: string | null;
 }
 
 export interface CustomerHistoryRecentMembershipTrade {

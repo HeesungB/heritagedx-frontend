@@ -5,6 +5,8 @@ export interface CustomerEntity {
   createdByName: string;
   name: string;
   contact: string;
+  email: string | null;
+  address: string | null;
   memo: string | null;
   createdAt: string;
   updatedAt: string;
@@ -17,6 +19,7 @@ export interface CustomerHistoryRecentConsultationEntity {
   tradeType: "매도" | "매수";
   registrationDate: string | null;
   approvalStatus: string;
+  accountNumber?: string | null;
 }
 
 export interface CustomerHistoryRecentMembershipTradeEntity {

@@ -1,6 +1,6 @@
 # Admin 매물 API
 
-> spec: `v1.0.0+15ac42bd` · captured: `2026-04-17`
+> spec: `v1.0.0+d8345ee2` · captured: `2026-04-22`
 > base URL: `https://api.heritage-dx.com`
 > 인증: 쿠키 `hdx_access_token` 필수 (SUPER_ADMIN / ORG_ADMIN / EDITOR 중 권한 보유자만)
 

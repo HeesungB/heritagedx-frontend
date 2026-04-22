@@ -1,6 +1,6 @@
 # 회원권 거래 API
 
-> spec: `v1.0.0+15ac42bd` · captured: `2026-04-17`
+> spec: `v1.0.0+d8345ee2` · captured: `2026-04-22`
 > base URL: `https://api.heritage-dx.com`
 
 > ↔ Admin 대응: [admin/membership-trades.md](admin/membership-trades.md)

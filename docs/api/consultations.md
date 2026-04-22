@@ -1,6 +1,6 @@
 # 상담 기록 API
 
-> spec: `v1.0.0+15ac42bd` · captured: `2026-04-17`
+> spec: `v1.0.0+d8345ee2` · captured: `2026-04-22`
 > base URL: `https://api.heritage-dx.com`
 
 > ↔ Admin 대응: [admin/consultations.md](admin/consultations.md)
@@ -391,6 +391,7 @@ Cookie: hdx_access_token=<JWT>
 | `desiredPrice` | number |  | 희망가 (원 단위) |
 | `desiredPriceNote` | string |  | 희망가 메모 |
 | `depositAmount` | number |  | 계약금 (원 단위) |
+| `accountNumber` | string |  | 계좌번호 |
 | `customFields` | object | ✓ | 상담별 자유형 커스텀 필드 _예: `{'희망지역': '제주', 'VIP': True}`_ |
 | `notes` | string |  | 특기사항 |
 | `registrationDate` | string (date-time) |  | 등록일자 |
@@ -422,6 +423,7 @@ Cookie: hdx_access_token=<JWT>
 | `desiredPrice` | number |  | 희망가 (원 단위) _예: `180000000`_ |
 | `desiredPriceNote` | string |  | 희망가 메모 _예: `급매`_ |
 | `depositAmount` | number |  | 계약금 (원 단위) _예: `30000000`_ |
+| `accountNumber` | string |  | 계좌번호 _예: `110-123-456789`_ |
 | `customFields` | object |  | 상담별 자유형 커스텀 필드. 최상위는 객체여야 하며 내부 값은 모든 JSON 값을 허용합니다. _예: `{'희망지역': '제주', 'VIP': True, '예산': 300000000, '태그': ['급매', '재상담'], '메모': None}`_ |
 | `notes` | string |  | 특기사항 _예: `타회원권 교환 희망`_ |
 | `registrationDate` | string |  | 등록일자 (YYYY-MM-DD) _예: `2024-02-09`_ |
@@ -444,6 +446,7 @@ Cookie: hdx_access_token=<JWT>
 | `desiredPrice` | number |  | 희망가 (원 단위) _예: `180000000`_ |
 | `desiredPriceNote` | string |  | 희망가 메모 _예: `급매`_ |
 | `depositAmount` | number |  | 계약금 (원 단위) _예: `30000000`_ |
+| `accountNumber` | string |  | 계좌번호 _예: `110-123-456789`_ |
 | `notes` | string |  | 특기사항 _예: `타회원권 교환 희망`_ |
 | `registrationDate` | string |  | 등록일자 (YYYY-MM-DD) _예: `2024-02-09`_ |
 | `tradeDate` | string |  | 거래일 (YYYY-MM-DD) _예: `2024-02-15`_ |

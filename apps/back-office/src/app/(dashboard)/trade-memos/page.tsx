@@ -28,8 +28,8 @@ import {
   Badge,
   ClubSearchSelect,
 } from "@heritage-dx/ui";
-import { useConsultationAdminRepository, useClubRepository } from "@heritage-dx/api";
-import type { Consultation, Club, Pagination } from "@heritage-dx/types";
+import { useConsultationAdminRepository, useClubRepository, useCustomerRepository } from "@heritage-dx/api";
+import type { Consultation, Club, Pagination, CustomerHistorySummary } from "@heritage-dx/types";
 import type { ApprovalStatus } from "@heritage-dx/store";
 import { canDeleteConsultation } from "@heritage-dx/store";
 import { useAuth } from "@/contexts/AuthContext";
@@ -55,6 +55,7 @@ const formatPrice = (price: string | number | null) => {
 export default function ConsultationsPage() {
   const consultationsRepo = useConsultationAdminRepository();
   const clubsRepo = useClubRepository();
+  const customerRepo = useCustomerRepository();
   const { user } = useAuth();
   const { preloadedMemos, clearPreloadedMemos, clubs } = useData();
   const searchParams = useSearchParams();
@@ -96,6 +97,10 @@ export default function ConsultationsPage() {
   const [isLoadingRelated, setIsLoadingRelated] = useState(false);
   const [relatedSort, setRelatedSort] = useState<"date" | "price">("date");
   const [relatedFilterDone, setRelatedFilterDone] = useState<"" | "done" | "notDone">("notDone");
+
+  // 고객 히스토리
+  const [customerHistory, setCustomerHistory] = useState<CustomerHistorySummary | null>(null);
+  const [isLoadingCustomerHistory, setIsLoadingCustomerHistory] = useState(false);
 
   // 디바운스: searchInput → searchQuery (300ms)
   useEffect(() => {
@@ -179,6 +184,7 @@ export default function ConsultationsPage() {
     desiredPrice: "",
     desiredPriceNote: "",
     depositAmount: "",
+    accountNumber: "",
     notes: "",
     registrationDate: new Date().toISOString().split("T")[0],
     tradeDate: "",
@@ -203,6 +209,7 @@ export default function ConsultationsPage() {
       desiredPrice: "",
       desiredPriceNote: "",
       depositAmount: "",
+      accountNumber: "",
       notes: "",
       registrationDate: new Date().toISOString().split("T")[0],
       tradeDate: "",
@@ -307,8 +314,8 @@ export default function ConsultationsPage() {
     setIsSaving(true);
     try {
       const response = await consultationsRepo.create({
-        club: form.clubName,
-        membership: form.membershipType,
+        club: form.clubId || form.clubName,
+        membership: form.membershipId || form.membershipType,
         tradeType: form.tradeType,
         customerName: form.customerName,
         contact: form.contact,
@@ -317,6 +324,7 @@ export default function ConsultationsPage() {
         desiredPrice: form.desiredPrice ? Number(form.desiredPrice) : null,
         desiredPriceNote: form.desiredPriceNote || null,
         depositAmount: form.depositAmount ? Number(form.depositAmount) : null,
+        accountNumber: form.accountNumber || null,
         notes: form.notes || null,
         registrationDate: form.registrationDate || null,
         tradeDate: form.tradeDate || null,
@@ -346,8 +354,8 @@ export default function ConsultationsPage() {
     setIsSaving(true);
     try {
       const response = await consultationsRepo.update(editingMemo.id, {
-        club: form.clubName,
-        membership: form.membershipType,
+        club: form.clubId || form.clubName,
+        membership: form.membershipId || form.membershipType,
         tradeType: form.tradeType,
         customerName: form.customerName,
         contact: form.contact,
@@ -356,6 +364,7 @@ export default function ConsultationsPage() {
         desiredPrice: form.desiredPrice ? Number(form.desiredPrice) : null,
         desiredPriceNote: form.desiredPriceNote || null,
         depositAmount: form.depositAmount ? Number(form.depositAmount) : null,
+        accountNumber: form.accountNumber || null,
         notes: form.notes || null,
         registrationDate: form.registrationDate || null,
         tradeDate: form.tradeDate || null,
@@ -409,6 +418,7 @@ export default function ConsultationsPage() {
       desiredPrice: trade.desiredPrice ? String(trade.desiredPrice) : "",
       desiredPriceNote: trade.desiredPriceNote || "",
       depositAmount: trade.depositAmount ? String(trade.depositAmount) : "",
+      accountNumber: trade.accountNumber || "",
       notes: trade.notes || "",
       registrationDate: trade.registrationDate || new Date().toISOString().split("T")[0],
       tradeDate: trade.tradeDate || "",
@@ -435,8 +445,8 @@ export default function ConsultationsPage() {
     setRelatedMemos(prev => prev.map(m => m.id === memo.id ? { ...m, isDone: newIsDone } : m));
     try {
       await consultationsRepo.update(memo.id, {
-        club: memo.clubName,
-        membership: memo.membershipName,
+        club: memo.clubId || memo.clubName,
+        membership: memo.membershipId || memo.membershipName,
         tradeType: memo.tradeType,
         customerName: memo.customerName,
         contact: memo.contact,
@@ -445,6 +455,7 @@ export default function ConsultationsPage() {
         desiredPrice: memo.desiredPrice ? Number(memo.desiredPrice) : null,
         desiredPriceNote: memo.desiredPriceNote || null,
         depositAmount: memo.depositAmount ?? null,
+        accountNumber: memo.accountNumber ?? null,
         notes: memo.notes || null,
         registrationDate: memo.registrationDate || null,
         tradeDate: memo.tradeDate || null,
@@ -489,27 +500,38 @@ export default function ConsultationsPage() {
     setIsLoadingRelated(true);
     setRelatedSort("date");
     setRelatedFilterDone("");
+    setCustomerHistory(null);
 
     const oppositeType = memo.tradeType === "매수" ? "매도" : "매수";
 
-    try {
-      const response = await consultationsRepo.getAll({
-        search: memo.clubName,
-        tradeType: oppositeType,
-        limit: 100,
+    // 반대매매 + 고객 히스토리 병렬 로드
+    const relatedPromise = consultationsRepo
+      .getAll({ search: memo.clubName, tradeType: oppositeType, limit: 100 })
+      .then((res) =>
+        res.data?.trades?.filter((t: Consultation) => t.clubName === memo.clubName) || [],
+      )
+      .catch((error) => {
+        console.error("Failed to load related memos:", error);
+        return [] as Consultation[];
       });
 
-      const filtered =
-        response.data?.trades?.filter(
-          (t: Consultation) => t.clubName === memo.clubName
-        ) || [];
-
-      setRelatedMemos(filtered);
-    } catch (error) {
-      console.error("Failed to load related memos:", error);
-      setRelatedMemos([]);
+    let historyPromise: Promise<CustomerHistorySummary | null> = Promise.resolve(null);
+    if (memo.customerId) {
+      setIsLoadingCustomerHistory(true);
+      historyPromise = customerRepo
+        .getHistorySummary(memo.customerId)
+        .then((res) => (res.success && res.data ? res.data : null))
+        .catch((error) => {
+          console.error("Failed to load customer history:", error);
+          return null;
+        });
     }
+
+    const [related, history] = await Promise.all([relatedPromise, historyPromise]);
+    setRelatedMemos(related);
     setIsLoadingRelated(false);
+    setCustomerHistory(history);
+    setIsLoadingCustomerHistory(false);
   };
 
   const sortedRelatedMemos = useMemo(() => {
@@ -977,6 +999,14 @@ export default function ConsultationsPage() {
             {form.depositAmount && <p className="mt-1 text-xs text-gray-500">{formatPrice(form.depositAmount)}</p>}
           </div>
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">계좌번호</label>
+            <Input
+              value={form.accountNumber}
+              onChange={(e) => setForm((f) => ({ ...f, accountNumber: e.target.value }))}
+              placeholder="110-123-456789"
+            />
+          </div>
+          <div>
             <Textarea
               label="메모"
               value={form.notes}
@@ -1083,6 +1113,100 @@ export default function ConsultationsPage() {
                 <div className="mt-2 text-sm text-gray-600">
                   {selectedMemo.notes}
                 </div>
+              )}
+            </div>
+
+            {/* 고객 이력 섹션 */}
+            <div className="rounded-lg border border-gray-200 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-700">
+                  {selectedMemo.customerName} 이력
+                </h3>
+                {customerHistory && (
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <Badge variant="default">
+                      상담 {customerHistory.summary.consultationCount}건
+                    </Badge>
+                    <Badge variant="default">
+                      거래 {customerHistory.summary.membershipTradeCount}건
+                    </Badge>
+                  </div>
+                )}
+              </div>
+
+              {!selectedMemo.customerId ? (
+                <p className="text-xs text-gray-400">
+                  연결된 고객 프로필이 없어 이력을 조회할 수 없습니다.
+                </p>
+              ) : isLoadingCustomerHistory ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                </div>
+              ) : customerHistory ? (
+                <div className="space-y-3 text-sm">
+                  {customerHistory.recentConsultations.length > 0 && (
+                    <div>
+                      <h4 className="text-[11px] font-semibold text-gray-500 mb-1 uppercase">
+                        최근 상담
+                      </h4>
+                      <ul className="space-y-1">
+                        {customerHistory.recentConsultations.map((c) => (
+                          <li
+                            key={c.id}
+                            className="flex items-center justify-between text-gray-700 gap-3"
+                          >
+                            <span className="truncate">
+                              <Badge variant={c.tradeType === "매수" ? "info" : "error"}>
+                                {c.tradeType}
+                              </Badge>
+                              <span className="ml-1.5">
+                                {c.clubName} · {c.membershipName}
+                              </span>
+                            </span>
+                            <span className="text-xs text-gray-400 shrink-0">
+                              {c.registrationDate ?? "-"}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {customerHistory.recentMembershipTrades.length > 0 && (
+                    <div>
+                      <h4 className="text-[11px] font-semibold text-gray-500 mb-1 uppercase">
+                        최근 거래
+                      </h4>
+                      <ul className="space-y-1">
+                        {customerHistory.recentMembershipTrades.map((t) => (
+                          <li
+                            key={t.id}
+                            className="flex items-center justify-between text-gray-700 gap-3"
+                          >
+                            <span className="truncate">
+                              <Badge variant={t.tradeType === "매수" ? "info" : "error"}>
+                                {t.tradeType}
+                              </Badge>
+                              <span className="ml-1.5">
+                                {t.clubName} · {t.membershipName}
+                              </span>
+                            </span>
+                            <span className="text-xs text-gray-400 shrink-0">
+                              {t.contractDate ?? "-"}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {customerHistory.recentConsultations.length === 0 &&
+                    customerHistory.recentMembershipTrades.length === 0 && (
+                      <p className="text-xs text-gray-400">이력이 없습니다.</p>
+                    )}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-400">이력을 불러오지 못했습니다.</p>
               )}
             </div>
 

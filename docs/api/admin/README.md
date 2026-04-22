@@ -1,6 +1,6 @@
 # Heritage DX Admin API 레퍼런스
 
-> spec: `v1.0.0+15ac42bd` · captured: `2026-04-17`
+> spec: `v1.0.0+d8345ee2` · captured: `2026-04-22`
 > 범위: `https://api.heritage-dx.com/api/admin/*` — 관리자 전용 엔드포인트 **80 operations / 14 파일**.
 
 공개 API 는 [`../README.md`](../README.md) 참조. 인증·응답 envelope·에러·페이지네이션 규칙은 전부 공통이다.

@@ -21,6 +21,7 @@ export interface Consultation {
   desiredPrice: string | number | null;
   desiredPriceNote: string | null;
   depositAmount: number | null;
+  accountNumber: string | null;
   customFields: Record<string, unknown>;
   notes: string | null;
   registrationDate: string | null;
@@ -54,6 +55,7 @@ export interface ConsultationInput {
   desiredPrice?: number | null;
   desiredPriceNote?: string | null;
   depositAmount?: number | null;
+  accountNumber?: string | null;
   customFields?: Record<string, unknown>;
   notes?: string | null;
   registrationDate?: string | null;

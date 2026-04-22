@@ -21,10 +21,18 @@ const DEFAULT_LIMIT = 20;
 interface CustomerFormState {
   name: string;
   contact: string;
+  email: string;
+  address: string;
   memo: string;
 }
 
-const emptyForm: CustomerFormState = { name: "", contact: "", memo: "" };
+const emptyForm: CustomerFormState = {
+  name: "",
+  contact: "",
+  email: "",
+  address: "",
+  memo: "",
+};
 
 export default function CustomersPageClient() {
   const { customer: customerStore } = useAppStores();
@@ -97,6 +105,8 @@ export default function CustomersPageClient() {
     setEditForm({
       name: item.name,
       contact: item.contact,
+      email: item.email ?? "",
+      address: item.address ?? "",
       memo: item.memo ?? "",
     });
     setEditError(null);
@@ -118,6 +128,8 @@ export default function CustomersPageClient() {
     const result = await create({
       name: createForm.name.trim(),
       contact: createForm.contact.trim(),
+      email: createForm.email.trim() || null,
+      address: createForm.address.trim() || null,
       memo: createForm.memo.trim() || undefined,
     });
     setCreateSubmitting(false);
@@ -144,6 +156,8 @@ export default function CustomersPageClient() {
     const updated = await update(selected.id, {
       name: editForm.name.trim(),
       contact: editForm.contact.trim(),
+      email: editForm.email.trim() || null,
+      address: editForm.address.trim() || null,
       memo: editForm.memo.trim() || undefined,
     });
     setEditSubmitting(false);
@@ -320,6 +334,31 @@ export default function CustomersPageClient() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
+              이메일
+            </label>
+            <Input
+              type="email"
+              value={createForm.email}
+              onChange={(e) =>
+                setCreateForm({ ...createForm, email: e.target.value })
+              }
+              placeholder="hong@example.com"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              주소
+            </label>
+            <Input
+              value={createForm.address}
+              onChange={(e) =>
+                setCreateForm({ ...createForm, address: e.target.value })
+              }
+              placeholder="서울특별시 강남구 테헤란로 123"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               메모
             </label>
             <Textarea
@@ -367,6 +406,31 @@ export default function CustomersPageClient() {
                   onChange={(e) =>
                     setEditForm({ ...editForm, contact: e.target.value })
                   }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  이메일
+                </label>
+                <Input
+                  type="email"
+                  value={editForm.email}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, email: e.target.value })
+                  }
+                  placeholder="hong@example.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  주소
+                </label>
+                <Input
+                  value={editForm.address}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, address: e.target.value })
+                  }
+                  placeholder="서울특별시 강남구 테헤란로 123"
                 />
               </div>
               <div>

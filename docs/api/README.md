@@ -1,6 +1,6 @@
 # Heritage DX API 레퍼런스
 
-> spec: `v1.0.0+15ac42bd` · captured: `2026-04-17`
+> spec: `v1.0.0+d8345ee2` · captured: `2026-04-22`
 > 원본 스펙: <https://api.heritage-dx.com/api-docs-json> (Swagger UI: <https://api.heritage-dx.com/api-docs>)
 > 총 엔드포인트: **113 operations / 68 unique paths**, DTO **149 개**
 

@@ -29,6 +29,7 @@ const initialForm: Omit<MembershipTradeForm, "clubId" | "clubName"> = {
   desiredPrice: 0,
   desiredPriceNote: "",
   depositAmount: 0,
+  accountNumber: "",
   notes: "",
   registrationDate: new Date().toISOString().split("T")[0],
   tradeDate: "",
@@ -87,6 +88,7 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
       desiredPrice: cleaned.desiredPrice || null,
       desiredPriceNote: cleaned.desiredPriceNote,
       depositAmount: cleaned.depositAmount || null,
+      accountNumber: cleaned.accountNumber || null,
       notes: cleaned.notes,
       registrationDate: cleaned.registrationDate,
       tradeDate: cleaned.tradeDate,
@@ -209,6 +211,7 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
       desiredPrice: trade.desiredPrice ? Number(trade.desiredPrice) : 0,
       desiredPriceNote: trade.desiredPriceNote || "",
       depositAmount: trade.depositAmount ?? 0,
+      accountNumber: trade.accountNumber || "",
       notes: trade.notes || "",
       registrationDate: trade.registrationDate || new Date().toISOString().split("T")[0],
       tradeDate: trade.tradeDate || "",
@@ -672,6 +675,18 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
                 onChange={(e) => setForm((f) => ({ ...f, depositAmount: e.target.value === "" ? 0 : Number(e.target.value) }))}
                 className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
                 placeholder="10000000"
+              />
+            </div>
+
+            {/* 계좌번호 */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">계좌번호</label>
+              <input
+                type="text"
+                value={form.accountNumber}
+                onChange={(e) => setForm((f) => ({ ...f, accountNumber: e.target.value }))}
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
+                placeholder="110-123-456789"
               />
             </div>
 

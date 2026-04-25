@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Header from "@/components/Header";
 import { useAppStores } from "@/stores";
 import { useCustomers } from "@heritage-dx/store";
 import type { CustomerEntity, CustomerHistorySummaryEntity } from "@heritage-dx/store";
@@ -227,8 +226,7 @@ export default function CustomersPageClient() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header clubName={null} />
+    <div>
       <main className="max-w-4xl mx-auto px-4 py-6 sm:py-8">
         <div className="flex items-center justify-between mb-4">
           <div>

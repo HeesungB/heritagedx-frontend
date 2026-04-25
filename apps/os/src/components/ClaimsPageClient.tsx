@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Header from "@/components/Header";
 import { useClaimRepository } from "@heritage-dx/api";
 import { Button } from "@heritage-dx/ui";
 import { trackEvent } from "@/lib/gtag";
@@ -75,8 +74,7 @@ export default function ClaimsPageClient() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header clubName={null} />
+    <div>
       <main className="max-w-2xl mx-auto px-4 py-6 sm:py-8">
         <div className="mb-6">
           <h2 className="text-xl font-bold text-gray-900">건의사항</h2>

@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import Header from "@/components/Header";
 import ClubProfile from "@/components/ClubProfile";
 import ClubDirectory, {
   INITIALS,
@@ -103,9 +102,7 @@ export default function HomeClient({
   const isDirectoryView = !selectedClub;
 
   return (
-    <div className="h-screen flex flex-col bg-gray-100 overflow-hidden print:h-auto print:overflow-visible print:bg-white">
-      <Header clubName={clubDetail?.name || selectedClub?.name || null} />
-
+    <div className="flex h-[calc(100vh-72px)] flex-col bg-gray-100 overflow-hidden print:h-auto print:overflow-visible print:bg-white">
       {isDirectoryView ? (
         /* 디렉토리 뷰: 골프장 목록 전체 화면 */
         clubsLoading ? (

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import Header from "@/components/Header";
 import { Button, Loading, Modal } from "@heritage-dx/ui";
 import { Notice, NoticeForm } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
@@ -99,9 +98,7 @@ export default function DashboardClient() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-gray-100 overflow-hidden">
-      <Header clubName={null} />
-
+    <div className="flex h-[calc(100vh-72px)] flex-col bg-gray-100 overflow-hidden">
       <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="px-4 py-6 max-w-5xl mx-auto">
           {/* 골프장 바로가기 카드 */}

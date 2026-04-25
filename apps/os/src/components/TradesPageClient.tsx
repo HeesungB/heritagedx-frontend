@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import Header from "@/components/Header";
 import { MembershipTrade, MembershipTradeForm, Club } from "@/types";
 import { ClubSearchSelect, Button, Loading, ConfirmModal } from "@heritage-dx/ui";
 import { useAppStores } from "@/stores";
@@ -360,9 +359,7 @@ export default function TradesPageClient() {
   const filters: TradeFilter[] = ["전체", "매수", "매도"];
 
   return (
-    <div className="h-screen flex flex-col bg-gray-100 overflow-hidden">
-      <Header clubName={null} />
-
+    <div className="flex h-[calc(100vh-72px)] flex-col bg-gray-100 overflow-hidden">
       <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="px-4 py-6">
           {/* 페이지 헤더 */}

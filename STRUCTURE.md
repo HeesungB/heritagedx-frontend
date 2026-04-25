@@ -23,7 +23,7 @@ heritage-dx/
 │   ├── os/                          # 공개 사이트 (포트 3000)
 │   │   ├── src/
 │   │   │   ├── app/                 # Next.js App Router (loading/error: clubs, trades, claims, customers)
-│   │   │   ├── components/          # 39개 컴포넌트 (top-level 28 + club-profile/ 11)
+│   │   │   ├── components/          # 41개 컴포넌트 (top-level 30 + club-profile/ 11) — Sidebar/AppHeader/AppShell shell + 페이지 컴포넌트들
 │   │   │   │   ├── club-profile/        # ClubBasicInfoTable, MembershipInfoSection,
 │   │   │   │   │                        #   EstimateSection, CostCalculatorSection, GreenFeeField, InfoField,
 │   │   │   │   │                        #   BenefitsSheetSection, DocumentsSection, MarketPriceSummary,
@@ -506,10 +506,12 @@ ESLint 9 flat config 공유 패키지. `eslint-config-next`의 `core-web-vitals`
 └── claims/page.tsx               # 건의사항
 ```
 
-#### 컴포넌트 (39개 — top-level 28, `club-profile/` 11)
+#### 컴포넌트 (41개 — top-level 30, `club-profile/` 11)
 
 **코어:**
-`AuthGuard`, `ClientLayout`, `Header`, `MobileNavigation`, `GoogleAnalytics`
+`AuthGuard`, `ClientLayout`, `AppShell`, `Sidebar`, `AppHeader`, `MobileNavigation`, `GoogleAnalytics`
+
+**레이아웃 셸**: `ClientLayout` 안 `AuthGuard` 안에 `AppShell` 을 둔다. `AppShell` 은 `pathname === "/login"` 일 때 children 만 통과(풀스크린 로그인 페이지). 그 외에는 좌측 `Sidebar`(260px, 다크 #111)와 상단 `AppHeader`(72px, 흰색, breadcrumb·검색 placeholder·알림 placeholder·사용자) 를 렌더한다. 모바일(`< lg`)에서는 사이드바가 슬라이드 오버레이. 사이드바 메뉴는 `골프장 검색(/clubs)`, `고객 관리(/customers)`, `상담일지(/trades)`, 하단 영역에 `건의 사항(/claims)`. breadcrumb 매핑은 `apps/os/src/lib/breadcrumb.ts`.
 
 **골프장:**
 `ClubProfile`, `ClubDirectory`, `GolfClubDetail`, `GolfClubTable`, `GolfClubSearch`, `NaverMap`, `MapSidebar`

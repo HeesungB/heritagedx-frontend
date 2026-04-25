@@ -455,6 +455,8 @@ packages/store/
 
 공유 Tailwind CSS 테마 + `globals.css`.
 
+**전역 폰트:** 양쪽 앱 `layout.tsx`에서 `next/font/google`로 Inter(400~800) + Noto Sans KR(400~900)을 로드해 `--font-inter` / `--font-noto-sans-kr` CSS 변수로 주입. 각 앱의 `globals.css` `body`가 두 변수를 폰트 스택의 최우선으로 사용. 로그인 페이지의 `font-extrabold` 등 두꺼운 굵기 합성 깨짐을 방지하기 위함.
+
 **커스텀 색상 팔레트:**
 ```
 primary:    #000000
@@ -489,7 +491,7 @@ ESLint 9 flat config 공유 패키지. `eslint-config-next`의 `core-web-vitals`
 
 ```
 /app
-├── layout.tsx                    # 루트 레이아웃
+├── layout.tsx                    # 루트 레이아웃 (+ next/font: Inter + Noto Sans KR)
 ├── page.tsx                      # 홈 (골프장 목록 + 지도)
 ├── error.tsx                     # 에러 바운더리
 ├── global-error.tsx              # 글로벌 에러 핸들러
@@ -587,7 +589,7 @@ getInitialData()    // 초기 데이터 프리로드
 
 ```
 /app
-├── layout.tsx                            # 루트 레이아웃 (+ Sonner Toaster)
+├── layout.tsx                            # 루트 레이아웃 (+ Sonner Toaster, + next/font: Inter + Noto Sans KR)
 ├── login/page.tsx                        # 로그인
 ├── api/fcm-tokens/route.ts              # FCM 토큰 CRUD API
 ├── api/notifications/route.ts           # 알림 목록 GET API

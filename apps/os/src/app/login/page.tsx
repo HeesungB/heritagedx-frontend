@@ -7,12 +7,21 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const REMEMBER_KEY = "heritage-dx:os:remember-id";
 
+const readRememberedId = () => {
+  if (typeof window === "undefined") return "";
+  try {
+    return localStorage.getItem(REMEMBER_KEY) ?? "";
+  } catch {
+    return "";
+  }
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const { user, isLoading: authLoading, login } = useAuth();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(readRememberedId);
   const [password, setPassword] = useState("");
-  const [rememberId, setRememberId] = useState(false);
+  const [rememberId, setRememberId] = useState(() => Boolean(readRememberedId()));
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -21,15 +30,6 @@ export default function LoginPage() {
       router.replace("/");
     }
   }, [authLoading, user, router]);
-
-  useEffect(() => {
-    const saved =
-      typeof window !== "undefined" ? localStorage.getItem(REMEMBER_KEY) : null;
-    if (saved) {
-      setEmail(saved);
-      setRememberId(true);
-    }
-  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -45,15 +45,21 @@ export default function LoginPage() {
     }
 
     setIsSubmitting(true);
-    if (rememberId) {
-      localStorage.setItem(REMEMBER_KEY, email);
-    } else {
-      localStorage.removeItem(REMEMBER_KEY);
-    }
     const loginError = await login(email, password);
     if (loginError) {
       setError(loginError);
       setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      if (rememberId) {
+        localStorage.setItem(REMEMBER_KEY, email);
+      } else {
+        localStorage.removeItem(REMEMBER_KEY);
+      }
+    } catch {
+      // localStorage 사용 불가 환경에서는 조용히 패스
     }
   };
 

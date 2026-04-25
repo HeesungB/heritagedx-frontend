@@ -20,20 +20,29 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 const REMEMBER_KEY = "heritage-dx:bo:remember-id";
 
+const readRememberedId = () => {
+  if (typeof window === "undefined") return "";
+  try {
+    return localStorage.getItem(REMEMBER_KEY) ?? "";
+  } catch {
+    return "";
+  }
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const { user, isLoading: authLoading, login } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [rememberId, setRememberId] = useState(false);
+  const [rememberId, setRememberId] = useState(() => Boolean(readRememberedId()));
 
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
+    defaultValues: { email: readRememberedId(), password: "" },
   });
 
   useEffect(() => {
@@ -42,26 +51,24 @@ export default function LoginPage() {
     }
   }, [authLoading, user, router]);
 
-  useEffect(() => {
-    const saved = typeof window !== "undefined" ? localStorage.getItem(REMEMBER_KEY) : null;
-    if (saved) {
-      setValue("email", saved);
-      setRememberId(true);
-    }
-  }, [setValue]);
-
   const onSubmit = async (data: LoginFormData) => {
     setError(null);
     setIsSubmitting(true);
-    if (rememberId) {
-      localStorage.setItem(REMEMBER_KEY, data.email);
-    } else {
-      localStorage.removeItem(REMEMBER_KEY);
-    }
     const loginError = await login(data.email, data.password);
     if (loginError) {
       setError(loginError);
       setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      if (rememberId) {
+        localStorage.setItem(REMEMBER_KEY, data.email);
+      } else {
+        localStorage.removeItem(REMEMBER_KEY);
+      }
+    } catch {
+      // localStorage 사용 불가 환경에서는 조용히 패스
     }
   };
 

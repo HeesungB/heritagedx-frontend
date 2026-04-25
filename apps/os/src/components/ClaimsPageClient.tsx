@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { useClaimRepository } from "@heritage-dx/api";
-import { Button } from "@heritage-dx/ui";
 import { trackEvent } from "@/lib/gtag";
 
 const CATEGORIES = [
@@ -15,6 +15,9 @@ const CATEGORIES = [
   "기타",
 ] as const;
 
+const FIELD_BASE =
+  "w-full rounded-[14px] border-2 border-[#e5e7eb] bg-[#f9fafb] text-[18px] tracking-[-0.024em] text-[#101828] placeholder:text-[#101828]/50 focus:border-black focus:outline-none";
+
 export default function ClaimsPageClient() {
   const claimRepo = useClaimRepository();
   const [category, setCategory] = useState("");
@@ -23,6 +26,13 @@ export default function ClaimsPageClient() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const manualInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (manualCategoryInput) {
+      manualInputRef.current?.focus();
+    }
+  }, [manualCategoryInput]);
 
   const handleCategorySelect = (value: string) => {
     if (value === "기타") {
@@ -40,11 +50,11 @@ export default function ClaimsPageClient() {
 
   const handleSubmit = async () => {
     if (!category.trim()) {
-      setErrorMessage("카테고리를 선택하거나 입력해주세요.");
+      setErrorMessage("건의 종류를 선택하거나 입력해주세요.");
       return;
     }
     if (!content.trim()) {
-      setErrorMessage("내용을 입력해주세요.");
+      setErrorMessage("건의 내용을 입력해주세요.");
       return;
     }
 
@@ -74,47 +84,59 @@ export default function ClaimsPageClient() {
   };
 
   return (
-    <div>
-      <main className="max-w-2xl mx-auto px-4 py-6 sm:py-8">
-        <div className="mb-6">
-          <h2 className="text-xl font-bold text-gray-900">건의사항</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            서비스 이용 중 불편사항이나 개선 제안을 보내주세요.
-          </p>
-        </div>
+    <div className="mx-auto max-w-[1036px] px-4 py-12 lg:px-8">
+      {/* 타이틀 */}
+      <div className="flex items-end justify-between border-b-[3px] border-black pb-7">
+        <h1 className="text-[34px] font-extrabold tracking-[-0.025em] text-[#101828]">
+          건의 사항
+        </h1>
+        <p className="text-[20px] font-bold tracking-[-0.022em] text-[#fb2c36]">
+          * 필수입력 사항입니다.
+        </p>
+      </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 sm:p-6">
-          {/* 카테고리 */}
-          <div className="mb-5">
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              카테고리 <span className="text-red-500">*</span>
+      {/* 카드 */}
+      <div className="mt-6 rounded-[20px] border border-[#e5e7eb] bg-white p-8 shadow-[0_1px_3px_0_rgba(0,0,0,0.1),0_1px_2px_0_rgba(0,0,0,0.1)]">
+        <div className="space-y-8">
+          {/* 건의 종류 */}
+          <div className="space-y-3">
+            <label
+              htmlFor="claim-category"
+              className="block text-[18px] font-bold leading-7 tracking-[-0.024em] text-[#101828]"
+            >
+              건의 종류 <span className="text-[#fb2c36]">*</span>
             </label>
+
             {manualCategoryInput ? (
-              <div className="flex gap-1.5">
+              <div className="relative">
                 <input
+                  id="claim-category"
+                  ref={manualInputRef}
                   type="text"
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  placeholder="카테고리를 직접 입력해주세요"
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                  placeholder="건의 종류를 직접 입력해주세요"
+                  className={`${FIELD_BASE} h-16 px-6 pr-14`}
                 />
                 <button
                   type="button"
                   onClick={handleSwitchToList}
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-500 hover:bg-gray-50 whitespace-nowrap"
+                  aria-label="목록에서 선택"
+                  className="absolute right-5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-[#101828]/50 hover:text-black"
                 >
-                  목록선택
+                  <ChevronDown className="h-5 w-5" strokeWidth={2} />
                 </button>
               </div>
             ) : (
               <select
+                id="claim-category"
                 value={category}
                 onChange={(e) => handleCategorySelect(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white"
+                className={`${FIELD_BASE} h-16 px-6 ${category ? "" : "text-[#101828]/50"}`}
               >
-                <option value="">카테고리를 선택해주세요</option>
+                <option value="">건의 종류를 선택해 주세요</option>
                 {CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat}>
+                  <option key={cat} value={cat} className="text-[#101828]">
                     {cat}
                   </option>
                 ))}
@@ -122,43 +144,46 @@ export default function ClaimsPageClient() {
             )}
           </div>
 
-          {/* 내용 */}
-          <div className="mb-5">
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              내용 <span className="text-red-500">*</span>
+          {/* 건의 내용 */}
+          <div className="space-y-3">
+            <label
+              htmlFor="claim-content"
+              className="block text-[18px] font-bold leading-7 tracking-[-0.024em] text-[#101828]"
+            >
+              건의 내용 <span className="text-[#fb2c36]">*</span>
             </label>
             <textarea
+              id="claim-content"
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              rows={6}
-              placeholder="건의사항 내용을 입력해주세요"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none resize-none"
+              placeholder="건의사항 내용을 상세히 입력해주세요."
+              className={`${FIELD_BASE} h-[280px] resize-none px-5 py-4 leading-7`}
             />
           </div>
 
-          {/* 에러/성공 메시지 */}
+          {/* 메시지 */}
           {errorMessage && (
-            <div className="mb-4 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            <div className="rounded-[14px] border border-red-200 bg-red-50 px-5 py-3 text-[15px] text-red-700">
               {errorMessage}
             </div>
           )}
           {successMessage && (
-            <div className="mb-4 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+            <div className="rounded-[14px] border border-emerald-200 bg-emerald-50 px-5 py-3 text-[15px] text-emerald-700">
               {successMessage}
             </div>
           )}
 
           {/* 제출 버튼 */}
-          <Button
+          <button
+            type="button"
             onClick={handleSubmit}
             disabled={submitting}
-            isLoading={submitting}
-            className="w-full"
+            className="h-16 w-full rounded-[14px] border border-[#e5e7eb] bg-white text-[18px] font-bold tracking-[-0.024em] text-black shadow-[0_1px_3px_0_rgba(0,0,0,0.1),0_1px_2px_0_rgba(0,0,0,0.1)] transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {submitting ? "접수 중..." : "건의사항 접수"}
-          </Button>
+            {submitting ? "전송 중..." : "건의사항 전송하기"}
+          </button>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

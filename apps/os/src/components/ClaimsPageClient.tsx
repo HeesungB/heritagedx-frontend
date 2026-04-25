@@ -27,6 +27,7 @@ export default function ClaimsPageClient() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const manualInputRef = useRef<HTMLInputElement>(null);
+  const selectRef = useRef<HTMLSelectElement>(null);
 
   useEffect(() => {
     if (manualCategoryInput) {
@@ -46,6 +47,19 @@ export default function ClaimsPageClient() {
   const handleSwitchToList = () => {
     setManualCategoryInput(false);
     setCategory("");
+    // 다음 paint 에서 select 펼치기 — chevron 한 번 클릭으로 리스트 노출
+    requestAnimationFrame(() => {
+      const select = selectRef.current;
+      if (!select) return;
+      select.focus();
+      if (typeof select.showPicker === "function") {
+        try {
+          select.showPicker();
+        } catch {
+          // showPicker 미지원/거부 — 포커스만 유지
+        }
+      }
+    });
   };
 
   const handleSubmit = async () => {
@@ -128,19 +142,27 @@ export default function ClaimsPageClient() {
                 </button>
               </div>
             ) : (
-              <select
-                id="claim-category"
-                value={category}
-                onChange={(e) => handleCategorySelect(e.target.value)}
-                className={`${FIELD_BASE} h-12 px-4 ${category ? "" : "text-[#101828]/50"}`}
-              >
-                <option value="">건의 종류를 선택해 주세요</option>
-                {CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat} className="text-[#101828]">
-                    {cat}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  id="claim-category"
+                  ref={selectRef}
+                  value={category}
+                  onChange={(e) => handleCategorySelect(e.target.value)}
+                  className={`${FIELD_BASE} h-12 appearance-none px-4 pr-10 ${category ? "" : "text-[#101828]/50"}`}
+                >
+                  <option value="">건의 종류를 선택해 주세요</option>
+                  {CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat} className="text-[#101828]">
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  aria-hidden
+                  className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#101828]/50"
+                  strokeWidth={2}
+                />
+              </div>
             )}
           </div>
 

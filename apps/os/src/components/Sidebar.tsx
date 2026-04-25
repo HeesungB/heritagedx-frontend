@@ -4,13 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Search, Users, FileText, MessageSquare } from "lucide-react";
 
-const MAIN_ITEMS = [
+const NAV_ITEMS = [
   { href: "/clubs", label: "골프장 검색", icon: Search },
   { href: "/customers", label: "고객 관리", icon: Users },
   { href: "/trades", label: "상담일지", icon: FileText },
+  { href: "/claims", label: "건의 사항", icon: MessageSquare },
 ] as const;
-
-const FOOTER_ITEM = { href: "/claims", label: "건의 사항", icon: MessageSquare } as const;
 
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
@@ -65,13 +64,10 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         </span>
       </Link>
 
-      {/* 메인 메뉴 */}
-      <nav className="flex-1 overflow-y-auto px-4 pt-8">
-        <p className="mb-4 px-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[#71717b]">
-          Main Menu
-        </p>
+      {/* 메뉴 */}
+      <nav className="flex-1 overflow-y-auto px-4 pt-4">
         <ul className="space-y-1">
-          {MAIN_ITEMS.map((item) => (
+          {NAV_ITEMS.map((item) => (
             <li key={item.href}>
               <NavItem
                 href={item.href}
@@ -84,17 +80,6 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           ))}
         </ul>
       </nav>
-
-      {/* 하단 — 건의 사항 */}
-      <div className="border-t border-[#27272a] px-4 py-3">
-        <NavItem
-          href={FOOTER_ITEM.href}
-          label={FOOTER_ITEM.label}
-          Icon={FOOTER_ITEM.icon}
-          active={isActive(pathname, FOOTER_ITEM.href)}
-          onNavigate={onNavigate}
-        />
-      </div>
     </aside>
   );
 }

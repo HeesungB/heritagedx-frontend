@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Search, ChevronRight, User as UserIcon, Menu } from "lucide-react";
+import { Search, ChevronRight, User as UserIcon, Menu, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getPageTitle } from "@/lib/breadcrumb";
 
@@ -12,7 +12,7 @@ export default function AppHeader({
   onMenuClick?: () => void;
 }) {
   const pathname = usePathname();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const title = getPageTitle(pathname);
 
   return (
@@ -64,6 +64,17 @@ export default function AppHeader({
           <span className="hidden text-[13px] font-bold tracking-[-0.005em] text-[#4a5565] sm:block">
             {user?.name ?? "사용자"}
           </span>
+          <button
+            type="button"
+            onClick={() => {
+              void logout();
+            }}
+            aria-label="로그아웃"
+            title="로그아웃"
+            className="ml-1 flex h-8 w-8 items-center justify-center rounded-md text-[#6a7282] hover:bg-gray-100 hover:text-black"
+          >
+            <LogOut className="h-4 w-4" strokeWidth={2} />
+          </button>
         </div>
       </div>
     </header>

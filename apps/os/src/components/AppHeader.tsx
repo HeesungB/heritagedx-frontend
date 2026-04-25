@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Search, Bell, ChevronRight, User as UserIcon, Menu } from "lucide-react";
+import { Search, ChevronRight, User as UserIcon, Menu } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getPageTitle } from "@/lib/breadcrumb";
 
@@ -55,12 +55,6 @@ export default function AppHeader({
         </div>
 
         <div className="hidden h-6 w-px bg-[#e5e7eb] sm:block" />
-
-        {/* 알림 종 (placeholder) */}
-        <div aria-hidden className="relative hidden h-5 w-5 text-black sm:block">
-          <Bell className="h-5 w-5" strokeWidth={2} />
-          <span className="absolute -right-1 -top-1 block h-2.5 w-2.5 rounded-full border border-white bg-black" />
-        </div>
 
         {/* 사용자 */}
         <div className="flex items-center gap-2">

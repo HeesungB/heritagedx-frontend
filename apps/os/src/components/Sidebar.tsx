@@ -33,13 +33,13 @@ function NavItem({
     <Link
       href={href}
       onClick={onNavigate}
-      className={`flex h-[42px] items-center gap-[14px] rounded-md px-3 text-[15px] font-medium tracking-[-0.03em] transition-colors ${
+      className={`flex h-9 items-center gap-3 rounded-md px-3 text-[13px] font-medium tracking-[-0.025em] transition-colors ${
         active
           ? "bg-white text-black shadow-[0_1px_3px_0_rgba(0,0,0,0.1),0_1px_2px_0_rgba(0,0,0,0.1)]"
           : "text-[#9f9fa9] hover:bg-white/5 hover:text-white"
       }`}
     >
-      <Icon className="h-5 w-5 shrink-0" strokeWidth={2} />
+      <Icon className="h-4 w-4 shrink-0" strokeWidth={2} />
       <span className="truncate">{label}</span>
     </Link>
   );
@@ -49,23 +49,23 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
 
   return (
-    <aside className="flex h-full w-[260px] flex-col border-r border-[#27272a] bg-[#111] text-white">
+    <aside className="flex h-full w-56 flex-col border-r border-[#27272a] bg-[#111] text-white">
       {/* 로고 */}
       <Link
         href="/"
         onClick={onNavigate}
-        className="flex h-[72px] items-center gap-2.5 px-6"
+        className="flex h-[72px] items-center gap-2.5 px-5"
       >
-        <span className="flex h-7 w-[26.5px] items-center justify-center rounded-md bg-white shadow-[0_1px_3px_0_rgba(0,0,0,0.1),0_1px_2px_0_rgba(0,0,0,0.1)]">
-          <span className="h-3 w-3 rounded-md bg-black" />
+        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-white shadow-[0_1px_3px_0_rgba(0,0,0,0.1),0_1px_2px_0_rgba(0,0,0,0.1)]">
+          <span className="h-2.5 w-2.5 rounded-md bg-black" />
         </span>
-        <span className="text-[19px] leading-[28.5px] tracking-[0.0297px] text-white">
+        <span className="text-[16px] leading-6 tracking-[0.02em] text-white">
           Heritage <span className="font-bold">DX</span>
         </span>
       </Link>
 
       {/* 메뉴 */}
-      <nav className="flex-1 overflow-y-auto px-4 pt-4">
+      <nav className="flex-1 overflow-y-auto px-3 pt-3">
         <ul className="space-y-1">
           {NAV_ITEMS.map((item) => (
             <li key={item.href}>

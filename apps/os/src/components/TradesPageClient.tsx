@@ -936,14 +936,6 @@ export default function TradesPageClient() {
                                 다시 열기
                               </button>
                             )}
-                            {trade.approvalStatus === "FIRST_APPROVED" && trade.linkedTradeId && (
-                              <a
-                                href={`/membership-trades?highlight=${trade.linkedTradeId}`}
-                                className="text-xs px-2 py-0.5 rounded border border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                              >
-                                거래 보기
-                              </a>
-                            )}
                           </div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">

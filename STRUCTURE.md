@@ -22,9 +22,9 @@ heritage-dx/
 ├── apps/
 │   ├── os/                          # 공개 사이트 (포트 3000)
 │   │   ├── src/
-│   │   │   ├── app/                 # Next.js App Router (loading/error: clubs, trades, claims, membership-trades, customers)
-│   │   │   ├── components/          # 41개 컴포넌트 (top-level 29 + club-profile/ 12)
-│   │   │   │   ├── club-profile/        # ClubBasicInfoTable, MembershipInfoSection, MembershipTradesSection,
+│   │   │   ├── app/                 # Next.js App Router (loading/error: clubs, trades, claims, customers)
+│   │   │   ├── components/          # 39개 컴포넌트 (top-level 28 + club-profile/ 11)
+│   │   │   │   ├── club-profile/        # ClubBasicInfoTable, MembershipInfoSection,
 │   │   │   │   │                        #   EstimateSection, CostCalculatorSection, GreenFeeField, InfoField,
 │   │   │   │   │                        #   BenefitsSheetSection, DocumentsSection, MarketPriceSummary,
 │   │   │   │   │                        #   NearbyClubPrices, PriceChart
@@ -502,12 +502,11 @@ ESLint 9 flat config 공유 패키지. `eslint-config-next`의 `core-web-vitals`
 │   ├── page.tsx                  # 골프장 디렉토리/검색
 │   └── loading.tsx               # 로딩 스켈레톤
 ├── trades/page.tsx               # 거래 메모 (상담 기록)
-├── membership-trades/page.tsx    # 거래 내역
 ├── customers/page.tsx            # 고객 관리 (CRUD + 이력 Drawer)
 └── claims/page.tsx               # 건의사항
 ```
 
-#### 컴포넌트 (41개 — top-level 29, `club-profile/` 12)
+#### 컴포넌트 (39개 — top-level 28, `club-profile/` 11)
 
 **코어:**
 `AuthGuard`, `ClientLayout`, `Header`, `MobileNavigation`, `GoogleAnalytics`
@@ -516,10 +515,10 @@ ESLint 9 flat config 공유 패키지. `eslint-config-next`의 `core-web-vitals`
 `ClubProfile`, `ClubDirectory`, `GolfClubDetail`, `GolfClubTable`, `GolfClubSearch`, `NaverMap`, `MapSidebar`
 
 **골프장 프로필 섹션** (`club-profile/`):
-`ClubBasicInfoTable`, `MembershipInfoSection`, `MembershipTradesSection`, `EstimateSection`, `CostCalculatorSection`, `GreenFeeField`, `InfoField`, `BenefitsSheetSection`, `DocumentsSection`, `MarketPriceSummary`, `NearbyClubPrices`, `PriceChart`
+`ClubBasicInfoTable`, `MembershipInfoSection`, `EstimateSection`, `CostCalculatorSection`, `GreenFeeField`, `InfoField`, `BenefitsSheetSection`, `DocumentsSection`, `MarketPriceSummary`, `NearbyClubPrices`, `PriceChart`
 
 **회원권/거래:**
-`MembershipCalculator`, `MembershipInfoSheet`, `MembershipTradesClient`, `RequiredDocuments`, `TradesPageClient`, `TransactionTypeForm`, `TradeMemoSidebar`
+`MembershipCalculator`, `MembershipInfoSheet`, `RequiredDocuments`, `TradesPageClient`, `TransactionTypeForm`, `TradeMemoSidebar`
 
 **승인 워크플로우 (`approval/`):**
 `StatusBadge` — 상담·거래 상태 공통 배지
@@ -557,7 +556,7 @@ getInitialData()    // 초기 데이터 프리로드
 
 `OsRepositoryProvider`에서 `@heritage-dx/api`의 General + Admin Repository를 주입. 클라이언트 컴포넌트는 `@heritage-dx/store`의 훅만 소비한다. Repository convenience hooks(`useXxxRepository`)는 훅 내부에서만 사용.
 
-주요 훅: `useClubs`, `useClubDetail`, `useConsultations`, `useMembershipTrades`, `useConsultationsAdmin`, `useMembershipTradesAdmin`, `useScenarioOptions`, `useScenarioDocuments`, `useClaims`, `useNotices`, `useNoticeMutations`, `useMarketPrices`, `useSendTradeNotification`, `useGeocode`
+주요 훅: `useClubs`, `useClubDetail`, `useConsultations`, `useConsultationsAdmin`, `useScenarioOptions`, `useScenarioDocuments`, `useClaims`, `useNotices`, `useNoticeMutations`, `useMarketPrices`, `useSendTradeNotification`, `useGeocode`
 
 #### 매물 시세 & 주변 골프장 가격
 
@@ -724,7 +723,7 @@ useAuth() / useClubs() / useClubDetail() / useConsultations() 등
 컴포넌트
 ```
 
-- OS: `AuthProvider` → `OsRepositoryProvider` → Zustand Store (캐시) → `useClubs()`, `useClubDetail()`, `useConsultations()`, `useMembershipTrades()` hooks
+- OS: `AuthProvider` → `OsRepositoryProvider` → Zustand Store (캐시) → `useClubs()`, `useClubDetail()`, `useConsultations()` hooks
 - Back Office: `AuthProvider` → `BackOfficeRepositoryProvider` (General + Admin) → `DataProvider` → `useAuth()` + `useData()` + repository hooks
 
 ### 6.5. Type Layer

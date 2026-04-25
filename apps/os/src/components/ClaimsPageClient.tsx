@@ -16,7 +16,7 @@ const CATEGORIES = [
 ] as const;
 
 const FIELD_BASE =
-  "w-full rounded-[12px] border-2 border-[#e5e7eb] bg-[#f9fafb] text-[15px] tracking-[-0.02em] text-[#101828] placeholder:text-[#101828]/50 focus:border-black focus:outline-none";
+  "w-full rounded-[14px] border-2 border-[#e5e7eb] bg-[#f9fafb] text-[16px] tracking-[-0.022em] text-[#101828] placeholder:text-[#101828]/50 focus:border-black focus:outline-none";
 
 export default function ClaimsPageClient() {
   const claimRepo = useClaimRepository();
@@ -84,25 +84,25 @@ export default function ClaimsPageClient() {
   };
 
   return (
-    <div className="px-6 py-10 lg:px-12">
+    <div className="mx-auto max-w-[1036px] px-4 py-12 lg:px-8">
       {/* 타이틀 */}
       <div className="flex items-end justify-between border-b-2 border-black pb-5">
-        <h1 className="text-[28px] font-extrabold tracking-[-0.02em] text-[#101828]">
+        <h1 className="text-[28px] font-extrabold tracking-[-0.022em] text-[#101828]">
           건의 사항
         </h1>
-        <p className="text-[16px] font-bold tracking-[-0.015em] text-[#fb2c36]">
+        <p className="text-[16px] font-bold tracking-[-0.018em] text-[#fb2c36]">
           * 필수입력 사항입니다.
         </p>
       </div>
 
       {/* 카드 */}
-      <div className="mt-6 rounded-[16px] border border-[#e5e7eb] bg-white p-8 shadow-[0_1px_3px_0_rgba(0,0,0,0.1),0_1px_2px_0_rgba(0,0,0,0.1)]">
-        <div className="space-y-7">
+      <div className="mt-6 rounded-[16px] border border-[#e5e7eb] bg-white p-7 shadow-[0_1px_3px_0_rgba(0,0,0,0.1),0_1px_2px_0_rgba(0,0,0,0.1)]">
+        <div className="space-y-6">
           {/* 건의 종류 */}
           <div className="space-y-2">
             <label
               htmlFor="claim-category"
-              className="block text-[16px] font-bold leading-6 tracking-[-0.02em] text-[#101828]"
+              className="block text-[15px] font-bold leading-6 tracking-[-0.02em] text-[#101828]"
             >
               건의 종류 <span className="text-[#fb2c36]">*</span>
             </label>
@@ -116,7 +116,7 @@ export default function ClaimsPageClient() {
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
                   placeholder="건의 종류를 직접 입력해주세요"
-                  className={`${FIELD_BASE} h-14 px-5 pr-12`}
+                  className={`${FIELD_BASE} h-12 px-4 pr-10`}
                 />
                 <button
                   type="button"
@@ -132,7 +132,7 @@ export default function ClaimsPageClient() {
                 id="claim-category"
                 value={category}
                 onChange={(e) => handleCategorySelect(e.target.value)}
-                className={`${FIELD_BASE} h-14 px-5 ${category ? "" : "text-[#101828]/50"}`}
+                className={`${FIELD_BASE} h-12 px-4 ${category ? "" : "text-[#101828]/50"}`}
               >
                 <option value="">건의 종류를 선택해 주세요</option>
                 {CATEGORIES.map((cat) => (
@@ -145,10 +145,10 @@ export default function ClaimsPageClient() {
           </div>
 
           {/* 건의 내용 */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             <label
               htmlFor="claim-content"
-              className="block text-[18px] font-bold leading-7 tracking-[-0.024em] text-[#101828]"
+              className="block text-[15px] font-bold leading-6 tracking-[-0.02em] text-[#101828]"
             >
               건의 내용 <span className="text-[#fb2c36]">*</span>
             </label>
@@ -157,7 +157,7 @@ export default function ClaimsPageClient() {
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder="건의사항 내용을 상세히 입력해주세요."
-              className={`${FIELD_BASE} h-[280px] resize-none px-5 py-4 leading-6`}
+              className={`${FIELD_BASE} h-[240px] resize-none px-4 py-3 leading-6`}
             />
           </div>
 
@@ -178,7 +178,7 @@ export default function ClaimsPageClient() {
             type="button"
             onClick={handleSubmit}
             disabled={submitting}
-            className="h-14 w-full rounded-[12px] border border-[#e5e7eb] bg-white text-[16px] font-bold tracking-[-0.02em] text-black shadow-[0_1px_3px_0_rgba(0,0,0,0.1),0_1px_2px_0_rgba(0,0,0,0.1)] transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="h-12 w-full rounded-[12px] border border-[#e5e7eb] bg-white text-[15px] font-bold tracking-[-0.02em] text-black shadow-[0_1px_3px_0_rgba(0,0,0,0.1),0_1px_2px_0_rgba(0,0,0,0.1)] transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? "전송 중..." : "건의사항 전송하기"}
           </button>

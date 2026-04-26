@@ -48,7 +48,6 @@ export interface ConsultationStoreState {
       reason?: string;
     },
   ) => Promise<RequestApprovalResult>;
-  reopen: (id: string, reason?: string) => Promise<ConsultationEntity | null>;
   hydrate: (items: ConsultationEntity[], pagination: PaginationState) => void;
 }
 
@@ -135,36 +134,16 @@ export function createConsultationStore(repos: GeneralRepositories) {
       }
     },
 
+    // 백엔드가 ConsultationInput 으로 isDone 을 더 이상 받지 않아 서버 영구화는 보류 상태.
+    // 새로고침 시 토글 결과가 사라질 수 있으므로 별도 토글 엔드포인트가 생기면 그쪽으로 연결.
     toggleDone: async (id: string, isDone: boolean) => {
       const { items } = get();
       const item = items.find((i) => i.id === id);
       if (!item) return false;
-
-      // 낙관적 업데이트
       set((s) => ({
         items: s.items.map((i) => (i.id === id ? { ...i, isDone } : i)),
       }));
-
-      try {
-        const response = await repos.consultations.update(id, {
-          ...mapConsultationEntityToInput(item),
-          isDone,
-        });
-        if (!response.success) {
-          // 롤백
-          set((s) => ({
-            items: s.items.map((i) => (i.id === id ? { ...i, isDone: !isDone } : i)),
-          }));
-          return false;
-        }
-        return true;
-      } catch {
-        // 롤백
-        set((s) => ({
-          items: s.items.map((i) => (i.id === id ? { ...i, isDone: !isDone } : i)),
-        }));
-        return false;
-      }
+      return true;
     },
 
     requestApproval: async (
@@ -259,25 +238,6 @@ export function createConsultationStore(repos: GeneralRepositories) {
         return { entity: null, errorMessage: response.error };
       } catch {
         return { entity: null };
-      }
-    },
-
-    reopen: async (id: string, reason?: string) => {
-      try {
-        const response = await repos.consultations.approvalAction(id, {
-          action: APPROVAL_ACTIONS.REOPEN,
-          reason,
-        });
-        if (response.success && response.data) {
-          const entity = mapConsultationDtoToEntity(response.data);
-          set((s) => ({
-            items: s.items.map((item) => (item.id === id ? entity : item)),
-          }));
-          return entity;
-        }
-        return null;
-      } catch {
-        return null;
       }
     },
 

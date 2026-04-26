@@ -34,12 +34,11 @@ const initialForm: Omit<MembershipTradeForm, "clubId" | "clubName"> = {
   registrationDate: new Date().toISOString().split("T")[0],
   tradeDate: "",
   remarks: "",
-  isDone: false,
 };
 
 export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSidebarProps) {
   const { tradeMemo: tradeMemoStore } = useAppStores();
-  const { items: trades, fetch: fetchFromStore, create, update, remove, toggleDone, isLoading: loading } = useConsultations(tradeMemoStore);
+  const { items: rawTrades, fetch: fetchFromStore, create, update, remove, toggleDone, isLoading: loading } = useConsultations(tradeMemoStore);
   const { send: sendNotification } = useSendTradeNotification();
   const [activeTab, setActiveTab] = useState<SidebarTab>("create");
   const [form, setForm] = useState(initialForm);
@@ -52,9 +51,18 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
   const [filterType, setFilterType] = useState<"" | "매수" | "매도">("");
   const [filterDone, setFilterDone] = useState<"" | "done" | "progress">("progress");
   const [manualMembershipInput, setManualMembershipInput] = useState(false);
+
+  // 클라이언트 사이드 isDone 필터 (백엔드에서 isDone 쿼리 파라미터 제거됨)
+  const trades = rawTrades.filter((t) => {
+    if (filterDone === "done") return t.isDone === true;
+    if (filterDone === "progress") return !t.isDone;
+    return true;
+  });
   const ensureFlow = useCustomerEnsureFlow();
 
   useEffect(() => {
+    // 백엔드가 isDone 쿼리 파라미터를 더 이상 받지 않아 서버 필터를 보내지 않는다.
+    // 완료/진행중 필터는 클라이언트 사이드에서 적용한다 (filterDone 사용처 참고).
     fetchFromStore({
       page: 1,
       limit: 50,
@@ -62,9 +70,8 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
       order: "DESC",
       search: searchQuery.trim() || undefined,
       tradeType: filterType || undefined,
-      isDone: filterDone === "done" ? true : filterDone === "progress" ? false : undefined,
     });
-  }, [searchQuery, filterType, filterDone]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searchQuery, filterType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const persistConsultation = async () => {
     const cleaned = {
@@ -93,7 +100,6 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
       registrationDate: cleaned.registrationDate,
       tradeDate: cleaned.tradeDate,
       remarks: cleaned.remarks,
-      isDone: cleaned.isDone,
     };
 
     const wasEditing = !!editingTrade;
@@ -216,7 +222,6 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
       registrationDate: trade.registrationDate || new Date().toISOString().split("T")[0],
       tradeDate: trade.tradeDate || "",
       remarks: trade.remarks || "",
-      isDone: trade.isDone ?? false,
     });
     setActiveTab("create");
   };

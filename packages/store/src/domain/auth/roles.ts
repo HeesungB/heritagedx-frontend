@@ -43,7 +43,9 @@ export function canDeleteConsultation(
 ): boolean {
   if (!user) return false;
   const isConvertedOrApproved =
-    cons.approvalStatus === APPROVAL_STATUS.FIRST_APPROVED || !!cons.linkedTradeId;
+    cons.approvalStatus === APPROVAL_STATUS.DEPOSIT_APPROVED ||
+    cons.approvalStatus === APPROVAL_STATUS.FIRST_APPROVED ||
+    !!cons.linkedTradeId;
   if (isConvertedOrApproved) return canManageOrg(user);
   return true;
 }

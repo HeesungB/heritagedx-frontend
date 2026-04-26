@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { Button, Textarea } from "@heritage-dx/ui";
 
-export type ReasonAction = "HOLD" | "REJECT";
+// REJECT: 거래내역 이관 후 무산 → 거래 레코드 물리 삭제 + 상담 DRAFT 복귀
+// REOPEN: 거래내역 이관 전 승인 단계(계약금 입/송금)에서 무산 → 상담 DRAFT 복귀
+export type ReasonAction = "REJECT" | "REOPEN";
 
 interface Props {
   open: boolean;
@@ -14,8 +16,8 @@ interface Props {
 }
 
 const TITLES: Record<ReasonAction, { title: string; placeholder: string }> = {
-  HOLD: { title: "보류 사유 입력", placeholder: "보류 사유를 입력하세요" },
   REJECT: { title: "반려 사유 입력", placeholder: "반려 사유를 입력하세요" },
+  REOPEN: { title: "다시 열기 사유 입력", placeholder: "다시 열기 사유를 입력하세요" },
 };
 
 export function ActionReasonModal({ open, action, onConfirm, onCancel, submitting }: Props) {

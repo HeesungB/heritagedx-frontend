@@ -23,6 +23,10 @@ interface CustomerFormState {
   email: string;
   address: string;
   memo: string;
+  ageBracket: string;
+  occupation: string;
+  ownedMembershipSummary: string;
+  residenceArea: string;
 }
 
 const emptyForm: CustomerFormState = {
@@ -31,7 +35,14 @@ const emptyForm: CustomerFormState = {
   email: "",
   address: "",
   memo: "",
+  ageBracket: "",
+  occupation: "",
+  ownedMembershipSummary: "",
+  residenceArea: "",
 };
+
+// 연령대 select 후보. 백엔드 enum이 확정되면 정렬·라벨 정렬.
+const AGE_BRACKET_OPTIONS = ["20대", "30대", "40대", "50대", "60대", "70대 이상"] as const;
 
 export default function CustomersPageClient() {
   const { customer: customerStore } = useAppStores();
@@ -107,6 +118,10 @@ export default function CustomersPageClient() {
       email: item.email ?? "",
       address: item.address ?? "",
       memo: item.memo ?? "",
+      ageBracket: item.ageBracket ?? "",
+      occupation: item.occupation ?? "",
+      ownedMembershipSummary: item.ownedMembershipSummary ?? "",
+      residenceArea: item.residenceArea ?? "",
     });
     setEditError(null);
     loadHistory(item.id);
@@ -130,6 +145,10 @@ export default function CustomersPageClient() {
       email: createForm.email.trim() || null,
       address: createForm.address.trim() || null,
       memo: createForm.memo.trim() || undefined,
+      ageBracket: createForm.ageBracket.trim() || null,
+      occupation: createForm.occupation.trim() || null,
+      ownedMembershipSummary: createForm.ownedMembershipSummary.trim() || null,
+      residenceArea: createForm.residenceArea.trim() || null,
     });
     setCreateSubmitting(false);
     if (result.success) {
@@ -158,6 +177,10 @@ export default function CustomersPageClient() {
       email: editForm.email.trim() || null,
       address: editForm.address.trim() || null,
       memo: editForm.memo.trim() || undefined,
+      ageBracket: editForm.ageBracket.trim() || null,
+      occupation: editForm.occupation.trim() || null,
+      ownedMembershipSummary: editForm.ownedMembershipSummary.trim() || null,
+      residenceArea: editForm.residenceArea.trim() || null,
     });
     setEditSubmitting(false);
     if (updated) {
@@ -355,6 +378,54 @@ export default function CustomersPageClient() {
               placeholder="서울특별시 강남구 테헤란로 123"
             />
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                연령대
+              </label>
+              <select
+                value={createForm.ageBracket}
+                onChange={(e) => setCreateForm({ ...createForm, ageBracket: e.target.value })}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
+              >
+                <option value="">선택</option>
+                {AGE_BRACKET_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                직업
+              </label>
+              <Input
+                value={createForm.occupation}
+                onChange={(e) => setCreateForm({ ...createForm, occupation: e.target.value })}
+                placeholder="회사원, 자영업 등"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              거주 지역
+            </label>
+            <Input
+              value={createForm.residenceArea}
+              onChange={(e) => setCreateForm({ ...createForm, residenceArea: e.target.value })}
+              placeholder="서울 강남구, 경기 성남 등"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              보유 회원권 요약
+            </label>
+            <Textarea
+              value={createForm.ownedMembershipSummary}
+              onChange={(e) => setCreateForm({ ...createForm, ownedMembershipSummary: e.target.value })}
+              rows={2}
+              placeholder="현재 보유 중인 회원권"
+            />
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               메모
@@ -431,6 +502,62 @@ export default function CustomersPageClient() {
                   placeholder="서울특별시 강남구 테헤란로 123"
                 />
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    연령대
+                  </label>
+                  <select
+                    value={editForm.ageBracket}
+                    onChange={(e) => setEditForm({ ...editForm, ageBracket: e.target.value })}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
+                  >
+                    <option value="">선택</option>
+                    {AGE_BRACKET_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    직업
+                  </label>
+                  <Input
+                    value={editForm.occupation}
+                    onChange={(e) => setEditForm({ ...editForm, occupation: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  거주 지역
+                </label>
+                <Input
+                  value={editForm.residenceArea}
+                  onChange={(e) => setEditForm({ ...editForm, residenceArea: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  보유 회원권 요약
+                </label>
+                <Textarea
+                  value={editForm.ownedMembershipSummary}
+                  onChange={(e) => setEditForm({ ...editForm, ownedMembershipSummary: e.target.value })}
+                  rows={2}
+                />
+              </div>
+              {selected.customerGrade && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    영업 등급
+                  </label>
+                  <span className="inline-block text-xs px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    {selected.customerGrade}
+                  </span>
+                  <p className="text-xs text-gray-400 mt-1">거래 라이프사이클에 따라 자동 산정됩니다.</p>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   메모

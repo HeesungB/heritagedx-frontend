@@ -5,6 +5,7 @@ import type {
   Consultation,
   ConsultationInput,
   ConsultationsResponse,
+  UserConsultationAction,
 } from "@heritage-dx/types";
 import type { IConsultationRepository } from "../../interfaces/general/consultation.repository";
 import type { TradeListParams } from "../../types";
@@ -23,13 +24,11 @@ export class ConsultationRepository implements IConsultationRepository {
     if (params?.clubId) searchParams.append("clubId", params.clubId);
     if (params?.sort) searchParams.append("sort", params.sort);
     if (params?.order) searchParams.append("order", params.order);
-    if (params?.isDone !== undefined) searchParams.append("isDone", String(params.isDone));
     if (params?.isShared !== undefined) searchParams.append("isShared", String(params.isShared));
     if (params?.organizationId) searchParams.append("organizationId", params.organizationId);
     if (params?.approvalStatus) searchParams.append("approvalStatus", params.approvalStatus);
     if (params?.customerId) searchParams.append("customerId", params.customerId);
     if (params?.linkedTradeId) searchParams.append("linkedTradeId", params.linkedTradeId);
-    if (params?.isConverted !== undefined) searchParams.append("isConverted", String(params.isConverted));
     const queryString = searchParams.toString();
     const endpoint = `/consultations${queryString ? `?${queryString}` : ""}`;
     return this.api.get<ConsultationsResponse>(endpoint);
@@ -52,7 +51,7 @@ export class ConsultationRepository implements IConsultationRepository {
 
   async approvalAction(
     id: string,
-    body: ApprovalActionInput,
+    body: ApprovalActionInput<UserConsultationAction>,
   ): Promise<ApiResponse<Consultation>> {
     return this.api.patch<Consultation>(
       `/consultations/${id}/approval-action`,

@@ -12,11 +12,9 @@ export function useMembershipTradesAdmin(store: MembershipTradeAdminStore) {
   const update = useStore(store, (s) => s.update);
   const remove = useStore(store, (s) => s.remove);
   const workflowAction = useStore(store, (s) => s.workflowAction);
-  const requestFinalReview = useStore(store, (s) => s.requestFinalReview);
-  const approveFirst = useStore(store, (s) => s.approveFirst);
-  const hold = useStore(store, (s) => s.hold);
+  const advanceToTaxFiling = useStore(store, (s) => s.advanceToTaxFiling);
+  const advanceToCompleted = useStore(store, (s) => s.advanceToCompleted);
   const reject = useStore(store, (s) => s.reject);
-  const reopen = useStore(store, (s) => s.reopen);
   const hydrate = useStore(store, (s) => s.hydrate);
 
   return {
@@ -30,11 +28,9 @@ export function useMembershipTradesAdmin(store: MembershipTradeAdminStore) {
     update,
     remove,
     workflowAction,
-    requestFinalReview,
-    approveFirst,
-    hold,
+    advanceToTaxFiling,
+    advanceToCompleted,
     reject,
-    reopen,
     hydrate,
   };
 }

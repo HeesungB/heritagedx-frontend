@@ -1,12 +1,13 @@
 import { createStore } from "zustand/vanilla";
 import type { GeneralRepositories, TradeListParams } from "@heritage-dx/api";
-import type { MembershipTradeInput } from "@heritage-dx/types";
-import { APPROVAL_ACTIONS } from "@heritage-dx/types";
 import type { FetchStatus, PaginationState } from "../entities/common";
 import type { MembershipTradeEntity } from "../entities/membership-trade";
 import { mapMembershipTradeDtoToEntity } from "../mappers/membership-trade.mapper";
 import { normalizePagination } from "../mappers/helpers";
 
+// 공개 거래 store는 read-only.
+// 거래 생성/수정/삭제/액션 엔드포인트는 모두 제거되었고 (거래는 상담 APPROVE_FIRST 시 백엔드가 자동 생성),
+// 관리자만 admin 경로에서 변경할 수 있다.
 export interface MembershipTradeStoreState {
   items: MembershipTradeEntity[];
   pagination: PaginationState | null;
@@ -14,11 +15,6 @@ export interface MembershipTradeStoreState {
   lastParams: TradeListParams | null;
 
   fetch: (params?: TradeListParams) => Promise<void>;
-  create: (data: MembershipTradeInput) => Promise<MembershipTradeEntity | null>;
-  update: (id: string, data: MembershipTradeInput) => Promise<MembershipTradeEntity | null>;
-  remove: (id: string) => Promise<boolean>;
-  requestFinalReview: (id: string, reason?: string) => Promise<MembershipTradeEntity | null>;
-  reopen: (id: string, reason?: string) => Promise<MembershipTradeEntity | null>;
   hydrate: (items: MembershipTradeEntity[], pagination: PaginationState) => void;
 }
 
@@ -50,93 +46,6 @@ export function createMembershipTradeStore(repos: GeneralRepositories) {
         }
       } catch {
         set({ status: "error" });
-      }
-    },
-
-    create: async (data: MembershipTradeInput) => {
-      try {
-        const response = await repos.membershipTrades.create(data);
-        if (response.success && response.data) {
-          const entity = mapMembershipTradeDtoToEntity(response.data);
-          const { lastParams } = get();
-          get().fetch(lastParams ?? undefined);
-          return entity;
-        }
-        return null;
-      } catch {
-        return null;
-      }
-    },
-
-    update: async (id: string, data: MembershipTradeInput) => {
-      try {
-        const response = await repos.membershipTrades.update(id, data);
-        if (response.success && response.data) {
-          const entity = mapMembershipTradeDtoToEntity(response.data);
-          set((s) => ({
-            items: s.items.map((item) => (item.id === id ? entity : item)),
-          }));
-          return entity;
-        }
-        return null;
-      } catch {
-        return null;
-      }
-    },
-
-    remove: async (id: string) => {
-      try {
-        const response = await repos.membershipTrades.delete(id);
-        if (response.success) {
-          set((s) => ({
-            items: s.items.filter((item) => item.id !== id),
-            pagination: s.pagination
-              ? { ...s.pagination, total: s.pagination.total - 1 }
-              : null,
-          }));
-          return true;
-        }
-        return false;
-      } catch {
-        return false;
-      }
-    },
-
-    requestFinalReview: async (id: string, reason?: string) => {
-      try {
-        const response = await repos.membershipTrades.workflowAction(id, {
-          action: APPROVAL_ACTIONS.REQUEST_APPROVAL,
-          reason,
-        });
-        if (response.success && response.data) {
-          const entity = mapMembershipTradeDtoToEntity(response.data);
-          set((s) => ({
-            items: s.items.map((item) => (item.id === id ? entity : item)),
-          }));
-          return entity;
-        }
-        return null;
-      } catch {
-        return null;
-      }
-    },
-
-    reopen: async (id: string, reason?: string) => {
-      try {
-        const response = await repos.membershipTrades.workflowAction(id, {
-          action: APPROVAL_ACTIONS.REOPEN,
-          reason,
-        });
-        if (response.success && response.data) {
-          const entity = mapMembershipTradeDtoToEntity(response.data);
-          set((s) => ({
-            items: s.items.map((item) => (item.id === id ? entity : item)),
-          }));
-          return entity;
-        }
-        return null;
-      } catch {
-        return null;
       }
     },
 

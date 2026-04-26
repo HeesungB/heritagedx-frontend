@@ -1,9 +1,16 @@
 # Heritage DX Admin API 레퍼런스
 
-> spec: `v1.0.0+d8345ee2` · captured: `2026-04-22`
-> 범위: `https://api.heritage-dx.com/api/admin/*` — 관리자 전용 엔드포인트 **80 operations / 14 파일**.
+> spec: `v1.0.0+d8345ee2` · captured: `2026-04-22` (다음 캡처에서 본 변경분 정식 반영 예정 — Phase B)
+> 범위: `https://api.heritage-dx.com/api/admin/*` — 관리자 전용 엔드포인트 **80 operations / 14 파일** (캡처 시점 기준).
 
 공개 API 는 [`../README.md`](../README.md) 참조. 인증·응답 envelope·에러·페이지네이션 규칙은 전부 공통이다.
+
+## 2026-04 변경 요약 (캡처 갱신 전 임시 메모)
+
+- `PATCH /api/admin/consultations/:id/approval-action` 의 `action` enum이 **`APPROVE_FIRST | REOPEN`** 으로 축소됨. (`REQUEST_APPROVAL` / `HOLD` / `REJECT` 불가)
+- `PATCH /api/admin/membership-trades/:id/workflow-action` 의 `action` enum이 **`ADVANCE_TO_TAX_FILING | ADVANCE_TO_COMPLETED | REJECT`** 로 재정의됨. REJECT 는 거래 레코드를 *물리 삭제*하고 원천 상담을 `DRAFT` 로 복귀시키며 다른 거래가 없으면 고객 등급을 `HIGH_INTENT` 로 자동 하향한다.
+- 거래 모델 워크플로우 상태에 단계 전환 상태(예: `TAX_FILING`, `COMPLETED`)가 추가됨 — 정확한 enum 이름은 신규 스펙 캡처 후 확정.
+- 완료 거래(및 거래에 연결된 상담)는 수정/삭제가 서버에서 거부된다.
 
 ## 인증 / 권한
 

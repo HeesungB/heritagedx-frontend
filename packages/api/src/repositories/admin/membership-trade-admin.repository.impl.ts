@@ -1,5 +1,6 @@
 import type { ApiClient } from "@heritage-dx/api-client";
 import type {
+  AdminTradeAction,
   ApiResponse,
   ApprovalActionInput,
   MembershipTrade,
@@ -55,7 +56,7 @@ export class MembershipTradeAdminRepository
 
   async workflowAction(
     id: string,
-    body: ApprovalActionInput,
+    body: ApprovalActionInput<AdminTradeAction>,
   ): Promise<ApiResponse<MembershipTrade>> {
     return this.api.patch<MembershipTrade>(
       `/admin/membership-trades/${id}/workflow-action`,

@@ -12,10 +12,7 @@ export function useConsultationsAdmin(store: ConsultationAdminStore) {
   const update = useStore(store, (s) => s.update);
   const remove = useStore(store, (s) => s.remove);
   const approvalAction = useStore(store, (s) => s.approvalAction);
-  const requestApproval = useStore(store, (s) => s.requestApproval);
   const approveFirst = useStore(store, (s) => s.approveFirst);
-  const hold = useStore(store, (s) => s.hold);
-  const reject = useStore(store, (s) => s.reject);
   const reopen = useStore(store, (s) => s.reopen);
   const hydrate = useStore(store, (s) => s.hydrate);
 
@@ -30,10 +27,7 @@ export function useConsultationsAdmin(store: ConsultationAdminStore) {
     update,
     remove,
     approvalAction,
-    requestApproval,
     approveFirst,
-    hold,
-    reject,
     reopen,
     hydrate,
   };

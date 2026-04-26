@@ -44,6 +44,8 @@ export interface ConsultationsResponse {
   pagination: Pagination;
 }
 
+// 상담 생성/수정 입력. 백엔드가 isDone 필드를 거부하므로 입력 페이로드에서 제외한다.
+// (응답 Consultation 에는 isDone 이 그대로 존재 — 표시용)
 export interface ConsultationInput {
   club: string;
   membership: string;
@@ -61,7 +63,6 @@ export interface ConsultationInput {
   registrationDate?: string | null;
   tradeDate?: string | null;
   remarks?: string | null;
-  isDone?: boolean;
   isShared?: boolean;
 }
 

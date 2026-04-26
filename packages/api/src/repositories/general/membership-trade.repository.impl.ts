@@ -1,9 +1,7 @@
 import type { ApiClient } from "@heritage-dx/api-client";
 import type {
   ApiResponse,
-  ApprovalActionInput,
   MembershipTrade,
-  MembershipTradeInput,
   MembershipTradesResponse,
 } from "@heritage-dx/types";
 import type { IMembershipTradeRepository } from "../../interfaces/general/membership-trade.repository";
@@ -32,28 +30,7 @@ export class MembershipTradeRepository implements IMembershipTradeRepository {
     return this.api.get<MembershipTradesResponse>(endpoint);
   }
 
-  async create(data: MembershipTradeInput): Promise<ApiResponse<MembershipTrade>> {
-    return this.api.post<MembershipTrade>("/membership-trades", data);
-  }
-
-  async update(
-    id: string,
-    data: MembershipTradeInput,
-  ): Promise<ApiResponse<MembershipTrade>> {
-    return this.api.put<MembershipTrade>(`/membership-trades/${id}`, data);
-  }
-
-  async delete(id: string): Promise<ApiResponse<void>> {
-    return this.api.delete(`/membership-trades/${id}`);
-  }
-
-  async workflowAction(
-    id: string,
-    body: ApprovalActionInput,
-  ): Promise<ApiResponse<MembershipTrade>> {
-    return this.api.patch<MembershipTrade>(
-      `/membership-trades/${id}/workflow-action`,
-      body,
-    );
+  async getOne(id: string): Promise<ApiResponse<MembershipTrade>> {
+    return this.api.get<MembershipTrade>(`/membership-trades/${id}`);
   }
 }

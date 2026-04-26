@@ -10,8 +10,7 @@ import {
   MessageSquare,
   Edit3,
   CheckCircle2,
-  PauseCircle,
-  XCircle,
+  RotateCcw,
   ExternalLink,
 } from "lucide-react";
 import {
@@ -34,8 +33,7 @@ import type { ApprovalStatus } from "@heritage-dx/store";
 import { canDeleteConsultation } from "@heritage-dx/store";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
-import { StatusBadge } from "@/components/approval/StatusBadge";
-import { ActionReasonModal, type ReasonAction } from "@/components/approval/ActionReasonModal";
+import { ActionReasonModal } from "@/components/approval/ActionReasonModal";
 
 const formatPrice = (price: string | number | null) => {
   if (!price) return "-";
@@ -72,7 +70,8 @@ export default function ConsultationsPage() {
   const [filterApproval, setFilterApproval] = useState<"" | ApprovalStatus>("");
   const [showConverted, setShowConverted] = useState(false);
   const [approvalBusyId, setApprovalBusyId] = useState<string | null>(null);
-  const [reasonModal, setReasonModal] = useState<{ action: ReasonAction; memoId: string } | null>(null);
+  // 상담일지의 사유 입력 모달은 REOPEN 액션 전용 (FIRST_APPROVED 상태에서 거래내역 이관 전 무산 시 호출)
+  const [reasonModal, setReasonModal] = useState<{ memoId: string } | null>(null);
   const [reasonSubmitting, setReasonSubmitting] = useState(false);
 
   // 골프장/회원권/기간 필터
@@ -143,7 +142,8 @@ export default function ConsultationsPage() {
     return () => { cancelled = true; };
   }, [selectedClubCode]);
 
-  // 클라이언트 필터링 (골프장 + 회원권 + 기간)
+  // 클라이언트 필터링 (골프장 + 회원권 + 기간 + 완료여부 + 거래 전환 완료 포함)
+  // isDone/isConverted 쿼리 파라미터는 백엔드가 거부하므로 모두 클라이언트 사이드에서 적용한다.
   const displayMemos = useMemo(() => {
     let result = rawMemos;
     if (selectedClubCode) {
@@ -161,8 +161,22 @@ export default function ConsultationsPage() {
     if (dateTo) {
       result = result.filter((m) => m.registrationDate && m.registrationDate <= dateTo);
     }
+    if (filterDone === "done") {
+      result = result.filter((m) => m.isDone === true);
+    } else if (filterDone === "notDone") {
+      result = result.filter((m) => !m.isDone);
+    }
+    // showConverted=false 면 거래로 전환된 상담(linkedTradeId 있음 또는 DEPOSIT_APPROVED) 제외
+    if (!showConverted) {
+      result = result.filter(
+        (m) =>
+          !m.linkedTradeId &&
+          m.approvalStatus !== "DEPOSIT_APPROVED" &&
+          m.approvalStatus !== "FIRST_APPROVED",
+      );
+    }
     return result;
-  }, [rawMemos, selectedClubCode, selectedMembership, dateFrom, dateTo]);
+  }, [rawMemos, selectedClubCode, selectedMembership, dateFrom, dateTo, filterDone, showConverted]);
 
   // 폼용 골프장/회원권 상태
   const [formClubCode, setFormClubCode] = useState("");
@@ -189,7 +203,6 @@ export default function ConsultationsPage() {
     registrationDate: new Date().toISOString().split("T")[0],
     tradeDate: "",
     remarks: "",
-    isDone: false,
   });
   const formRef = useRef(form);
   formRef.current = form;
@@ -214,7 +227,6 @@ export default function ConsultationsPage() {
       registrationDate: new Date().toISOString().split("T")[0],
       tradeDate: "",
       remarks: "",
-      isDone: false,
     });
     setFormClubCode("");
     setFormMemberships([]);
@@ -265,8 +277,7 @@ export default function ConsultationsPage() {
       preloadedMemos &&
       page === 1 &&
       !searchQuery &&
-      !filterType &&
-      !filterDone
+      !filterType
     ) {
       usedPreloadRef.current = true;
       setRawMemos(preloadedMemos.trades);
@@ -278,6 +289,8 @@ export default function ConsultationsPage() {
 
     setIsLoading(true);
     try {
+      // 백엔드가 isDone/isConverted 쿼리 파라미터를 거부하므로 서버 필터에서 제외.
+      // 완료/진행중·거래전환 필터는 클라이언트 사이드(displayMemos)에서 적용한다.
       const response = await consultationsRepo.getAll({
         page,
         limit: 20,
@@ -285,26 +298,52 @@ export default function ConsultationsPage() {
         tradeType: filterType || undefined,
         sort: "registrationDate",
         order: "DESC",
-        isDone: filterDone === "done" ? true : filterDone === "notDone" ? false : undefined,
         approvalStatus: filterApproval || undefined,
-        isConverted: showConverted ? undefined : false,
       });
       if (response.success && response.data) {
-        setRawMemos(response.data.trades || []);
+        const fresh = response.data.trades || [];
+        if (page === 1) {
+          setRawMemos(fresh);
+        } else {
+          // 인피니트 스크롤: dedupe 후 누적
+          setRawMemos((prev) => {
+            const ids = new Set(prev.map((m) => m.id));
+            const newOnes = fresh.filter((m) => !ids.has(m.id));
+            return newOnes.length === 0 ? prev : [...prev, ...newOnes];
+          });
+        }
         setPagination(response.data.pagination || null);
       } else {
-        setRawMemos([]);
+        console.error("loadMemos failed:", response.error);
+        if (page === 1) setRawMemos([]);
       }
     } catch (error) {
       console.error("Failed to load trade memos:", error);
-      setRawMemos([]);
+      if (page === 1) setRawMemos([]);
     }
     setIsLoading(false);
-  }, [page, searchQuery, filterType, filterDone, filterApproval, showConverted, preloadedMemos, clearPreloadedMemos]);
+  }, [page, searchQuery, filterType, filterApproval, preloadedMemos, clearPreloadedMemos]);
 
   useEffect(() => {
     loadMemos();
   }, [loadMemos]);
+
+  // IntersectionObserver: sentinel 진입 시 다음 페이지 로드
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && pagination?.hasNext && !isLoading) {
+          setPage((p) => p + 1);
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [pagination?.hasNext, isLoading]);
 
   const handleAdd = async () => {
     if (!form.customerName.trim() || !form.clubName.trim()) {
@@ -329,7 +368,6 @@ export default function ConsultationsPage() {
         registrationDate: form.registrationDate || null,
         tradeDate: form.tradeDate || null,
         remarks: form.remarks || null,
-        isDone: false,
       });
       if (response.success) {
         alert("상담일지가 등록되었습니다.");
@@ -369,7 +407,6 @@ export default function ConsultationsPage() {
         registrationDate: form.registrationDate || null,
         tradeDate: form.tradeDate || null,
         remarks: form.remarks || null,
-        isDone: form.isDone,
       });
       if (response.success) {
         alert("상담일지가 수정되었습니다.");
@@ -423,7 +460,6 @@ export default function ConsultationsPage() {
       registrationDate: trade.registrationDate || new Date().toISOString().split("T")[0],
       tradeDate: trade.tradeDate || "",
       remarks: trade.remarks || "",
-      isDone: trade.isDone ?? false,
     });
     // 골프장 매칭
     const matched = clubs.find((c) => c.name === trade.clubName);
@@ -437,42 +473,18 @@ export default function ConsultationsPage() {
     setManualMembershipInput(false);
   };
 
+  // 백엔드가 ConsultationInput 으로 isDone 을 더 이상 받지 않아 서버 영구화는 보류 상태.
+  // 별도 토글 엔드포인트가 생기면 그쪽으로 연결한다. (현재는 로컬 상태만 변경)
   const handleToggleDone = async (memo: Consultation) => {
     const newIsDone = !memo.isDone;
-    // 낙관적 업데이트
     setRawMemos(prev => prev.map(m => m.id === memo.id ? { ...m, isDone: newIsDone } : m));
     setSelectedMemo(prev => prev && prev.id === memo.id ? { ...prev, isDone: newIsDone } : prev);
     setRelatedMemos(prev => prev.map(m => m.id === memo.id ? { ...m, isDone: newIsDone } : m));
-    try {
-      await consultationsRepo.update(memo.id, {
-        club: memo.clubId || memo.clubName,
-        membership: memo.membershipId || memo.membershipName,
-        tradeType: memo.tradeType,
-        customerName: memo.customerName,
-        contact: memo.contact,
-        offerPrice: memo.offerPrice ? Number(memo.offerPrice) : null,
-        offerPriceNote: memo.offerPriceNote || null,
-        desiredPrice: memo.desiredPrice ? Number(memo.desiredPrice) : null,
-        desiredPriceNote: memo.desiredPriceNote || null,
-        depositAmount: memo.depositAmount ?? null,
-        accountNumber: memo.accountNumber ?? null,
-        notes: memo.notes || null,
-        registrationDate: memo.registrationDate || null,
-        tradeDate: memo.tradeDate || null,
-        remarks: memo.remarks || null,
-        isDone: newIsDone,
-      });
-    } catch {
-      // 롤백
-      setRawMemos(prev => prev.map(m => m.id === memo.id ? { ...m, isDone: !newIsDone } : m));
-      setSelectedMemo(prev => prev && prev.id === memo.id ? { ...prev, isDone: !newIsDone } : prev);
-      setRelatedMemos(prev => prev.map(m => m.id === memo.id ? { ...m, isDone: !newIsDone } : m));
-    }
   };
 
   const runApprovalAction = async (
     memo: Consultation,
-    action: "APPROVE_FIRST" | "HOLD" | "REJECT" | "REQUEST_APPROVAL",
+    action: "APPROVE_FIRST" | "REOPEN",
     reason?: string,
   ) => {
     setApprovalBusyId(memo.id);
@@ -635,11 +647,9 @@ export default function ConsultationsPage() {
               className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 bg-white w-[140px] h-[34px]"
             >
               <option value="">승인 상태 전체</option>
-              <option value="DRAFT">작성중</option>
-              <option value="PENDING_APPROVAL">승인대기</option>
-              <option value="ON_HOLD">보류</option>
-              <option value="REJECTED">반려</option>
-              {showConverted && <option value="FIRST_APPROVED">승인</option>}
+              <option value="IN_CONSULTATION">상담중</option>
+              <option value="PENDING_DEPOSIT">계약금 대기</option>
+              {showConverted && <option value="DEPOSIT_APPROVED">계약금 승인</option>}
             </select>
             <label className="flex items-center gap-1.5 text-xs text-gray-600 select-none cursor-pointer">
               <input
@@ -712,7 +722,7 @@ export default function ConsultationsPage() {
               <table className="min-w-[400px] w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs text-gray-500">
-                    <th className="py-2 pr-3 font-medium">승인</th>
+                    <th className="py-2 pr-3 font-medium w-20">액션</th>
                     <th className="py-2 pr-3 font-medium">유형</th>
                     <th className="py-2 pr-3 font-medium">골프장</th>
                     <th className="hidden md:table-cell py-2 pr-3 font-medium">회원권</th>
@@ -731,60 +741,42 @@ export default function ConsultationsPage() {
                     <tr key={trade.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors group cursor-pointer ${trade.isDone ? "opacity-50" : ""}`} onClick={() => handleRowClick(trade)}>
                       <td className="py-2.5 pr-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1.5">
-                          <StatusBadge status={trade.approvalStatus} />
-                          {trade.approvalStatus === "PENDING_APPROVAL" && (
+                          {(trade.approvalStatus === "PENDING_DEPOSIT" || trade.approvalStatus === "PENDING_APPROVAL") && (() => {
+                            const hasDeposit = !!trade.depositAmount && trade.depositAmount > 0;
+                            return (
+                              <button
+                                type="button"
+                                disabled={approvalBusyId === trade.id || !hasDeposit}
+                                onClick={() => runApprovalAction(trade, "APPROVE_FIRST")}
+                                className="p-1 rounded hover:bg-emerald-50 text-emerald-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                                title={hasDeposit ? "승인 (거래 자동 생성)" : "계약금 입력 후 승인 가능"}
+                              >
+                                <CheckCircle2 className="w-4 h-4" />
+                              </button>
+                            );
+                          })()}
+                          {(trade.approvalStatus === "DEPOSIT_APPROVED" || trade.approvalStatus === "FIRST_APPROVED") && (
                             <>
-                              {(() => {
-                                const hasDeposit = !!trade.depositAmount && trade.depositAmount > 0;
-                                return (
-                                  <button
-                                    type="button"
-                                    disabled={approvalBusyId === trade.id || !hasDeposit}
-                                    onClick={() => runApprovalAction(trade, "APPROVE_FIRST")}
-                                    className="p-1 rounded hover:bg-emerald-50 text-emerald-600 disabled:opacity-30 disabled:cursor-not-allowed"
-                                    title={hasDeposit ? "승인" : "계약금 입력 후 승인 가능"}
-                                  >
-                                    <CheckCircle2 className="w-4 h-4" />
-                                  </button>
-                                );
-                              })()}
                               <button
                                 type="button"
                                 disabled={approvalBusyId === trade.id}
-                                onClick={() => setReasonModal({ action: "HOLD", memoId: trade.id })}
-                                className="p-1 rounded hover:bg-orange-50 text-orange-600 disabled:opacity-50"
-                                title="보류"
+                                onClick={() => setReasonModal({ memoId: trade.id })}
+                                className="p-1 rounded hover:bg-amber-50 text-amber-700 disabled:opacity-50"
+                                title="다시 열기 (계약금 입/송금 무산 시)"
                               >
-                                <PauseCircle className="w-4 h-4" />
+                                <RotateCcw className="w-4 h-4" />
                               </button>
-                              <button
-                                type="button"
-                                disabled={approvalBusyId === trade.id}
-                                onClick={() => setReasonModal({ action: "REJECT", memoId: trade.id })}
-                                className="p-1 rounded hover:bg-rose-50 text-rose-600 disabled:opacity-50"
-                                title="반려"
-                              >
-                                <XCircle className="w-4 h-4" />
-                              </button>
+                              {trade.linkedTradeId && (
+                                <a
+                                  href={`/trade-records?highlight=${trade.linkedTradeId}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="p-1 rounded hover:bg-emerald-50 text-emerald-700"
+                                  title="연결된 거래 보기"
+                                >
+                                  <ExternalLink className="w-4 h-4" />
+                                </a>
+                              )}
                             </>
-                          )}
-                          {(trade.approvalStatus === "ON_HOLD" || trade.approvalStatus === "REJECTED") && (
-                            <span
-                              className="text-[11px] text-gray-400"
-                              title="딜러의 다시 열기 요청 대기"
-                            >
-                              딜러 요청 대기
-                            </span>
-                          )}
-                          {trade.approvalStatus === "FIRST_APPROVED" && trade.linkedTradeId && (
-                            <a
-                              href={`/trade-records?highlight=${trade.linkedTradeId}`}
-                              onClick={(e) => e.stopPropagation()}
-                              className="p-1 rounded hover:bg-emerald-50 text-emerald-700"
-                              title="거래 초안 보기"
-                            >
-                              <ExternalLink className="w-4 h-4" />
-                            </a>
                           )}
                         </div>
                       </td>
@@ -817,12 +809,13 @@ export default function ConsultationsPage() {
                 </tbody>
               </table>
               </div>
-              {pagination && pagination.totalPages > 1 && (
-                <div className="flex items-center justify-center gap-2 mt-6 pt-4 border-t">
-                  <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>이전</Button>
-                  <span className="text-sm text-gray-600">{pagination.page} / {pagination.totalPages}</span>
-                  <Button variant="outline" size="sm" disabled={page >= pagination.totalPages} onClick={() => setPage((p) => p + 1)}>다음</Button>
-                </div>
+              {/* 인피니트 스크롤 sentinel */}
+              <div ref={sentinelRef} className="h-1" />
+              {pagination?.hasNext && isLoading && (
+                <div className="py-4 text-center text-xs text-gray-400">불러오는 중...</div>
+              )}
+              {!pagination?.hasNext && rawMemos.length > 0 && (
+                <div className="py-4 text-center text-xs text-gray-400">모든 항목을 불러왔습니다 ({rawMemos.length}건)</div>
               )}
             </>
           )}
@@ -1023,17 +1016,6 @@ export default function ConsultationsPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">특이사항</label>
             <Input value={form.remarks} onChange={(e) => setForm((f) => ({ ...f, remarks: e.target.value }))} placeholder="계약금 입금 완료 등" />
           </div>
-          {editingMemo && (
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={form.isDone}
-                onChange={(e) => setForm((f) => ({ ...f, isDone: e.target.checked }))}
-                className="w-4 h-4 rounded border-gray-300 text-emerald-600 cursor-pointer"
-              />
-              <span className="text-sm text-gray-700">완료 처리</span>
-            </label>
-          )}
           <div className="flex justify-end gap-3 pt-4 border-t">
             <Button variant="outline" onClick={() => { setShowAddDrawer(false); setEditingMemo(null); resetForm(); }}>취소</Button>
             <Button onClick={editingMemo ? handleUpdate : handleAdd} disabled={isSaving}>
@@ -1354,7 +1336,7 @@ export default function ConsultationsPage() {
 
       <ActionReasonModal
         open={!!reasonModal}
-        action={reasonModal?.action ?? null}
+        action={reasonModal ? "REOPEN" : null}
         submitting={reasonSubmitting}
         onCancel={() => setReasonModal(null)}
         onConfirm={async (reason) => {
@@ -1362,7 +1344,7 @@ export default function ConsultationsPage() {
           setReasonSubmitting(true);
           const target = rawMemos.find((m) => m.id === reasonModal.memoId);
           if (target) {
-            const ok = await runApprovalAction(target, reasonModal.action, reason);
+            const ok = await runApprovalAction(target, "REOPEN", reason);
             if (ok) setReasonModal(null);
           }
           setReasonSubmitting(false);

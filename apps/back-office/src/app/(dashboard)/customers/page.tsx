@@ -180,6 +180,15 @@ export default function CustomersPage() {
                       주소
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      등급
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      연령대
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      거주 지역
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       메모
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -208,6 +217,19 @@ export default function CustomersPage() {
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700 max-w-[220px] truncate">
                         {customer.address || "-"}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {customer.customerGrade ? (
+                          <Badge variant="info">{customer.customerGrade}</Badge>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {customer.ageBracket || "-"}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700 max-w-[180px] truncate">
+                        {customer.residenceArea || "-"}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">
                         {customer.memo ?? "-"}
@@ -300,6 +322,42 @@ export default function CustomersPage() {
                     {selected.address || "-"}
                   </div>
                 </div>
+                <div>
+                  <div className="text-gray-500 text-xs">영업 등급</div>
+                  <div className="font-medium text-gray-900">
+                    {selected.customerGrade ? (
+                      <Badge variant="info">{selected.customerGrade}</Badge>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-gray-500 text-xs">연령대</div>
+                  <div className="font-medium text-gray-900">
+                    {selected.ageBracket || "-"}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-gray-500 text-xs">직업</div>
+                  <div className="font-medium text-gray-900">
+                    {selected.occupation || "-"}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-gray-500 text-xs">거주 지역</div>
+                  <div className="font-medium text-gray-900">
+                    {selected.residenceArea || "-"}
+                  </div>
+                </div>
+                {selected.ownedMembershipSummary && (
+                  <div className="col-span-2">
+                    <div className="text-gray-500 text-xs">보유 회원권 요약</div>
+                    <div className="text-gray-700 whitespace-pre-wrap">
+                      {selected.ownedMembershipSummary}
+                    </div>
+                  </div>
+                )}
                 {selected.memo && (
                   <div className="col-span-2">
                     <div className="text-gray-500 text-xs">메모</div>

@@ -1,4 +1,5 @@
 import type {
+  AdminTradeAction,
   ApiResponse,
   ApprovalActionInput,
   MembershipTrade,
@@ -16,8 +17,10 @@ export interface IMembershipTradeAdminRepository {
     data: MembershipTradeInput,
   ): Promise<ApiResponse<MembershipTrade>>;
   delete(id: string): Promise<ApiResponse<void>>;
+  // 관리자 거래 액션: ADVANCE_TO_TAX_FILING / ADVANCE_TO_COMPLETED / REJECT 만 허용
+  // REJECT 는 거래 레코드를 물리 삭제하고 원천 상담을 DRAFT 로 복귀시킨다.
   workflowAction(
     id: string,
-    body: ApprovalActionInput,
+    body: ApprovalActionInput<AdminTradeAction>,
   ): Promise<ApiResponse<MembershipTrade>>;
 }

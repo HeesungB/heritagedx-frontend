@@ -1,10 +1,28 @@
 # Heritage DX API 레퍼런스
 
-> spec: `v1.0.0+d8345ee2` · captured: `2026-04-22`
+> spec: `v1.0.0+d8345ee2` · captured: `2026-04-22` (다음 캡처에서 본 변경분 정식 반영 예정 — Phase B)
 > 원본 스펙: <https://api.heritage-dx.com/api-docs-json> (Swagger UI: <https://api.heritage-dx.com/api-docs>)
-> 총 엔드포인트: **113 operations / 68 unique paths**, DTO **149 개**
+> 총 엔드포인트: **113 operations / 68 unique paths**, DTO **149 개** (캡처 시점 기준 — 2026-04 변경 후 일부 축소·재정의)
 
 이 폴더는 `https://api.heritage-dx.com` 의 REST API 레퍼런스다. 코드 변경 전 **항상 여기서 path / DTO / 인증 요구를 확인**한 뒤 `@heritage-dx/api` Repository / 훅을 작성한다.
+
+## 2026-04 변경 요약 (캡처 갱신 전 임시 메모)
+
+- **공개 거래 mutation 4개 엔드포인트 삭제** — `POST /membership-trades`, `PUT /membership-trades/:id`, `DELETE /membership-trades/:id`, `PATCH /membership-trades/:id/workflow-action`. 거래는 관리자가 상담의 `APPROVE_FIRST` 액션을 수행하면 백엔드가 자동 생성한다.
+- **액션 enum 축소/재정의**:
+  - `PATCH /api/consultations/:id/approval-action` (공개) → `REQUEST_APPROVAL` 만.
+  - `PATCH /api/admin/consultations/:id/approval-action` (관리자) → `APPROVE_FIRST`, `REOPEN`.
+  - `PATCH /api/admin/membership-trades/:id/workflow-action` (관리자) → `ADVANCE_TO_TAX_FILING`, `ADVANCE_TO_COMPLETED`, `REJECT`.
+- **자동 사이드이펙트**:
+  - 거래 생성 시 고객 등급 자동 `ACTIVE_DEAL`.
+  - 거래 `REJECT` 또는 삭제 시 거래 레코드 물리 삭제 + 원천 상담 `DRAFT` 복귀 + `approvalRequestedAt/approvalRequestedByUserId` 초기화 + 다른 거래 없으면 고객 등급 `HIGH_INTENT` 자동 하향.
+  - 완료 거래(및 그 거래에 연결된 상담)는 수정/삭제 차단.
+- **고객 모델 신규 필드 5개**: `ageBracket`, `occupation`, `ownedMembershipSummary`, `customerGrade`(서버 자동 산정·읽기 전용), `residenceArea`.
+- **상담 `approvalStatus` 명칭 변경**: 백엔드는 이제 `IN_CONSULTATION | PENDING_DEPOSIT | DEPOSIT_APPROVED` 만 허용한다.
+  - `DRAFT` → `IN_CONSULTATION` (상담중, 디폴트)
+  - `PENDING_APPROVAL` → `PENDING_DEPOSIT` (계약금 입/송금 대기)
+  - `FIRST_APPROVED` → `DEPOSIT_APPROVED` (계약금 승인 완료, 거래내역 이관됨)
+  - 구 값들은 클라이언트 호환 위해 enum 에 deprecated 로 남아 있음.
 
 ## 파일 구조
 

@@ -9,8 +9,8 @@ import { useSendTradeNotification } from "@/hooks/useSendTradeNotification";
 import { useCustomerEnsureFlow } from "@/hooks/useCustomerEnsureFlow";
 import CustomerAutocomplete from "@/components/CustomerAutocomplete";
 import ApprovalRequirementsModal from "@/components/ApprovalRequirementsModal";
-import { trackEvent } from "@/lib/gtag";
 import { StatusBadge } from "@/components/approval/StatusBadge";
+import { trackEvent } from "@/lib/gtag";
 import {
   collectMissingConsultationApprovalFields,
   type ApprovalStatus,
@@ -41,20 +41,20 @@ const emptyForm: MembershipTradeForm = {
   registrationDate: new Date().toISOString().split("T")[0],
   tradeDate: "",
   remarks: "",
-  isDone: false,
 };
 
 export default function TradesPageClient() {
   const { club: clubStore, tradeMemo: tradeMemoStore } = useAppStores();
   const { user } = useAuth();
   const { clubs, isLoading: clubsLoading } = useClubs(clubStore);
-  const { items: rawTrades, fetch: fetchFromStore, create, update, remove, toggleDone, requestApproval, reopen, isLoading: loading } = useConsultations(tradeMemoStore);
+  const { items: pageTrades, pagination, fetch: fetchFromStore, create, update, remove, toggleDone, requestApproval, isLoading: loading } = useConsultations(tradeMemoStore);
+  // 인피니트 스크롤: 페이지마다 store가 items를 대체하므로 컴포넌트에서 누적
+  const [rawTrades, setRawTrades] = useState<MembershipTrade[]>([]);
   const { send: sendNotification } = useSendTradeNotification();
   const [filter, setFilter] = useState<TradeFilter>("전체");
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<MembershipTradeForm>(emptyForm);
   const [submitting, setSubmitting] = useState(false);
@@ -134,6 +134,8 @@ export default function TradesPageClient() {
   }, [searchInput]);
 
   useEffect(() => {
+    // 백엔드가 isDone/isConverted 쿼리 파라미터를 거부하므로 서버 필터에서 제외.
+    // 완료/진행중·거래전환 필터는 클라이언트 사이드에서 적용한다.
     fetchFromStore({
       page,
       limit: 20,
@@ -141,13 +143,42 @@ export default function TradesPageClient() {
       order: sortOrder,
       tradeType: filter !== "전체" ? filter : undefined,
       search: searchQuery.trim() || undefined,
-      isDone: filterDone === "완료" ? true : filterDone === "진행중" ? false : undefined,
       approvalStatus: filterApproval || undefined,
-      isConverted: showConverted ? undefined : false,
     });
-  }, [page, filter, searchQuery, sortField, sortOrder, filterDone, filterApproval, showConverted]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [page, filter, searchQuery, sortField, sortOrder, filterApproval]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 클라이언트 필터링: 골프장/회원권/기간 선택 시 네트워크 요청 없이 즉시 필터
+  // 인피니트 스크롤 누적: page=1 이면 대체, 그 외에는 dedupe 추가
+  useEffect(() => {
+    if (page === 1) {
+      setRawTrades(pageTrades as MembershipTrade[]);
+    } else {
+      setRawTrades((prev) => {
+        const ids = new Set(prev.map((t) => t.id));
+        const fresh = (pageTrades as MembershipTrade[]).filter((t) => !ids.has(t.id));
+        return fresh.length === 0 ? prev : [...prev, ...fresh];
+      });
+    }
+  }, [pageTrades, page]);
+
+  // IntersectionObserver: sentinel 진입 시 다음 페이지 로드
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && pagination?.hasNext && !loading) {
+          setPage((p) => p + 1);
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [pagination?.hasNext, loading]);
+
+  // 클라이언트 필터링: 골프장/회원권/기간/완료여부/거래전환 선택 시 네트워크 요청 없이 즉시 필터
+  // (isDone/isConverted 는 서버 쿼리 파라미터에서 제거되어 여기서 처리한다)
   const trades = useMemo(() => {
     let filtered = rawTrades as MembershipTrade[];
     const selectedClubName = clubs.find((c) => c.code === selectedClubCode)?.name;
@@ -163,8 +194,21 @@ export default function TradesPageClient() {
     if (dateTo) {
       filtered = filtered.filter((t) => (t.registrationDate || "") <= dateTo);
     }
+    if (filterDone === "완료") {
+      filtered = filtered.filter((t) => t.isDone === true);
+    } else if (filterDone === "진행중") {
+      filtered = filtered.filter((t) => !t.isDone);
+    }
+    if (!showConverted) {
+      filtered = filtered.filter(
+        (t) =>
+          !t.linkedTradeId &&
+          t.approvalStatus !== "DEPOSIT_APPROVED" &&
+          t.approvalStatus !== "FIRST_APPROVED",
+      );
+    }
     return filtered;
-  }, [rawTrades, clubs, selectedClubCode, selectedMembership, dateFrom, dateTo]);
+  }, [rawTrades, clubs, selectedClubCode, selectedMembership, dateFrom, dateTo, filterDone, showConverted]);
 
   // 거래 데이터에 있는 골프장만 필터 드롭다운에 표시
   const availableClubs = useMemo(() => {
@@ -190,7 +234,6 @@ export default function TradesPageClient() {
       registrationDate: form.registrationDate || null,
       tradeDate: form.tradeDate || null,
       remarks: form.remarks || null,
-      isDone: form.isDone,
     };
 
     const wasEditing = !!editingTrade;
@@ -294,7 +337,6 @@ export default function TradesPageClient() {
       registrationDate: trade.registrationDate || new Date().toISOString().split("T")[0],
       tradeDate: trade.tradeDate || "",
       remarks: trade.remarks || "",
-      isDone: trade.isDone ?? false,
     });
     const matchedClub = clubs.find((c) => c.name === trade.clubName);
     if (matchedClub) {
@@ -428,11 +470,9 @@ export default function TradesPageClient() {
                 className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
               >
                 <option value="">승인 상태 전체</option>
-                <option value="DRAFT">작성중</option>
-                <option value="PENDING_APPROVAL">승인대기</option>
-                <option value="ON_HOLD">보류</option>
-                <option value="REJECTED">반려</option>
-                {showConverted && <option value="FIRST_APPROVED">승인</option>}
+                <option value="IN_CONSULTATION">상담중</option>
+                <option value="PENDING_DEPOSIT">계약금 대기</option>
+                {showConverted && <option value="DEPOSIT_APPROVED">계약금 승인</option>}
               </select>
 
               {/* 승인내역 포함 토글 */}
@@ -442,7 +482,7 @@ export default function TradesPageClient() {
                   checked={showConverted}
                   onChange={(e) => {
                     setShowConverted(e.target.checked);
-                    if (!e.target.checked && filterApproval === "FIRST_APPROVED") {
+                    if (!e.target.checked && filterApproval === "DEPOSIT_APPROVED") {
                       setFilterApproval("");
                     }
                     setPage(1);
@@ -845,8 +885,6 @@ export default function TradesPageClient() {
                 <table className="w-full border-collapse min-w-[360px]">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">상태</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">승인</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">유형</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">골프장</th>
                       <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">회원권</th>
@@ -857,25 +895,53 @@ export default function TradesPageClient() {
                       <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">등록일</th>
                       <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">작성자</th>
                       <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">메모</th>
+                      <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">승인 상태</th>
                       <th className="hidden md:table-cell px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">관리</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {trades.map((trade) => (
                       <tr key={trade.id} className={`transition-colors ${trade.isDone ? "bg-green-50/40 opacity-60" : "hover:bg-gray-50"}`}>
-                        <td className="px-4 py-3 text-center">
-                          <input
-                            type="checkbox"
-                            checked={trade.isDone ?? false}
-                            onChange={() => handleToggleDone(trade)}
-                            className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 cursor-pointer"
-                            title={trade.isDone ? "완료 → 진행중" : "진행중 → 완료"}
-                          />
-                        </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
-                            <StatusBadge status={trade.approvalStatus} />
-                            {(trade.approvalStatus === "DRAFT" || trade.approvalStatus === "ON_HOLD") && (
+                          <span
+                            className={`px-2 py-0.5 rounded text-xs font-medium ${
+                              trade.isDone
+                                ? "bg-gray-100 text-gray-400"
+                                : trade.tradeType === "매수"
+                                  ? "bg-blue-50 text-blue-700"
+                                  : "bg-red-50 text-red-700"
+                            }`}
+                          >
+                            {trade.tradeType}
+                          </span>
+                        </td>
+                        <td className={`px-4 py-3 text-sm font-medium whitespace-nowrap ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>{trade.clubName}</td>
+                        <td className={`hidden md:table-cell px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.membershipType}</td>
+                        <td className={`px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>{trade.customerName}</td>
+                        <td className={`hidden md:table-cell px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.contact}</td>
+                        <td className={`hidden md:table-cell px-4 py-3 text-sm text-right whitespace-nowrap ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>
+                          {formatPrice(trade.offerPrice)}
+                          {trade.offerPriceNote && (
+                            <span className="text-xs text-gray-400 ml-1">({trade.offerPriceNote})</span>
+                          )}
+                        </td>
+                        <td className={`hidden md:table-cell px-4 py-3 text-sm text-right whitespace-nowrap ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>
+                          {formatPrice(trade.desiredPrice)}
+                          {trade.desiredPriceNote && (
+                            <span className="text-xs text-gray-400 ml-1">({trade.desiredPriceNote})</span>
+                          )}
+                        </td>
+                        <td className={`hidden md:table-cell px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.registrationDate}</td>
+                        <td className={`hidden md:table-cell px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.createdByName || "-"}</td>
+                        <td className={`hidden md:table-cell px-4 py-3 text-sm max-w-[200px] truncate ${trade.isDone ? "text-gray-400" : "text-gray-500"}`}>
+                          {trade.notes || trade.remarks || "-"}
+                        </td>
+                        <td className="hidden md:table-cell px-4 py-3 whitespace-nowrap">
+                          <StatusBadge status={trade.approvalStatus} />
+                        </td>
+                        <td className="hidden md:table-cell px-4 py-3 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            {(trade.approvalStatus === "IN_CONSULTATION" || trade.approvalStatus === "DRAFT" || trade.approvalStatus === "ON_HOLD") && (
                               <button
                                 type="button"
                                 disabled={approvalPendingId === trade.id}
@@ -916,61 +982,10 @@ export default function TradesPageClient() {
                               </button>
                             )}
                             {trade.approvalStatus === "REJECTED" && (
-                              <button
-                                type="button"
-                                disabled={approvalPendingId === trade.id}
-                                onClick={async () => {
-                                  setApprovalPendingId(trade.id);
-                                  try {
-                                    const updated = await reopen(trade.id);
-                                    if (!updated) setErrorMessage("다시 열기 요청 실패");
-                                  } finally {
-                                    setApprovalPendingId(null);
-                                  }
-                                }}
-                                className="text-xs px-2 py-0.5 rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                              >
-                                다시 열기
-                              </button>
+                              <span className="text-[11px] text-gray-400" title="관리자에게 다시 열기를 요청해 주세요">
+                                관리자 대기
+                              </span>
                             )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span
-                            className={`px-2 py-0.5 rounded text-xs font-medium ${
-                              trade.isDone
-                                ? "bg-gray-100 text-gray-400"
-                                : trade.tradeType === "매수"
-                                  ? "bg-blue-50 text-blue-700"
-                                  : "bg-red-50 text-red-700"
-                            }`}
-                          >
-                            {trade.tradeType}
-                          </span>
-                        </td>
-                        <td className={`px-4 py-3 text-sm font-medium whitespace-nowrap ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>{trade.clubName}</td>
-                        <td className={`hidden md:table-cell px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.membershipType}</td>
-                        <td className={`px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>{trade.customerName}</td>
-                        <td className={`hidden md:table-cell px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.contact}</td>
-                        <td className={`hidden md:table-cell px-4 py-3 text-sm text-right whitespace-nowrap ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>
-                          {formatPrice(trade.offerPrice)}
-                          {trade.offerPriceNote && (
-                            <span className="text-xs text-gray-400 ml-1">({trade.offerPriceNote})</span>
-                          )}
-                        </td>
-                        <td className={`hidden md:table-cell px-4 py-3 text-sm text-right whitespace-nowrap ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>
-                          {formatPrice(trade.desiredPrice)}
-                          {trade.desiredPriceNote && (
-                            <span className="text-xs text-gray-400 ml-1">({trade.desiredPriceNote})</span>
-                          )}
-                        </td>
-                        <td className={`hidden md:table-cell px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.registrationDate}</td>
-                        <td className={`hidden md:table-cell px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.createdByName || "-"}</td>
-                        <td className={`hidden md:table-cell px-4 py-3 text-sm max-w-[200px] truncate ${trade.isDone ? "text-gray-400" : "text-gray-500"}`}>
-                          {trade.notes || trade.remarks || "-"}
-                        </td>
-                        <td className="hidden md:table-cell px-4 py-3 text-center">
-                          <div className="flex items-center justify-center gap-1">
                             <button
                               onClick={() => handleEdit(trade)}
                               className="p-1.5 hover:bg-gray-200 rounded text-gray-400 hover:text-gray-600"
@@ -1015,15 +1030,13 @@ export default function TradesPageClient() {
               </div>
             )}
 
-            {/* 페이지네이션 */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 py-4 border-t border-gray-200">
-                <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>이전</Button>
-                <span className="text-sm text-gray-600">
-                  {page} / {totalPages}
-                </span>
-                <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>다음</Button>
-              </div>
+            {/* 인피니트 스크롤 sentinel */}
+            <div ref={sentinelRef} className="h-1" />
+            {pagination?.hasNext && loading && (
+              <div className="py-4 text-center text-xs text-gray-400">불러오는 중...</div>
+            )}
+            {!pagination?.hasNext && rawTrades.length > 0 && (
+              <div className="py-4 text-center text-xs text-gray-400">모든 항목을 불러왔습니다 ({rawTrades.length}건)</div>
             )}
           </div>
         </div>

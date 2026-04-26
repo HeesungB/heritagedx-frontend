@@ -186,6 +186,8 @@ export type {
   WorkflowStatus,
   ApprovalAction,
   UserApprovalAction,
-  AdminApprovalAction,
+  UserConsultationAction,
+  AdminConsultationAction,
+  AdminTradeAction,
   ApprovalActionInput,
 } from "@heritage-dx/types";

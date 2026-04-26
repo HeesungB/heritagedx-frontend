@@ -8,6 +8,12 @@ export interface CustomerEntity {
   email: string | null;
   address: string | null;
   memo: string | null;
+  ageBracket: string | null;
+  occupation: string | null;
+  ownedMembershipSummary: string | null;
+  // 서버가 거래 라이프사이클에 맞춰 자동 산정. 클라이언트는 읽기 전용.
+  customerGrade: string | null;
+  residenceArea: string | null;
   createdAt: string;
   updatedAt: string;
 }

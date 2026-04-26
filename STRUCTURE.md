@@ -245,19 +245,27 @@ packages/api/
 
 #### 승인 워크플로우
 
-상담(`approvalStatus`)과 거래(`workflowStatus`)는 동일한 상태·액션 enum을 공유한다(백엔드 통일). 응답 필드명은 상담이 `approvalRequestedAt`/`firstApprovedAt`/`holdReason`/`rejectionReason`/`linkedTradeId`, 거래가 `submittedForFinalReviewAt`/`finalApprovedAt`/`finalRejectedAt`/`finalRejectionReason`로 분리.
+상담(`approvalStatus`)과 거래(`workflowStatus`)는 한 enum을 공유하되, **2026-04 변경**으로 거래는 진행 단계(세무신고/완료)가 추가됐다. 응답 필드명은 상담이 `approvalRequestedAt`/`firstApprovedAt`/`linkedTradeId`, 거래가 `submittedForFinalReviewAt`/`finalApprovedAt`/`finalRejectedAt`/`finalRejectionReason`로 분리. (`holdReason`/`rejectionReason`은 deprecated, 과거 데이터 호환만)
 
-- **상태**: `DRAFT → PENDING_APPROVAL → FIRST_APPROVED | ON_HOLD | REJECTED`
-- **액션**: 공개 — `REQUEST_APPROVAL`. 관리자 — `REQUEST_APPROVAL | APPROVE_FIRST | HOLD | REJECT | REOPEN` (`PATCH /consultations/:id/approval-action`, `PATCH /membership-trades/:id/workflow-action`)
-- **상담 → 거래 연결**: 상담이 `FIRST_APPROVED`가 되면 서버가 거래 초안을 자동 생성하고 상담 응답에 `linkedTradeId`를 내려준다. 거래 측에는 `sourceConsultationId`로 역참조.
-- **DTO**: `ApprovalActionInput { action, reason? }` (상담·거래 공통)
+- **상담 상태**: `IN_CONSULTATION(상담중) → PENDING_DEPOSIT(계약금 대기) → DEPOSIT_APPROVED(계약금 승인)`. (구 `DRAFT`/`PENDING_APPROVAL`/`FIRST_APPROVED` 는 각각 `IN_CONSULTATION`/`PENDING_DEPOSIT`/`DEPOSIT_APPROVED` 로 명칭 변경됨 — enum 호환을 위해 코드에는 deprecated 로 남아 있음.) `ON_HOLD`/`REJECTED` 는 도달 불가하며 deprecated.
+- **거래 상태**: 상담 APPROVE_FIRST 이후 자동 생성된 거래는 진행 단계(`TAX_FILING → COMPLETED` 등)로 전환. 정확한 enum 이름은 백엔드 신규 스펙 캡처(Phase B) 후 확정.
+- **상담중(DRAFT)** 은 닫는 개념이 없는 디폴트 상태(반대 매물 매칭 탐색용).
+- **액션 분기**:
+  - 공개 상담 (`PATCH /consultations/:id/approval-action`) — `REQUEST_APPROVAL` 만.
+  - 관리자 상담 (`PATCH /admin/consultations/:id/approval-action`) — `APPROVE_FIRST`(거래 자동 생성) | `REOPEN`(거래내역 이관 *전* 무산 → 상담을 DRAFT 로 복귀).
+  - 관리자 거래 (`PATCH /admin/membership-trades/:id/workflow-action`) — `ADVANCE_TO_TAX_FILING` | `ADVANCE_TO_COMPLETED` | `REJECT`(거래 레코드 물리 삭제 + 원천 상담 DRAFT 복귀 + 다른 거래 없으면 고객 등급 `ACTIVE_DEAL → HIGH_INTENT` 자동 하향).
+- **공개 거래 mutation 엔드포인트는 모두 제거**(`POST/PUT/DELETE /membership-trades`, `PATCH .../workflow-action`). 거래는 상담 APPROVE_FIRST 시 백엔드가 자동 생성하므로 사용자가 직접 만들 수 없다. 따라서 `IMembershipTradeRepository`(general)는 `getAll`/`getOne`만 노출하고, 공개 store/hook도 read-only.
+- **상담 → 거래 연결**: APPROVE_FIRST 시 서버가 거래 초안 생성 + 원천 상담에 `linkedTradeId` 세팅 + 거래에 `sourceConsultationId`. 거래 REJECT/삭제 시 자동으로 상담 DRAFT 복귀 + `approvalRequestedAt/By` 초기화.
+- **타입 좁히기**: `UserConsultationAction` / `AdminConsultationAction` / `AdminTradeAction` 으로 역할별 액션을 분리(`packages/types/src/approval.ts`). 광역 `AdminApprovalAction` 은 제거됐다.
+- **DTO**: `ApprovalActionInput<A extends ApprovalAction = ApprovalAction> { action: A; reason? }` — 호출부에서 좁은 union을 전달.
 
-#### v1 운영 정책 적용 (Quick Wins)
+#### v1 운영 정책 적용
 
 - **상담일지 = 리드/재작업 장부**, **거래내역 = 계약금 이후 실행 + 월별 매출 집계 장부**. 전환 시점은 계약금 입금 확인 시점.
-- **상담 리스트 기본 필터**: OS/BO 모두 `isConverted=false` 를 기본 전달해 `FIRST_APPROVED`(거래 전환 완료) 건은 목록에서 숨김. BO는 "거래 전환 완료 포함" 토글로 조회 가능.
-- **APPROVE_FIRST 가드**: 상담 `depositAmount > 0` 일 때만 BO 승인 버튼 활성화. 의미는 "계약금 입금 확인 완료".
-- **거래 REOPEN 유지**: BO `/trade-records` UI에서 `ON_HOLD`/`REJECTED` 건은 REOPEN 버튼으로 되살릴 수 있다(관리자 권한). 계약금 이후 무산 건의 이월/대체매칭/장부제외 흐름은 후속 단계에서 별도 상태·액션으로 확장 예정.
+- **상담 리스트 기본 필터**: OS/BO 모두 `isConverted=false` 기본. FIRST_APPROVED 건은 "거래 전환 완료 포함" 토글로 노출.
+- **APPROVE_FIRST 가드**: 상담 `depositAmount > 0` 일 때만 BO 승인 버튼 활성화 = "계약금 입금 확인 완료".
+- **REOPEN vs REJECT**: REOPEN은 거래 이관 직전 단계에서 무산(상담 DRAFT 복귀), REJECT는 거래 이관 후 무산(거래 물리 삭제 + 상담 DRAFT 복귀). 둘 다 `ActionReasonModal`로 사유를 받는다.
+- **완료 거래 락**: COMPLETED 거래 자체와 그 거래에 연결된 상담은 수정/삭제가 서버에서 거부된다. UI는 가드 노출.
 - **삭제 권한**: `canDeleteConsultation(user, cons)` — `FIRST_APPROVED`/`linkedTradeId` 있는 상담은 대표/백오피스만 삭제. `canDeleteTrade(user)` — 거래내역은 항상 대표/백오피스만 삭제. OS/BO 삭제 버튼 모두 가드 적용.
 
 **Server Repository (ISR):** `IClubRepository`, `IScenarioRepository` — raw `fetch()` + `{ next: { revalidate } }`
@@ -309,7 +317,7 @@ packages/store/
 │   │   ├── organization.ts   # OrganizationEntity
 │   │   ├── user.ts           # UserRole, UserEntity, AdminUserEntity
 │   │   ├── employee.ts       # EmployeeEntity
-│   │   ├── customer.ts       # CustomerEntity
+│   │   ├── customer.ts       # CustomerEntity (+ ageBracket/occupation/ownedMembershipSummary/customerGrade(read-only)/residenceArea — 2026-04 추가)
 │   │   └── club-document.ts  # ClubDocumentEntity, ClubScenarioDocumentEntity
 │   ├── mappers/              # DTO ↔ Entity 변환 (순수 함수)
 │   │   ├── index.ts
@@ -330,10 +338,10 @@ packages/store/
 │   ├── stores/               # Zustand 스토어 (stale-while-revalidate)
 │   │   ├── index.ts
 │   │   ├── club.store.ts     # 목록 캐시 + 상세 캐시 (Map<code, detail>)
-│   │   ├── consultation.store.ts           # general — requestApproval(id, { depositAmount?, offerPrice?, customerName?, contact?, reason? }) → { entity, missingFillable?, errorMessage? }. 제공된 필드만 update 페이로드에 병합(문자열은 trim) 후 approvalAction. 서버가 CONSULTATION_APPROVAL_REQUIRED_FIELDS 로 거부하면 missingFields를 fillable로 필터해 로컬 엔티티를 서버 기준(null/빈문자열)으로 맞추고 missingFillable을 UI로 반환 → 드리프트 자동 복구
-│   │   ├── membership-trade.store.ts       # general — requestFinalReview
-│   │   ├── consultation-admin.store.ts     # admin — approveFirst/hold/reject/reopen
-│   │   ├── membership-trade-admin.store.ts # admin — 동일한 4개 액션
+│   │   ├── consultation.store.ts           # general — requestApproval (REQUEST_APPROVAL 만). REOPEN/HOLD/REJECT 모두 제거됨
+│   │   ├── membership-trade.store.ts       # general — read-only (mutation 메서드 모두 제거)
+│   │   ├── consultation-admin.store.ts     # admin — approveFirst / reopen 만 (HOLD/REJECT/REQUEST_APPROVAL 제거)
+│   │   ├── membership-trade-admin.store.ts # admin — advanceToTaxFiling / advanceToCompleted / reject (REJECT는 응답 후 로컬 목록에서 제거)
 │   │   └── customer.store.ts               # CRUD + searchByQuery (자동완성용)
 │   └── hooks/                # 컴포넌트용 편의 훅
 │       ├── index.ts

@@ -10,7 +10,6 @@ import {
   Edit3,
   Check,
   CheckCircle2,
-  PauseCircle,
   XCircle,
 } from "lucide-react";
 import {
@@ -34,7 +33,7 @@ import { canDeleteTrade } from "@heritage-dx/store";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import { StatusBadge } from "@/components/approval/StatusBadge";
-import { ActionReasonModal, type ReasonAction } from "@/components/approval/ActionReasonModal";
+import { ActionReasonModal } from "@/components/approval/ActionReasonModal";
 
 const formatPrice = (price: string | number | null) => {
   if (!price) return "-";
@@ -72,7 +71,8 @@ export default function MembershipTradesPage() {
   const [dateTo, setDateTo] = useState("");
   const [filterWorkflow, setFilterWorkflow] = useState<"" | WorkflowStatus>("");
   const [approvalBusyId, setApprovalBusyId] = useState<string | null>(null);
-  const [reasonModal, setReasonModal] = useState<{ action: ReasonAction; recordId: string } | null>(null);
+  // 거래내역의 사유 입력 모달은 REJECT 액션 전용
+  const [reasonModal, setReasonModal] = useState<{ recordId: string } | null>(null);
   const [reasonSubmitting, setReasonSubmitting] = useState(false);
   const clubsRef = useRef<Club[]>(clubs);
   const [page, setPage] = useState(1);
@@ -277,15 +277,22 @@ export default function MembershipTradesPage() {
 
   const runWorkflowAction = async (
     record: MembershipTrade,
-    action: "APPROVE_FIRST" | "HOLD" | "REJECT" | "REQUEST_APPROVAL",
+    action: "ADVANCE_TO_TAX_FILING" | "ADVANCE_TO_COMPLETED" | "REJECT",
     reason?: string,
   ) => {
     setApprovalBusyId(record.id);
     try {
       const response = await membershipTradesRepo.workflowAction(record.id, { action, reason });
-      if (response.success && response.data) {
-        const updated = response.data;
-        setRawRecords((prev) => prev.map((r) => (r.id === record.id ? updated : r)));
+      if (response.success) {
+        // REJECT 는 서버에서 거래 레코드를 물리 삭제하므로 목록에서도 제거
+        if (action === "REJECT") {
+          setRawRecords((prev) => prev.filter((r) => r.id !== record.id));
+          return true;
+        }
+        if (response.data) {
+          const updated = response.data;
+          setRawRecords((prev) => prev.map((r) => (r.id === record.id ? updated : r)));
+        }
         return true;
       }
       alert(response.error || "처리에 실패했습니다.");
@@ -520,12 +527,12 @@ export default function MembershipTradesPage() {
               onChange={(e) => { setFilterWorkflow(e.target.value as "" | WorkflowStatus); setPage(1); }}
               className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 bg-white w-[140px] h-[34px]"
             >
-              <option value="">승인 상태 전체</option>
-              <option value="DRAFT">작성중</option>
-              <option value="PENDING_APPROVAL">승인대기</option>
-              <option value="FIRST_APPROVED">승인</option>
-              <option value="ON_HOLD">보류</option>
-              <option value="REJECTED">반려</option>
+              <option value="">진행 단계 전체</option>
+              <option value="IN_CONSULTATION">상담중</option>
+              <option value="PENDING_DEPOSIT">계약금 대기</option>
+              <option value="DEPOSIT_APPROVED">계약금 승인</option>
+              <option value="TAX_FILING">세무신고</option>
+              <option value="COMPLETED">완료</option>
             </select>
             <ClubSearchSelect
               clubs={availableClubs}
@@ -612,44 +619,40 @@ export default function MembershipTradesPage() {
                         <td className="py-2.5 pr-3 whitespace-nowrap">
                           <div className="flex items-center gap-1.5">
                             <StatusBadge status={record.workflowStatus} />
-                            {record.workflowStatus === "PENDING_APPROVAL" && (
+                            {record.workflowStatus !== "COMPLETED" && (
                               <>
+                                {record.workflowStatus !== "TAX_FILING" && (
+                                  <button
+                                    type="button"
+                                    disabled={approvalBusyId === record.id}
+                                    onClick={() => runWorkflowAction(record, "ADVANCE_TO_TAX_FILING")}
+                                    className="p-1 rounded hover:bg-sky-50 text-sky-600 disabled:opacity-50"
+                                    title="세무신고로 진행"
+                                  >
+                                    <CheckCircle2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                                {record.workflowStatus === "TAX_FILING" && (
+                                  <button
+                                    type="button"
+                                    disabled={approvalBusyId === record.id}
+                                    onClick={() => runWorkflowAction(record, "ADVANCE_TO_COMPLETED")}
+                                    className="p-1 rounded hover:bg-emerald-50 text-emerald-600 disabled:opacity-50"
+                                    title="완료로 진행"
+                                  >
+                                    <CheckCircle2 className="w-4 h-4" />
+                                  </button>
+                                )}
                                 <button
                                   type="button"
                                   disabled={approvalBusyId === record.id}
-                                  onClick={() => runWorkflowAction(record, "APPROVE_FIRST")}
-                                  className="p-1 rounded hover:bg-emerald-50 text-emerald-600 disabled:opacity-50"
-                                  title="승인"
-                                >
-                                  <CheckCircle2 className="w-4 h-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={approvalBusyId === record.id}
-                                  onClick={() => setReasonModal({ action: "HOLD", recordId: record.id })}
-                                  className="p-1 rounded hover:bg-orange-50 text-orange-600 disabled:opacity-50"
-                                  title="보류"
-                                >
-                                  <PauseCircle className="w-4 h-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={approvalBusyId === record.id}
-                                  onClick={() => setReasonModal({ action: "REJECT", recordId: record.id })}
+                                  onClick={() => setReasonModal({ recordId: record.id })}
                                   className="p-1 rounded hover:bg-rose-50 text-rose-600 disabled:opacity-50"
-                                  title="반려"
+                                  title="반려 (거래 삭제 + 상담 복귀)"
                                 >
                                   <XCircle className="w-4 h-4" />
                                 </button>
                               </>
-                            )}
-                            {(record.workflowStatus === "ON_HOLD" || record.workflowStatus === "REJECTED") && (
-                              <span
-                                className="text-[11px] text-gray-400"
-                                title="딜러의 다시 열기 요청 대기"
-                              >
-                                딜러 요청 대기
-                              </span>
                             )}
                           </div>
                         </td>
@@ -862,7 +865,7 @@ export default function MembershipTradesPage() {
 
       <ActionReasonModal
         open={!!reasonModal}
-        action={reasonModal?.action ?? null}
+        action={reasonModal ? "REJECT" : null}
         submitting={reasonSubmitting}
         onCancel={() => setReasonModal(null)}
         onConfirm={async (reason) => {
@@ -870,7 +873,7 @@ export default function MembershipTradesPage() {
           setReasonSubmitting(true);
           const target = rawRecords.find((r) => r.id === reasonModal.recordId);
           if (target) {
-            const ok = await runWorkflowAction(target, reasonModal.action, reason);
+            const ok = await runWorkflowAction(target, "REJECT", reason);
             if (ok) setReasonModal(null);
           }
           setReasonSubmitting(false);

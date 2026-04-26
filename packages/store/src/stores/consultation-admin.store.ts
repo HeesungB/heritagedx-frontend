@@ -1,12 +1,15 @@
 import { createStore } from "zustand/vanilla";
 import type { AdminRepositories, TradeListParams } from "@heritage-dx/api";
-import type { ApprovalAction, ConsultationInput } from "@heritage-dx/types";
+import type { AdminConsultationAction, ConsultationInput } from "@heritage-dx/types";
 import { APPROVAL_ACTIONS } from "@heritage-dx/types";
 import type { FetchStatus, PaginationState } from "../entities/common";
 import type { ConsultationEntity } from "../entities/consultation";
 import { mapConsultationDtoToEntity } from "../mappers/consultation.mapper";
 import { normalizePagination } from "../mappers/helpers";
 
+// 관리자 상담 store
+// - approvalAction: APPROVE_FIRST / REOPEN 만 허용 (REQUEST_APPROVAL/HOLD/REJECT 모두 제거)
+// - REOPEN 은 거래내역 이관 *전* 승인 단계에서 무산된 경우에 호출되며, 상담을 DRAFT 로 복귀시킨다.
 export interface ConsultationAdminStoreState {
   items: ConsultationEntity[];
   pagination: PaginationState | null;
@@ -19,13 +22,10 @@ export interface ConsultationAdminStoreState {
   remove: (id: string) => Promise<boolean>;
   approvalAction: (
     id: string,
-    action: ApprovalAction,
+    action: AdminConsultationAction,
     reason?: string,
   ) => Promise<ConsultationEntity | null>;
-  requestApproval: (id: string, reason?: string) => Promise<ConsultationEntity | null>;
   approveFirst: (id: string, reason?: string) => Promise<ConsultationEntity | null>;
-  hold: (id: string, reason: string) => Promise<ConsultationEntity | null>;
-  reject: (id: string, reason: string) => Promise<ConsultationEntity | null>;
   reopen: (id: string, reason?: string) => Promise<ConsultationEntity | null>;
   hydrate: (items: ConsultationEntity[], pagination: PaginationState) => void;
 }
@@ -129,14 +129,8 @@ export function createConsultationAdminStore(repos: AdminRepositories) {
       }
     },
 
-    requestApproval: (id, reason) =>
-      get().approvalAction(id, APPROVAL_ACTIONS.REQUEST_APPROVAL, reason),
     approveFirst: (id, reason) =>
       get().approvalAction(id, APPROVAL_ACTIONS.APPROVE_FIRST, reason),
-    hold: (id, reason) =>
-      get().approvalAction(id, APPROVAL_ACTIONS.HOLD, reason),
-    reject: (id, reason) =>
-      get().approvalAction(id, APPROVAL_ACTIONS.REJECT, reason),
     reopen: (id, reason) =>
       get().approvalAction(id, APPROVAL_ACTIONS.REOPEN, reason),
 

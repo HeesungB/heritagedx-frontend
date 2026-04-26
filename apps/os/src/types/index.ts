@@ -88,7 +88,6 @@ export interface MembershipTradeForm {
   registrationDate: string;
   tradeDate: string;
   remarks: string;
-  isDone: boolean;
 }
 
 export interface MembershipTradeRecordForm {

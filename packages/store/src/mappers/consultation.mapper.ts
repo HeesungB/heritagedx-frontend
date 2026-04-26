@@ -58,7 +58,6 @@ export function mapConsultationEntityToInput(
     registrationDate: entity.registrationDate,
     tradeDate: entity.tradeDate,
     remarks: entity.remarks,
-    isDone: entity.isDone,
     isShared: entity.isShared,
   };
 }

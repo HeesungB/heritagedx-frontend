@@ -1,12 +1,16 @@
 import { createStore } from "zustand/vanilla";
 import type { AdminRepositories, TradeListParams } from "@heritage-dx/api";
-import type { ApprovalAction, MembershipTradeInput } from "@heritage-dx/types";
+import type { AdminTradeAction, MembershipTradeInput } from "@heritage-dx/types";
 import { APPROVAL_ACTIONS } from "@heritage-dx/types";
 import type { FetchStatus, PaginationState } from "../entities/common";
 import type { MembershipTradeEntity } from "../entities/membership-trade";
 import { mapMembershipTradeDtoToEntity } from "../mappers/membership-trade.mapper";
 import { normalizePagination } from "../mappers/helpers";
 
+// 관리자 거래 store
+// - workflowAction: ADVANCE_TO_TAX_FILING / ADVANCE_TO_COMPLETED / REJECT 만 허용.
+// - REJECT 는 거래 레코드를 물리 삭제하므로 응답 후 로컬 목록에서도 제거한다.
+//   (서버는 원천 상담을 DRAFT 로 복귀시키고, 다른 거래가 없으면 고객 등급을 HIGH_INTENT 로 자동 하향)
 export interface MembershipTradeAdminStoreState {
   items: MembershipTradeEntity[];
   pagination: PaginationState | null;
@@ -19,14 +23,12 @@ export interface MembershipTradeAdminStoreState {
   remove: (id: string) => Promise<boolean>;
   workflowAction: (
     id: string,
-    action: ApprovalAction,
+    action: AdminTradeAction,
     reason?: string,
   ) => Promise<MembershipTradeEntity | null>;
-  requestFinalReview: (id: string, reason?: string) => Promise<MembershipTradeEntity | null>;
-  approveFirst: (id: string, reason?: string) => Promise<MembershipTradeEntity | null>;
-  hold: (id: string, reason: string) => Promise<MembershipTradeEntity | null>;
-  reject: (id: string, reason: string) => Promise<MembershipTradeEntity | null>;
-  reopen: (id: string, reason?: string) => Promise<MembershipTradeEntity | null>;
+  advanceToTaxFiling: (id: string) => Promise<MembershipTradeEntity | null>;
+  advanceToCompleted: (id: string) => Promise<MembershipTradeEntity | null>;
+  reject: (id: string, reason: string) => Promise<boolean>;
   hydrate: (items: MembershipTradeEntity[], pagination: PaginationState) => void;
 }
 
@@ -129,16 +131,32 @@ export function createMembershipTradeAdminStore(repos: AdminRepositories) {
       }
     },
 
-    requestFinalReview: (id, reason) =>
-      get().workflowAction(id, APPROVAL_ACTIONS.REQUEST_APPROVAL, reason),
-    approveFirst: (id, reason) =>
-      get().workflowAction(id, APPROVAL_ACTIONS.APPROVE_FIRST, reason),
-    hold: (id, reason) =>
-      get().workflowAction(id, APPROVAL_ACTIONS.HOLD, reason),
-    reject: (id, reason) =>
-      get().workflowAction(id, APPROVAL_ACTIONS.REJECT, reason),
-    reopen: (id, reason) =>
-      get().workflowAction(id, APPROVAL_ACTIONS.REOPEN, reason),
+    advanceToTaxFiling: (id) =>
+      get().workflowAction(id, APPROVAL_ACTIONS.ADVANCE_TO_TAX_FILING),
+    advanceToCompleted: (id) =>
+      get().workflowAction(id, APPROVAL_ACTIONS.ADVANCE_TO_COMPLETED),
+
+    reject: async (id, reason) => {
+      try {
+        const response = await repos.membershipTrades.workflowAction(id, {
+          action: APPROVAL_ACTIONS.REJECT,
+          reason,
+        });
+        if (response.success) {
+          // REJECT 시 서버가 거래 레코드를 물리 삭제하므로 목록에서도 제거
+          set((s) => ({
+            items: s.items.filter((item) => item.id !== id),
+            pagination: s.pagination
+              ? { ...s.pagination, total: Math.max(0, s.pagination.total - 1) }
+              : null,
+          }));
+          return true;
+        }
+        return false;
+      } catch {
+        return false;
+      }
+    },
 
     hydrate: (items: MembershipTradeEntity[], pagination: PaginationState) => {
       set({ items, pagination, status: "success" });

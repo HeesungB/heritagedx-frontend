@@ -12,6 +12,11 @@ export function mapCustomerDtoToEntity(dto: Customer): CustomerEntity {
     email: dto.email ?? null,
     address: dto.address ?? null,
     memo: dto.memo ?? null,
+    ageBracket: dto.ageBracket ?? null,
+    occupation: dto.occupation ?? null,
+    ownedMembershipSummary: dto.ownedMembershipSummary ?? null,
+    customerGrade: dto.customerGrade ?? null,
+    residenceArea: dto.residenceArea ?? null,
     createdAt: dto.createdAt,
     updatedAt: dto.updatedAt,
   };
@@ -26,6 +31,10 @@ export function mapCustomerEntityToInput(
     email: entity.email ?? undefined,
     address: entity.address ?? undefined,
     memo: entity.memo ?? undefined,
+    ageBracket: entity.ageBracket ?? undefined,
+    occupation: entity.occupation ?? undefined,
+    ownedMembershipSummary: entity.ownedMembershipSummary ?? undefined,
+    residenceArea: entity.residenceArea ?? undefined,
   };
 }
 
@@ -38,5 +47,10 @@ export function mapCustomerEntityToUpdateInput(
   if (entity.email !== undefined) input.email = entity.email ?? undefined;
   if (entity.address !== undefined) input.address = entity.address ?? undefined;
   if (entity.memo !== undefined) input.memo = entity.memo ?? undefined;
+  if (entity.ageBracket !== undefined) input.ageBracket = entity.ageBracket ?? undefined;
+  if (entity.occupation !== undefined) input.occupation = entity.occupation ?? undefined;
+  if (entity.ownedMembershipSummary !== undefined)
+    input.ownedMembershipSummary = entity.ownedMembershipSummary ?? undefined;
+  if (entity.residenceArea !== undefined) input.residenceArea = entity.residenceArea ?? undefined;
   return input;
 }

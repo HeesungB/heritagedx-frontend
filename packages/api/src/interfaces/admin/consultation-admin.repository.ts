@@ -1,4 +1,5 @@
 import type {
+  AdminConsultationAction,
   ApiResponse,
   ApprovalActionInput,
   Consultation,
@@ -13,8 +14,9 @@ export interface IConsultationAdminRepository {
   create(data: ConsultationInput): Promise<ApiResponse<Consultation>>;
   update(id: string, data: ConsultationInput): Promise<ApiResponse<Consultation>>;
   delete(id: string): Promise<ApiResponse<void>>;
+  // 관리자 상담 액션은 APPROVE_FIRST, REOPEN 만 허용
   approvalAction(
     id: string,
-    body: ApprovalActionInput,
+    body: ApprovalActionInput<AdminConsultationAction>,
   ): Promise<ApiResponse<Consultation>>;
 }

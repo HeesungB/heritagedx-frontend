@@ -38,7 +38,6 @@ export function useKpiSummary(filters: KpiFilters): {
         fetchTrades({
           startDate,
           endDate,
-          dateField: filters.dateField,
           ...employeeParams,
         }),
         fetchConsultations({

@@ -8,6 +8,7 @@ import type {
   ConsultationApprovalFillableField,
 } from "../entities/consultation";
 import { collectMissingConsultationApprovalFields } from "../entities/consultation";
+import { appendMemoEntry } from "../entities/memo-history";
 
 const FILLABLE_FIELD_SET: ReadonlySet<ConsultationApprovalFillableField> = new Set([
   "customerName",
@@ -38,6 +39,11 @@ export interface ConsultationStoreState {
   update: (id: string, data: ConsultationInput) => Promise<ConsultationEntity | null>;
   remove: (id: string) => Promise<boolean>;
   toggleDone: (id: string, isDone: boolean) => Promise<boolean>;
+  appendMemo: (
+    id: string,
+    content: string,
+    author: { name: string; id: string | null },
+  ) => Promise<ConsultationEntity | null>;
   requestApproval: (
     id: string,
     input?: {
@@ -144,6 +150,26 @@ export function createConsultationStore(repos: GeneralRepositories) {
         items: s.items.map((i) => (i.id === id ? { ...i, isDone } : i)),
       }));
       return true;
+    },
+
+    appendMemo: async (id, content, author) => {
+      const trimmed = content.trim();
+      if (!trimmed) return null;
+      const current = get().items.find((i) => i.id === id);
+      if (!current) return null;
+      const { encoded } = appendMemoEntry(
+        current.notes,
+        { author: author.name, authorId: author.id, content: trimmed },
+        {
+          author: current.createdByName ?? "—",
+          createdAt: current.createdAt,
+          remarks: current.remarks,
+        },
+      );
+      const base = mapConsultationEntityToInput(current);
+      // 메모 히스토리로 흡수된 remarks 는 더 이상 별도 필드로 보내지 않는다.
+      const payload: ConsultationInput = { ...base, notes: encoded, remarks: null };
+      return get().update(id, payload);
     },
 
     requestApproval: async (

@@ -318,7 +318,8 @@ packages/store/
 │   │   ├── user.ts           # UserRole, UserEntity, AdminUserEntity
 │   │   ├── employee.ts       # EmployeeEntity
 │   │   ├── customer.ts       # CustomerEntity (+ ageBracket/occupation/ownedMembershipSummary/customerGrade(read-only)/residenceArea — 2026-04 추가)
-│   │   └── club-document.ts  # ClubDocumentEntity, ClubScenarioDocumentEntity
+│   │   ├── club-document.ts  # ClubDocumentEntity, ClubScenarioDocumentEntity
+│   │   └── memo-history.ts   # MemoHistoryEntry + decodeMemoHistory/encodeMemoHistory/appendMemoEntry/getLatestMemoEntry — Consultation.notes 컬럼에 `__MEMO_V1__{...}` prefix + JSON 으로 누적 메모 인코딩 (legacy 단일 텍스트는 첫 엔트리로 흡수)
 │   ├── mappers/              # DTO ↔ Entity 변환 (순수 함수)
 │   │   ├── index.ts
 │   │   ├── club.mapper.ts
@@ -338,7 +339,7 @@ packages/store/
 │   ├── stores/               # Zustand 스토어 (stale-while-revalidate)
 │   │   ├── index.ts
 │   │   ├── club.store.ts     # 목록 캐시 + 상세 캐시 (Map<code, detail>)
-│   │   ├── consultation.store.ts           # general — requestApproval (REQUEST_APPROVAL 만). REOPEN/HOLD/REJECT 모두 제거됨
+│   │   ├── consultation.store.ts           # general — requestApproval (REQUEST_APPROVAL 만) + appendMemo(id, content, author) — 메모 히스토리 누적 후 update 호출. REOPEN/HOLD/REJECT 모두 제거됨
 │   │   ├── membership-trade.store.ts       # general — read-only (mutation 메서드 모두 제거)
 │   │   ├── consultation-admin.store.ts     # admin — approveFirst / reopen 만 (HOLD/REJECT/REQUEST_APPROVAL 제거)
 │   │   ├── membership-trade-admin.store.ts # admin — advanceToTaxFiling / advanceToCompleted / reject (REJECT는 응답 후 로컬 목록에서 제거)
@@ -519,7 +520,7 @@ ESLint 9 flat config 공유 패키지. `eslint-config-next`의 `core-web-vitals`
 **코어:**
 `AuthGuard`, `ClientLayout`, `AppShell`, `Sidebar`, `AppHeader`, `MobileNavigation`, `GoogleAnalytics`
 
-**레이아웃 셸**: `ClientLayout` 안 `AuthGuard` 안에 `AppShell` 을 둔다. `AppShell` 은 `pathname === "/login"` 일 때 children 만 통과(풀스크린 로그인 페이지). 그 외에는 좌측 `Sidebar`(260px, 다크 #111)와 상단 `AppHeader`(72px, 흰색, breadcrumb·검색 placeholder·알림 placeholder·사용자) 를 렌더한다. 모바일(`< lg`)에서는 사이드바가 슬라이드 오버레이. 사이드바 메뉴는 단일 리스트로 `골프장 검색(/clubs)`, `고객 관리(/customers)`, `상담일지(/trades)`, `건의 사항(/claims)` 순. breadcrumb 매핑은 `apps/os/src/lib/breadcrumb.ts`.
+**레이아웃 셸**: `ClientLayout` 안 `AuthGuard` 안에 `AppShell` 을 둔다. `AppShell` 은 `pathname === "/login"` 일 때 children 만 통과(풀스크린 로그인 페이지). 그 외에는 좌측 `Sidebar`(다크 #1a1a1a, 헤더 보더 #2a2a2a)와 상단 `AppHeader`(57px, 흰색, 좌측 라우트 아이콘+페이지 제목 / 우측 사용자 role 라벨 + 로그아웃 텍스트 버튼) 를 렌더한다. 사이드바는 데스크톱에서 218px(확장) ↔ 64px(축소) 두 상태를 헤더 토글 버튼(`PanelLeftClose`/`PanelLeftOpen`)으로 전환하며 상태는 `localStorage["heritage-os.sidebar.collapsed"]` 에 영속화. 메뉴는 `골프장 검색(/clubs, Flag)`, `고객 관리(/customers, Users)`, `상담일지(/trades, BookOpen)`, `건의 사항(/claims, MessageSquare)` 순. 확장 상태에서만 "즐겨찾기"(Star, 더미 2개)·"최근 항목"(Clock, 이름+날짜 부제, 더미 3개) 섹션이 노출된다(추후 `packages/store` 로 이전 예정). 모바일(`< lg`)에서는 햄버거 → 슬라이드 오버레이로 항상 확장 상태 표시(`<Sidebar forceExpanded />`). 페이지 제목 매핑은 `apps/os/src/lib/breadcrumb.ts`(`getPageTitle`), 라우트 아이콘·role 라벨 매핑은 `AppHeader` 내부 상수(`PAGE_ICONS`, `ROLE_LABELS`).
 
 **골프장:**
 `ClubProfile`, `ClubDirectory`, `GolfClubDetail`, `GolfClubTable`, `GolfClubSearch`, `NaverMap`, `MapSidebar`
@@ -528,7 +529,7 @@ ESLint 9 flat config 공유 패키지. `eslint-config-next`의 `core-web-vitals`
 `ClubBasicInfoTable`, `MembershipInfoSection`, `EstimateSection`, `CostCalculatorSection`, `GreenFeeField`, `InfoField`, `BenefitsSheetSection`, `DocumentsSection`, `MarketPriceSummary`, `NearbyClubPrices`, `PriceChart`
 
 **회원권/거래:**
-`MembershipCalculator`, `MembershipInfoSheet`, `RequiredDocuments`, `TradesPageClient`, `TransactionTypeForm`, `TradeMemoSidebar`
+`MembershipCalculator`, `MembershipInfoSheet`, `RequiredDocuments`, `TradesPageClient`, `TransactionTypeForm`, `TradeMemoSidebar` — `TradesPageClient`/`TradeMemoSidebar` 의 메모 입력은 단일 `notes`/`remarks` 텍스트 필드를 폼에서 제거하고, 행/카드를 펼치면 나타나는 인라인 패널에서 메모 히스토리(`MemoHistoryEntry[]`)에 누적 기록한다. 저장은 `appendMemo` 훅이 `decodeMemoHistory` → append → `__MEMO_V1__` JSON 인코딩 후 기존 update 엔드포인트로 전달.
 
 **승인 워크플로우 (`approval/`):**
 `StatusBadge` — 상담·거래 상태 공통 배지

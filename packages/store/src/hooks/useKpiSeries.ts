@@ -55,7 +55,6 @@ export function useKpiSeries(filters: KpiFilters): {
         fetchTrades({
           startDate: b.startDate,
           endDate: b.endDate,
-          dateField: filters.dateField,
           ...employeeParams,
         }),
         fetchConsultations({

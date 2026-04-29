@@ -9,7 +9,6 @@ export interface KpiTradesResponse {
 export interface KpiTradesParams {
   startDate: string; // YYYY-MM-DD
   endDate: string;
-  dateField?: "contractDate" | "createdAt";
   employeeField?: "createdByUserId" | "manager";
   userId?: string;
   managerName?: string;
@@ -23,7 +22,6 @@ export interface KpiConsultationsResponse {
   depositBasedFirstApprovedCount: number;
   tradeConvertedCount: number;
   finalCompletedCount: number;
-  destroyedCount: number;
   userId?: string;
 }
 

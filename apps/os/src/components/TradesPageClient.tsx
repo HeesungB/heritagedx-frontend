@@ -1,15 +1,21 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback, Fragment } from "react";
 import { MembershipTrade, MembershipTradeForm, Club } from "@/types";
 import { ClubSearchSelect, Button, Loading, ConfirmModal } from "@heritage-dx/ui";
 import { useAppStores } from "@/stores";
-import { useClubs, useClubDetail, useConsultations, canDeleteConsultation } from "@heritage-dx/store";
+import {
+  useClubs,
+  useClubDetail,
+  useConsultations,
+  canDeleteConsultation,
+  decodeMemoHistory,
+  type MemoHistoryEntry,
+} from "@heritage-dx/store";
 import { useSendTradeNotification } from "@/hooks/useSendTradeNotification";
 import { useCustomerEnsureFlow } from "@/hooks/useCustomerEnsureFlow";
 import CustomerAutocomplete from "@/components/CustomerAutocomplete";
 import ApprovalRequirementsModal from "@/components/ApprovalRequirementsModal";
-import { StatusBadge } from "@/components/approval/StatusBadge";
 import { trackEvent } from "@/lib/gtag";
 import {
   collectMissingConsultationApprovalFields,
@@ -19,8 +25,119 @@ import {
 } from "@heritage-dx/store";
 import { useAuth } from "@/contexts/AuthContext";
 
-type TradeFilter = "전체" | "매수" | "매도";
+type TradeFilter = "전체" | "매수" | "매도" | "미정";
+
+function buildPageItems(current: number, total: number): (number | "…")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const items: (number | "…")[] = [1];
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  if (start > 2) items.push("…");
+  for (let i = start; i <= end; i += 1) items.push(i);
+  if (end < total - 1) items.push("…");
+  items.push(total);
+  return items;
+}
+
+function Pagination({
+  page,
+  totalPages,
+  onChange,
+}: {
+  page: number;
+  totalPages: number;
+  onChange: (p: number) => void;
+}) {
+  if (totalPages <= 1) return null;
+  const items = buildPageItems(page, totalPages);
+  const baseBtn =
+    "inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded-md text-[12px] font-medium transition-colors";
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        disabled={page <= 1}
+        onClick={() => onChange(page - 1)}
+        className={`${baseBtn} bg-white border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40`}
+        aria-label="이전 페이지"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+      {items.map((it, idx) =>
+        it === "…" ? (
+          <span key={`e-${idx}`} className="px-1 text-gray-400 text-[12px]">
+            ⋯
+          </span>
+        ) : (
+          <button
+            key={it}
+            type="button"
+            onClick={() => onChange(it)}
+            className={`${baseBtn} ${
+              it === page
+                ? "bg-gray-900 text-white"
+                : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            {it}
+          </button>
+        ),
+      )}
+      <button
+        type="button"
+        disabled={page >= totalPages}
+        onClick={() => onChange(page + 1)}
+        className={`${baseBtn} bg-white border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40`}
+        aria-label="다음 페이지"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 type ApprovalFilter = "" | ApprovalStatus;
+
+const APPROVAL_DOT: Record<string, string> = {
+  IN_CONSULTATION: "bg-gray-400",
+  DRAFT: "bg-gray-400",
+  PENDING_DEPOSIT: "bg-amber-500",
+  PENDING_APPROVAL: "bg-amber-500",
+  DEPOSIT_APPROVED: "bg-emerald-500",
+  FIRST_APPROVED: "bg-emerald-500",
+  TAX_FILING: "bg-sky-500",
+  COMPLETED: "bg-emerald-600",
+  ON_HOLD: "bg-orange-500",
+  REJECTED: "bg-red-500",
+};
+const APPROVAL_LABEL: Record<string, string> = {
+  IN_CONSULTATION: "상담중",
+  DRAFT: "상담중",
+  PENDING_DEPOSIT: "검토중",
+  PENDING_APPROVAL: "검토중",
+  DEPOSIT_APPROVED: "승인",
+  FIRST_APPROVED: "승인",
+  TAX_FILING: "세무신고",
+  COMPLETED: "완료",
+  ON_HOLD: "보류",
+  REJECTED: "반려",
+};
+
+const TRADE_TYPE_BADGE: Record<"매수" | "매도" | "미정", string> = {
+  매수: "bg-emerald-100 text-emerald-700",
+  매도: "bg-rose-100 text-rose-700",
+  미정: "bg-amber-100 text-amber-700",
+};
+
+function tradeTypeBadgeClass(tradeType: string | null | undefined, isDone: boolean): string {
+  if (isDone) return "bg-gray-100 text-gray-400";
+  const key = (tradeType === "매수" || tradeType === "매도") ? tradeType : "미정";
+  return TRADE_TYPE_BADGE[key];
+}
 
 const emptyForm: MembershipTradeForm = {
   clubId: "",
@@ -47,7 +164,7 @@ export default function TradesPageClient() {
   const { club: clubStore, tradeMemo: tradeMemoStore } = useAppStores();
   const { user } = useAuth();
   const { clubs, isLoading: clubsLoading } = useClubs(clubStore);
-  const { items: pageTrades, pagination, fetch: fetchFromStore, create, update, remove, toggleDone, requestApproval, isLoading: loading } = useConsultations(tradeMemoStore);
+  const { items: pageTrades, pagination, fetch: fetchFromStore, create, update, remove, toggleDone, appendMemo, requestApproval, isLoading: loading } = useConsultations(tradeMemoStore);
   // 인피니트 스크롤: 페이지마다 store가 items를 대체하므로 컴포넌트에서 누적
   const [rawTrades, setRawTrades] = useState<MembershipTrade[]>([]);
   const { send: sendNotification } = useSendTradeNotification();
@@ -81,6 +198,9 @@ export default function TradesPageClient() {
   const [formMemberships, setFormMemberships] = useState<string[]>([]);
   const [manualClubInput, setManualClubInput] = useState(false);
   const [manualMembershipInput, setManualMembershipInput] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [memoDraft, setMemoDraft] = useState<Record<string, string>>({});
+  const [memoSubmittingId, setMemoSubmittingId] = useState<string | null>(null);
   const ensureFlow = useCustomerEnsureFlow();
   const formRef = useRef(form);
   formRef.current = form;
@@ -141,46 +261,25 @@ export default function TradesPageClient() {
       limit: 20,
       sort: sortField,
       order: sortOrder,
-      tradeType: filter !== "전체" ? filter : undefined,
+      // "미정" 은 백엔드에 없는 클라이언트 분류이므로 서버 쿼리에서 제외
+      tradeType: filter === "매수" || filter === "매도" ? filter : undefined,
       search: searchQuery.trim() || undefined,
       approvalStatus: filterApproval || undefined,
     });
   }, [page, filter, searchQuery, sortField, sortOrder, filterApproval]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 인피니트 스크롤 누적: page=1 이면 대체, 그 외에는 dedupe 추가
+  // 페이지네이션: page 가 바뀔 때마다 현재 페이지 결과로 교체
   useEffect(() => {
-    if (page === 1) {
-      setRawTrades(pageTrades as MembershipTrade[]);
-    } else {
-      setRawTrades((prev) => {
-        const ids = new Set(prev.map((t) => t.id));
-        const fresh = (pageTrades as MembershipTrade[]).filter((t) => !ids.has(t.id));
-        return fresh.length === 0 ? prev : [...prev, ...fresh];
-      });
-    }
-  }, [pageTrades, page]);
-
-  // IntersectionObserver: sentinel 진입 시 다음 페이지 로드
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const node = sentinelRef.current;
-    if (!node) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting && pagination?.hasNext && !loading) {
-          setPage((p) => p + 1);
-        }
-      },
-      { rootMargin: "200px" },
-    );
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [pagination?.hasNext, loading]);
+    setRawTrades(pageTrades as MembershipTrade[]);
+  }, [pageTrades]);
 
   // 클라이언트 필터링: 골프장/회원권/기간/완료여부/거래전환 선택 시 네트워크 요청 없이 즉시 필터
   // (isDone/isConverted 는 서버 쿼리 파라미터에서 제거되어 여기서 처리한다)
   const trades = useMemo(() => {
     let filtered = rawTrades as MembershipTrade[];
+    if (filter === "미정") {
+      filtered = filtered.filter((t) => !t.offerPrice && !t.desiredPrice && !t.tradeDate);
+    }
     const selectedClubName = clubs.find((c) => c.code === selectedClubCode)?.name;
     if (selectedClubName) {
       filtered = filtered.filter((t) => t.clubName === selectedClubName);
@@ -208,7 +307,7 @@ export default function TradesPageClient() {
       );
     }
     return filtered;
-  }, [rawTrades, clubs, selectedClubCode, selectedMembership, dateFrom, dateTo, filterDone, showConverted]);
+  }, [rawTrades, clubs, selectedClubCode, selectedMembership, dateFrom, dateTo, filterDone, showConverted, filter]);
 
   // 거래 데이터에 있는 골프장만 필터 드롭다운에 표시
   const availableClubs = useMemo(() => {
@@ -218,6 +317,10 @@ export default function TradesPageClient() {
   }, [rawTrades, clubs]);
 
   const persistConsultation = async () => {
+    // 메모/특이사항은 폼이 아닌 행 확장 패널에서 누적되므로,
+    // 수정 시에는 기존 값을 유지하고 신규 등록 시에는 비워둔다.
+    const preservedNotes = editingTrade ? editingTrade.notes ?? null : null;
+    const preservedRemarks = editingTrade ? editingTrade.remarks ?? null : null;
     const input = {
       club: form.clubId || form.clubName,
       membership: form.membershipId || form.membershipType,
@@ -230,10 +333,10 @@ export default function TradesPageClient() {
       desiredPriceNote: form.desiredPriceNote || null,
       depositAmount: form.depositAmount || null,
       accountNumber: form.accountNumber || null,
-      notes: form.notes || null,
+      notes: preservedNotes,
       registrationDate: form.registrationDate || null,
       tradeDate: form.tradeDate || null,
-      remarks: form.remarks || null,
+      remarks: preservedRemarks,
     };
 
     const wasEditing = !!editingTrade;
@@ -383,6 +486,51 @@ export default function TradesPageClient() {
     setManualMembershipInput(false);
   };
 
+  const buildMemoEntries = useCallback((trade: MembershipTrade): MemoHistoryEntry[] => {
+    return decodeMemoHistory(trade.notes, {
+      author: trade.createdByName ?? "—",
+      createdAt: trade.createdAt,
+      remarks: trade.remarks,
+    });
+  }, []);
+
+  const handleSubmitMemo = useCallback(
+    async (trade: MembershipTrade) => {
+      const draft = (memoDraft[trade.id] ?? "").trim();
+      if (!draft) return;
+      const authorName = user?.name?.trim() || user?.email || "—";
+      const authorId = user?.id ? String(user.id) : null;
+      setMemoSubmittingId(trade.id);
+      try {
+        const entity = await appendMemo(trade.id, draft, { name: authorName, id: authorId });
+        if (!entity) {
+          setErrorMessage("메모 저장에 실패했습니다.");
+          return;
+        }
+        setRawTrades((prev) =>
+          prev.map((t) => (t.id === trade.id ? ({ ...t, notes: entity.notes, remarks: entity.remarks, updatedAt: entity.updatedAt } as MembershipTrade) : t)),
+        );
+        setMemoDraft((prev) => ({ ...prev, [trade.id]: "" }));
+      } catch (err) {
+        console.error("메모 추가 실패:", err);
+        setErrorMessage("네트워크 오류가 발생했습니다.");
+      } finally {
+        setMemoSubmittingId(null);
+      }
+    },
+    [appendMemo, memoDraft, user?.email, user?.id, user?.name],
+  );
+
+  const formatEntryTimestamp = (iso: string) => {
+    try {
+      const d = new Date(iso);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    } catch {
+      return iso;
+    }
+  };
+
   const formatPrice = (price: number | string | null) => {
     if (price === null) return "-";
     const num = typeof price === "string" ? Number(price) : price;
@@ -398,152 +546,165 @@ export default function TradesPageClient() {
     return `${num.toLocaleString()}원`;
   };
 
-  const filters: TradeFilter[] = ["전체", "매수", "매도"];
+  const filters: TradeFilter[] = ["전체", "매수", "매도", "미정"];
+
+  // "미정" = 제시가/희망가/거래일 모두 비어있어 아직 가격 정보가 정해지지 않은 상담
+  const isUndecided = (t: MembershipTrade) => !t.offerPrice && !t.desiredPrice && !t.tradeDate;
 
   return (
     <div className="flex h-[calc(100vh-72px)] flex-col bg-gray-100 overflow-hidden">
       <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="px-4 py-6">
           {/* 페이지 헤더 */}
-          <div className="bg-white rounded-lg border border-gray-200 border-l-4 border-l-amber-500 p-5 mb-6">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-11 h-11 bg-amber-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
-                </div>
-                <div className="min-w-0">
-                  <h2 className="text-xl font-bold text-gray-900">상담일지</h2>
-                  <p className="text-sm text-gray-500 mt-0.5">전체 골프장의 회원권 상담일지를 관리합니다</p>
-                </div>
-              </div>
-              <Button
-                className="flex-shrink-0"
-                onClick={() => { setShowForm(true); setEditingTrade(null); setForm(emptyForm); setFormClubCode(""); setFormMemberships([]); setManualClubInput(false); setManualMembershipInput(false); }}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                새 메모
-              </Button>
+          <div className="flex items-center justify-between gap-3 mb-5">
+            <div className="flex items-baseline gap-2 min-w-0">
+              <h2 className="text-[20px] font-bold text-gray-900 leading-none">상담일지</h2>
+              <p className="text-xs text-gray-500 leading-none">회원권 상담 내용을 기록·관리합니다</p>
             </div>
+            <button
+              type="button"
+              onClick={() => { setShowForm(true); setEditingTrade(null); setForm(emptyForm); setFormClubCode(""); setFormMemberships([]); setManualClubInput(false); setManualMembershipInput(false); }}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-gray-900 text-white text-xs font-medium hover:bg-black"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              새 상담일지
+              <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded bg-white/20 text-[10px] font-semibold leading-none">N</span>
+            </button>
+          </div>
+
+          {/* 검색 */}
+          <div className="relative bg-gray-50 rounded-md border border-gray-200 mb-3">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              placeholder="이 페이지에서 검색 — 고객명, 연락처, 골프장, 회원권, 메모 내용..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="w-full pl-9 pr-12 py-2.5 bg-transparent text-sm focus:outline-none rounded-md placeholder:text-gray-400"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded border border-gray-200 bg-white text-[10px] font-medium text-gray-500 leading-none">/</span>
           </div>
 
           {/* 필터 바 */}
-          <div className="bg-white rounded-lg border border-gray-200 border-t-2 border-t-amber-300 p-4 mb-4">
-            <div className="flex flex-wrap items-center gap-4">
-              {/* 거래유형 필터 */}
-              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-                {filters.map((f) => (
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            {/* 거래유형 pill 카운트 */}
+            <div className="flex items-center gap-1">
+              {filters.map((f) => {
+                const count =
+                  f === "전체"
+                    ? rawTrades.length
+                    : f === "미정"
+                      ? rawTrades.filter(isUndecided).length
+                      : rawTrades.filter((t) => t.tradeType === f).length;
+                const active = filter === f;
+                return (
                   <button
                     key={f}
+                    type="button"
                     onClick={() => { setFilter(f); setPage(1); }}
-                    className={`px-4 py-1.5 text-sm rounded-lg transition-colors ${
-                      filter === f
-                        ? f === "매도" ? "bg-red-100 text-red-700 border border-red-300"
-                          : f === "매수" ? "bg-blue-100 text-blue-700 border border-blue-300"
-                          : "bg-green-100 text-green-700 border border-green-300"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200 border border-transparent"
+                    className={`inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                      active
+                        ? "bg-gray-900 text-white"
+                        : "bg-white border border-gray-200 text-gray-700 hover:border-gray-300"
                     }`}
                   >
-                    {f}
+                    <span>{f}</span>
+                    <span className={`inline-flex items-center justify-center min-w-[22px] h-[20px] px-1.5 rounded-full text-[10px] font-semibold leading-none ${
+                      active ? "bg-white text-gray-900" : "bg-gray-100 text-gray-500"
+                    }`}>
+                      {count}
+                    </span>
                   </button>
-                ))}
-              </div>
+                );
+              })}
+            </div>
 
-              {/* 상태 필터 */}
-              <select
-                value={filterDone}
-                onChange={(e) => setFilterDone(e.target.value as "전체" | "완료" | "진행중")}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
-              >
-                <option value="전체">전체</option>
-                <option value="완료">완료</option>
-                <option value="진행중">진행중</option>
-              </select>
+            {/* 진행상태 */}
+            <select
+              value={filterDone}
+              onChange={(e) => setFilterDone(e.target.value as "전체" | "완료" | "진행중")}
+              className="bg-white border border-gray-200 rounded-md px-2.5 py-1.5 text-xs text-gray-700 focus:outline-none focus:border-gray-400"
+            >
+              <option value="전체">진행 전체</option>
+              <option value="완료">완료</option>
+              <option value="진행중">진행중</option>
+            </select>
 
-              {/* 승인 상태 필터 */}
-              <select
-                value={filterApproval}
-                onChange={(e) => { setFilterApproval(e.target.value as ApprovalFilter); setPage(1); }}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
-              >
-                <option value="">승인 상태 전체</option>
-                <option value="IN_CONSULTATION">상담중</option>
-                <option value="PENDING_DEPOSIT">계약금 대기</option>
-                {showConverted && <option value="DEPOSIT_APPROVED">계약금 승인</option>}
-              </select>
+            {/* 승인 상태 */}
+            <select
+              value={filterApproval}
+              onChange={(e) => { setFilterApproval(e.target.value as ApprovalFilter); setPage(1); }}
+              className="bg-white border border-gray-200 rounded-md px-2.5 py-1.5 text-xs text-gray-700 focus:outline-none focus:border-gray-400"
+            >
+              <option value="">승인 상태 전체</option>
+              <option value="IN_CONSULTATION">상담중</option>
+              <option value="PENDING_DEPOSIT">계약금 대기</option>
+              {showConverted && <option value="DEPOSIT_APPROVED">계약금 승인</option>}
+            </select>
 
-              {/* 승인내역 포함 토글 */}
-              <label className="flex items-center gap-1.5 text-xs text-gray-600 select-none cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showConverted}
-                  onChange={(e) => {
-                    setShowConverted(e.target.checked);
-                    if (!e.target.checked && filterApproval === "DEPOSIT_APPROVED") {
-                      setFilterApproval("");
-                    }
-                    setPage(1);
-                  }}
-                  className="w-3.5 h-3.5 rounded border-gray-300"
-                />
-                승인내역 포함
-              </label>
-
-              {/* 골프장 필터 */}
-              <ClubSearchSelect
-                clubs={availableClubs}
-                selectedClubCode={selectedClubCode}
-                onChange={(code) => { setSelectedClubCode(code); setSelectedMembership(""); setPage(1); }}
+            {/* 기간 */}
+            <div className="inline-flex items-center gap-1 bg-white border border-gray-200 rounded-md px-2 py-1">
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="bg-transparent text-xs text-gray-700 focus:outline-none w-[110px]"
               />
+              <span className="text-gray-300 text-xs">→</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="bg-transparent text-xs text-gray-700 focus:outline-none w-[110px]"
+              />
+            </div>
 
-              {/* 회원권 필터 */}
-              <select
-                value={selectedMembership}
-                onChange={(e) => { setSelectedMembership(e.target.value); }}
-                disabled={!selectedClubCode}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-500 disabled:bg-gray-100 disabled:text-gray-400"
-              >
-                <option value="">전체 회원권</option>
-                {memberships.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
+            {/* 골프장 필터 */}
+            <ClubSearchSelect
+              clubs={availableClubs}
+              selectedClubCode={selectedClubCode}
+              onChange={(code) => { setSelectedClubCode(code); setSelectedMembership(""); setPage(1); }}
+            />
 
-              {/* 기간 검색 */}
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-gray-500 w-full sm:w-[130px]"
-                />
-                <span className="text-gray-400 text-xs">~</span>
-                <input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-gray-500 w-full sm:w-[130px]"
-                />
-              </div>
+            {/* 회원권 */}
+            <select
+              value={selectedMembership}
+              onChange={(e) => { setSelectedMembership(e.target.value); }}
+              disabled={!selectedClubCode}
+              className="bg-white border border-gray-200 rounded-md px-2.5 py-1.5 text-xs text-gray-700 focus:outline-none focus:border-gray-400 disabled:bg-gray-50 disabled:text-gray-400"
+            >
+              <option value="">전체 회원권</option>
+              {memberships.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
 
-              {/* 검색 */}
-              <div className="relative w-full sm:w-52">
-                <input
-                  type="text"
-                  placeholder="골프장명, 고객명 검색"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  className="w-full px-2.5 py-1.5 pr-8 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-gray-500"
-                />
-                <svg className="absolute right-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
+            {/* 승인내역 포함 토글 */}
+            <label className="inline-flex items-center gap-1.5 text-[11px] text-gray-500 select-none cursor-pointer ml-1">
+              <input
+                type="checkbox"
+                checked={showConverted}
+                onChange={(e) => {
+                  setShowConverted(e.target.checked);
+                  if (!e.target.checked && filterApproval === "DEPOSIT_APPROVED") {
+                    setFilterApproval("");
+                  }
+                  setPage(1);
+                }}
+                className="w-3 h-3 rounded border-gray-300"
+              />
+              승인내역 포함
+            </label>
 
-              {/* 정렬 */}
+            {/* 우측: 카운트 + 정렬 */}
+            <div className="ml-auto flex items-center gap-2">
+              <span className="text-[11px] text-gray-500">총 {rawTrades.length}건</span>
+              <span className="text-[11px] text-gray-300">·</span>
+              <span className="text-[11px] text-gray-500">정렬</span>
               <select
                 value={`${sortField}-${sortOrder}`}
                 onChange={(e) => {
@@ -551,10 +712,10 @@ export default function TradesPageClient() {
                   setSortField(field);
                   setSortOrder(order);
                 }}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
+                className="bg-white border border-gray-200 rounded-md px-2.5 py-1.5 text-xs text-gray-700 focus:outline-none focus:border-gray-400"
               >
-                <option value="registrationDate-DESC">등록일 최신순</option>
-                <option value="registrationDate-ASC">등록일 오래된순</option>
+                <option value="registrationDate-DESC">최신순</option>
+                <option value="registrationDate-ASC">오래된순</option>
                 <option value="tradeDate-DESC">거래일 최신순</option>
                 <option value="tradeDate-ASC">거래일 오래된순</option>
               </select>
@@ -599,8 +760,8 @@ export default function TradesPageClient() {
                           className={`flex-1 py-2 text-sm rounded border transition-colors ${
                             form.tradeType === type
                               ? type === "매수"
-                                ? "bg-blue-600 text-white border-blue-600"
-                                : "bg-red-600 text-white border-red-600"
+                                ? "bg-emerald-600 text-white border-emerald-600"
+                                : "bg-rose-600 text-white border-rose-600"
                               : "border-gray-300 text-gray-600 hover:bg-gray-50"
                           }`}
                         >
@@ -810,19 +971,7 @@ export default function TradesPageClient() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* 메모 */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">메모</label>
-                    <input
-                      type="text"
-                      value={form.notes}
-                      onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
-                      placeholder="타회원권 교환 희망"
-                    />
-                  </div>
-
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* 등록일 */}
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">등록일</label>
@@ -846,17 +995,9 @@ export default function TradesPageClient() {
                   </div>
                 </div>
 
-                {/* 특이사항 */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">특이사항</label>
-                  <input
-                    type="text"
-                    value={form.remarks}
-                    onChange={(e) => setForm((f) => ({ ...f, remarks: e.target.value }))}
-                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
-                    placeholder="계약금 입금 완료 등"
-                  />
-                </div>
+                <p className="text-[11px] text-gray-400 leading-relaxed">
+                  메모와 특이사항은 행을 펼쳐 메모 히스토리에 누적 기록할 수 있습니다.
+                </p>
 
                 <div className="flex justify-end gap-2 pt-2">
                   <Button type="button" variant="outline" onClick={handleCancelForm}>취소</Button>
@@ -867,7 +1008,7 @@ export default function TradesPageClient() {
           )}
 
           {/* 메모 테이블 */}
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div>
             {loading ? (
               <div className="py-20 flex justify-center"><Loading text="로딩 중..." /></div>
             ) : trades.length === 0 ? (
@@ -884,62 +1025,87 @@ export default function TradesPageClient() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse min-w-[360px]">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">유형</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">골프장</th>
-                      <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">회원권</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">고객명</th>
-                      <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">연락처</th>
-                      <th className="hidden md:table-cell px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">제시가</th>
-                      <th className="hidden md:table-cell px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">희망가</th>
-                      <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">등록일</th>
-                      <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">작성자</th>
-                      <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">메모</th>
-                      <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">승인 상태</th>
-                      <th className="hidden md:table-cell px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">관리</th>
+                    <tr className="bg-gray-50/70 border-b border-gray-200">
+                      <th className="w-10 px-3 py-2.5 text-center text-[11px] font-medium text-gray-500 whitespace-nowrap" data-stop-row-toggle>
+                        <input type="checkbox" className="w-3.5 h-3.5 rounded border-gray-300" disabled />
+                      </th>
+                      <th className="px-3 py-2.5 text-left text-[11px] font-medium text-gray-500 whitespace-nowrap">유형</th>
+                      <th className="hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-gray-500 whitespace-nowrap">승인 상태</th>
+                      <th className="px-3 py-2.5 text-left text-[11px] font-medium text-gray-500 whitespace-nowrap">골프장</th>
+                      <th className="hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-gray-500 whitespace-nowrap">회원권</th>
+                      <th className="px-3 py-2.5 text-left text-[11px] font-medium text-gray-500 whitespace-nowrap">고객명</th>
+                      <th className="hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-gray-500 whitespace-nowrap">연락처</th>
+                      <th className="hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-gray-500 whitespace-nowrap">메모</th>
+                      <th className="hidden md:table-cell px-3 py-2.5 text-right text-[11px] font-medium text-gray-500 whitespace-nowrap">제시가</th>
+                      <th className="hidden md:table-cell px-3 py-2.5 text-right text-[11px] font-medium text-gray-500 whitespace-nowrap">희망가</th>
+                      <th className="hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-gray-500 whitespace-nowrap">등록일</th>
+                      <th className="hidden md:table-cell px-3 py-2.5 text-center text-[11px] font-medium text-gray-500 whitespace-nowrap w-10">⋯</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {trades.map((trade) => (
-                      <tr key={trade.id} className={`transition-colors ${trade.isDone ? "bg-green-50/40 opacity-60" : "hover:bg-gray-50"}`}>
-                        <td className="px-4 py-3 whitespace-nowrap">
+                    {trades.map((trade) => {
+                      const memoEntries = buildMemoEntries(trade);
+                      const latestEntry = memoEntries.length > 0 ? memoEntries[memoEntries.length - 1] : null;
+                      const isExpanded = expandedId === trade.id;
+                      const draft = memoDraft[trade.id] ?? "";
+                      const submittingMemo = memoSubmittingId === trade.id;
+                      return (
+                      <Fragment key={trade.id}>
+                      <tr
+                        onClick={(e) => {
+                          if ((e.target as HTMLElement).closest("[data-stop-row-toggle]")) return;
+                          setExpandedId((prev) => (prev === trade.id ? null : trade.id));
+                        }}
+                        className={`transition-colors cursor-pointer ${trade.isDone ? "bg-green-50/40 opacity-60" : isExpanded ? "bg-gray-100" : "hover:bg-gray-50"}`}
+                      >
+                        <td className="w-10 px-3 py-2.5 text-center" data-stop-row-toggle>
+                          <input type="checkbox" className="w-3.5 h-3.5 rounded border-gray-300" />
+                        </td>
+                        <td className="px-3 py-2.5 whitespace-nowrap">
                           <span
-                            className={`px-2 py-0.5 rounded text-xs font-medium ${
-                              trade.isDone
-                                ? "bg-gray-100 text-gray-400"
-                                : trade.tradeType === "매수"
-                                  ? "bg-blue-50 text-blue-700"
-                                  : "bg-red-50 text-red-700"
-                            }`}
+                            className={`inline-flex items-center justify-center w-11 h-5 rounded text-[11px] font-semibold ${tradeTypeBadgeClass(trade.tradeType, trade.isDone)}`}
                           >
-                            {trade.tradeType}
+                            {trade.tradeType || "미정"}
                           </span>
                         </td>
-                        <td className={`px-4 py-3 text-sm font-medium whitespace-nowrap ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>{trade.clubName}</td>
-                        <td className={`hidden md:table-cell px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.membershipType}</td>
-                        <td className={`px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>{trade.customerName}</td>
-                        <td className={`hidden md:table-cell px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.contact}</td>
-                        <td className={`hidden md:table-cell px-4 py-3 text-sm text-right whitespace-nowrap ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>
+                        <td className="hidden md:table-cell px-3 py-2.5 whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1.5 text-[12px] ${trade.isDone ? "text-gray-400" : "text-gray-700"}`}>
+                            <span className={`inline-block h-1.5 w-1.5 rounded-full ${APPROVAL_DOT[trade.approvalStatus] ?? "bg-gray-300"}`} />
+                            {APPROVAL_LABEL[trade.approvalStatus] ?? trade.approvalStatus}
+                          </span>
+                        </td>
+                        <td className={`px-3 py-2.5 text-[13px] font-medium whitespace-nowrap ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>{trade.clubName}</td>
+                        <td className={`hidden md:table-cell px-3 py-2.5 text-[12px] whitespace-nowrap ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.membershipType}</td>
+                        <td className={`px-3 py-2.5 text-[13px] whitespace-nowrap ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>{trade.customerName}</td>
+                        <td className={`hidden md:table-cell px-3 py-2.5 text-[12px] whitespace-nowrap ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.contact}</td>
+                        <td className={`hidden md:table-cell px-3 py-2.5 text-[12px] max-w-[260px] ${trade.isDone ? "text-gray-400" : "text-gray-500"}`}>
+                          {latestEntry ? (
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="truncate">{latestEntry.content}</span>
+                              {memoEntries.length > 1 && (
+                                <span className="shrink-0 px-1.5 py-0.5 rounded bg-gray-100 text-[10px] text-gray-500 font-medium">
+                                  +{memoEntries.length - 1}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-300">메모 없음</span>
+                          )}
+                        </td>
+                        <td className={`hidden md:table-cell px-3 py-2.5 text-[13px] text-right whitespace-nowrap ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>
                           {formatPrice(trade.offerPrice)}
                           {trade.offerPriceNote && (
-                            <span className="text-xs text-gray-400 ml-1">({trade.offerPriceNote})</span>
+                            <span className="text-[11px] text-gray-400 ml-1">({trade.offerPriceNote})</span>
                           )}
                         </td>
-                        <td className={`hidden md:table-cell px-4 py-3 text-sm text-right whitespace-nowrap ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>
+                        <td className={`hidden md:table-cell px-3 py-2.5 text-[13px] text-right whitespace-nowrap ${trade.isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>
                           {formatPrice(trade.desiredPrice)}
                           {trade.desiredPriceNote && (
-                            <span className="text-xs text-gray-400 ml-1">({trade.desiredPriceNote})</span>
+                            <span className="text-[11px] text-gray-400 ml-1">({trade.desiredPriceNote})</span>
                           )}
                         </td>
-                        <td className={`hidden md:table-cell px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.registrationDate}</td>
-                        <td className={`hidden md:table-cell px-4 py-3 text-sm whitespace-nowrap ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.createdByName || "-"}</td>
-                        <td className={`hidden md:table-cell px-4 py-3 text-sm max-w-[200px] truncate ${trade.isDone ? "text-gray-400" : "text-gray-500"}`}>
-                          {trade.notes || trade.remarks || "-"}
-                        </td>
-                        <td className="hidden md:table-cell px-4 py-3 whitespace-nowrap">
-                          <StatusBadge status={trade.approvalStatus} />
-                        </td>
-                        <td className="hidden md:table-cell px-4 py-3 text-center">
+                        <td className={`hidden md:table-cell px-3 py-2.5 text-[12px] whitespace-nowrap ${trade.isDone ? "text-gray-400" : "text-gray-600"}`}>{trade.registrationDate}</td>
+                        <td className="hidden md:table-cell px-3 py-2.5 text-center" data-stop-row-toggle>
                           <div className="flex items-center justify-center gap-1">
                             {(trade.approvalStatus === "IN_CONSULTATION" || trade.approvalStatus === "DRAFT" || trade.approvalStatus === "ON_HOLD") && (
                               <button
@@ -1024,19 +1190,97 @@ export default function TradesPageClient() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      {isExpanded && (
+                        <tr className="bg-white border-b border-gray-100">
+                          <td colSpan={12} className="px-3 pb-5 pt-1" data-stop-row-toggle>
+                            <div className="pl-10">
+                              {/* 빠른 메모 추가 입력 */}
+                              <div className="flex items-center gap-2 bg-gray-50 rounded-md border border-gray-200 px-3 py-2">
+                                <svg className="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                <input
+                                  type="text"
+                                  value={draft}
+                                  onChange={(e) => setMemoDraft((prev) => ({ ...prev, [trade.id]: e.target.value }))}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                                      e.preventDefault();
+                                      handleSubmitMemo(trade);
+                                    }
+                                  }}
+                                  placeholder={`${trade.customerName || "고객"} 고객 메모를 빠르게 추가… (Enter)`}
+                                  className="flex-1 bg-transparent text-[13px] focus:outline-none placeholder:text-gray-400"
+                                  disabled={submittingMemo}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleSubmitMemo(trade)}
+                                  disabled={submittingMemo || draft.trim().length === 0}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-gray-900 text-white text-[11px] font-medium disabled:bg-gray-300 hover:bg-black"
+                                >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12l5 5L20 7" />
+                                  </svg>
+                                  추가
+                                </button>
+                              </div>
+
+                              {/* 메모 히스토리 */}
+                              <div className="mt-3">
+                                <div className="flex items-center gap-1.5 text-[11px] text-gray-400 mb-2">
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  <span>메모 히스토리 · {memoEntries.length}건</span>
+                                </div>
+                                {memoEntries.length === 0 ? (
+                                  <p className="text-[12px] text-gray-400 py-1">아직 기록된 메모가 없습니다.</p>
+                                ) : (
+                                  <ul className="space-y-3">
+                                    {[...memoEntries].reverse().map((entry, idx) => (
+                                      <li key={entry.id} className="flex gap-2.5">
+                                        <span className={`mt-1 inline-block h-2 w-2 rounded-full shrink-0 ${idx === 0 ? "bg-gray-900" : "bg-white border border-gray-300"}`} />
+                                        <div className="min-w-0 flex-1">
+                                          <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
+                                            <span>{formatEntryTimestamp(entry.createdAt)}</span>
+                                            {idx === 0 && (
+                                              <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-medium leading-none">최신</span>
+                                            )}
+                                          </div>
+                                          <p className="text-[13px] text-gray-800 whitespace-pre-wrap break-words mt-0.5">
+                                            {entry.content}
+                                          </p>
+                                        </div>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      </Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
             )}
 
-            {/* 인피니트 스크롤 sentinel */}
-            <div ref={sentinelRef} className="h-1" />
-            {pagination?.hasNext && loading && (
-              <div className="py-4 text-center text-xs text-gray-400">불러오는 중...</div>
-            )}
-            {!pagination?.hasNext && rawTrades.length > 0 && (
-              <div className="py-4 text-center text-xs text-gray-400">모든 항목을 불러왔습니다 ({rawTrades.length}건)</div>
+            {/* 페이지네이션 */}
+            {pagination && pagination.total > 0 && (
+              <div className="mt-4 flex items-center justify-between text-[12px]">
+                <span className="text-gray-500">
+                  총 <span className="font-semibold text-gray-700">{pagination.total}</span>건 중 {(pagination.page - 1) * pagination.limit + 1}-{Math.min(pagination.page * pagination.limit, pagination.total)} 표시
+                </span>
+                <Pagination
+                  page={pagination.page}
+                  totalPages={pagination.totalPages}
+                  onChange={(p) => setPage(p)}
+                />
+              </div>
             )}
           </div>
         </div>

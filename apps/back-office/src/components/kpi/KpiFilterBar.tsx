@@ -122,9 +122,9 @@ export default function KpiFilterBar({
 
         <div className="hidden sm:block w-px h-6 bg-gray-200" />
 
-        {/* Date field */}
+        {/* Date field — 상담 KPI 에만 적용 (거래 KPI 는 백엔드 기본값 사용) */}
         <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-500 whitespace-nowrap">날짜 기준</label>
+          <label className="text-sm text-gray-500 whitespace-nowrap">상담 날짜 기준</label>
           <select
             value={filters.dateField}
             onChange={(e) =>
@@ -132,8 +132,8 @@ export default function KpiFilterBar({
             }
             className="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
           >
-            <option value="contractDate">계약일</option>
-            <option value="createdAt">등록일</option>
+            <option value="contractDate">등록일</option>
+            <option value="createdAt">생성일</option>
           </select>
         </div>
 

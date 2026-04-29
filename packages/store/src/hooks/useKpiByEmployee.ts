@@ -58,7 +58,6 @@ export function useKpiByEmployee(
         fetchTrades({
           startDate,
           endDate,
-          dateField: filters.dateField,
           userId: emp.id,
         }),
         fetchConsultations({

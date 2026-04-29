@@ -1,15 +1,40 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, Users, FileText, MessageSquare } from "lucide-react";
+import {
+  Flag,
+  Users,
+  BookOpen,
+  MessageSquare,
+  Star,
+  Clock,
+  PanelLeftClose,
+  PanelLeftOpen,
+  type LucideIcon,
+} from "lucide-react";
 
 const NAV_ITEMS = [
-  { href: "/clubs", label: "골프장 검색", icon: Search },
+  { href: "/clubs", label: "골프장 검색", icon: Flag },
   { href: "/customers", label: "고객 관리", icon: Users },
-  { href: "/trades", label: "상담일지", icon: FileText },
+  { href: "/trades", label: "상담일지", icon: BookOpen },
   { href: "/claims", label: "건의 사항", icon: MessageSquare },
 ] as const;
+
+// TODO: 추후 packages/store 의 즐겨찾기/최근 방문 store 로 이전
+const FAVORITES = [
+  { label: "김민준 고객 상담", href: "#" },
+  { label: "VIP 라운드 예약", href: "#" },
+] as const;
+
+const RECENTS = [
+  { label: "이서연", subLabel: "— 4월 23일", href: "#" },
+  { label: "박지호", subLabel: "— 4월 24일", href: "#" },
+  { label: "정유진", subLabel: "— 4월 25일", href: "#" },
+] as const;
+
+const STORAGE_KEY = "heritage-os.sidebar.collapsed";
 
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
@@ -21,52 +46,115 @@ function NavItem({
   label,
   Icon,
   active,
+  collapsed,
   onNavigate,
 }: {
   href: string;
   label: string;
-  Icon: typeof Search;
+  Icon: LucideIcon;
   active: boolean;
+  collapsed: boolean;
   onNavigate?: () => void;
 }) {
   return (
     <Link
       href={href}
       onClick={onNavigate}
-      className={`flex h-9 items-center gap-3 rounded-md px-3 text-[13px] font-medium tracking-[-0.025em] transition-colors ${
+      title={collapsed ? label : undefined}
+      className={[
+        "flex h-9 items-center rounded-[10px] text-[13px] font-medium tracking-[-0.01em] transition-colors",
+        collapsed ? "justify-center px-0" : "gap-3 px-3",
         active
-          ? "bg-white text-black shadow-[0_1px_3px_0_rgba(0,0,0,0.1),0_1px_2px_0_rgba(0,0,0,0.1)]"
-          : "text-[#9f9fa9] hover:bg-white/5 hover:text-white"
-      }`}
+          ? "bg-[#2a2a2a] text-white"
+          : "text-[#99a1af] hover:bg-white/5 hover:text-white",
+      ].join(" ")}
     >
       <Icon className="h-4 w-4 shrink-0" strokeWidth={2} />
-      <span className="truncate">{label}</span>
+      {!collapsed && <span className="truncate">{label}</span>}
     </Link>
   );
 }
 
-export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="px-3 pb-2 pt-4 text-[11px] uppercase tracking-[0.275px] text-[#6a7282]">
+      {children}
+    </div>
+  );
+}
+
+export default function Sidebar({
+  onNavigate,
+  forceExpanded = false,
+}: {
+  onNavigate?: () => void;
+  forceExpanded?: boolean;
+}) {
   const pathname = usePathname();
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    if (forceExpanded) return;
+    const saved = window.localStorage.getItem(STORAGE_KEY);
+    if (saved === "1") setCollapsed(true);
+  }, [forceExpanded]);
+
+  const isCollapsed = !forceExpanded && collapsed;
+
+  const toggle = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      window.localStorage.setItem(STORAGE_KEY, next ? "1" : "0");
+      return next;
+    });
+  };
 
   return (
-    <aside className="flex h-full w-56 flex-col border-r border-[#27272a] bg-[#111] text-white">
-      {/* 로고 */}
-      <Link
-        href="/"
-        onClick={onNavigate}
-        className="flex h-[72px] items-center gap-2.5 px-5"
+    <aside
+      className={[
+        "flex h-full flex-col bg-[#1a1a1a] text-white",
+        isCollapsed ? "w-16" : "w-[218px]",
+      ].join(" ")}
+    >
+      <div
+        className={[
+          "flex h-[57px] shrink-0 items-center border-b border-[#2a2a2a]",
+          isCollapsed ? "justify-center px-3.5" : "justify-between px-4",
+        ].join(" ")}
       >
-        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-white shadow-[0_1px_3px_0_rgba(0,0,0,0.1),0_1px_2px_0_rgba(0,0,0,0.1)]">
-          <span className="h-2.5 w-2.5 rounded-md bg-black" />
-        </span>
-        <span className="text-[16px] leading-6 tracking-[0.02em] text-white">
-          Heritage <span className="font-bold">DX</span>
-        </span>
-      </Link>
+        {!isCollapsed && (
+          <Link
+            href="/"
+            onClick={onNavigate}
+            className="flex items-center gap-3 overflow-hidden"
+          >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-white">
+              <span className="h-2.5 w-2.5 rounded-full bg-black" />
+            </span>
+            <span className="text-[15px] leading-[22px] tracking-[-0.005em] text-white">
+              Heritage <span className="font-bold">DX</span>
+            </span>
+          </Link>
+        )}
 
-      {/* 메뉴 */}
-      <nav className="flex-1 overflow-y-auto px-3 pt-3">
-        <ul className="space-y-1">
+        {!forceExpanded && (
+          <button
+            type="button"
+            onClick={toggle}
+            aria-label={isCollapsed ? "사이드바 펼치기" : "사이드바 접기"}
+            className="flex h-7 w-7 items-center justify-center rounded-md text-[#99a1af] hover:bg-white/5 hover:text-white"
+          >
+            {isCollapsed ? (
+              <PanelLeftOpen className="h-4 w-4" strokeWidth={2} />
+            ) : (
+              <PanelLeftClose className="h-4 w-4" strokeWidth={2} />
+            )}
+          </button>
+        )}
+      </div>
+
+      <nav className="flex-1 overflow-y-auto px-2 py-2">
+        <ul className="space-y-0.5">
           {NAV_ITEMS.map((item) => (
             <li key={item.href}>
               <NavItem
@@ -74,11 +162,55 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                 label={item.label}
                 Icon={item.icon}
                 active={isActive(pathname, item.href)}
+                collapsed={isCollapsed}
                 onNavigate={onNavigate}
               />
             </li>
           ))}
         </ul>
+
+        {!isCollapsed && (
+          <>
+            <SectionLabel>즐겨찾기</SectionLabel>
+            <ul className="space-y-0.5">
+              {FAVORITES.map((item) => (
+                <li key={item.label}>
+                  <Link
+                    href={item.href}
+                    onClick={onNavigate}
+                    className="flex h-9 items-center gap-3 rounded-[10px] px-3 text-[13px] font-medium text-[#99a1af] hover:bg-white/5 hover:text-white"
+                  >
+                    <Star className="h-4 w-4 shrink-0" strokeWidth={2} />
+                    <span className="truncate">{item.label}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+
+            <SectionLabel>최근 항목</SectionLabel>
+            <ul className="space-y-0.5">
+              {RECENTS.map((item) => (
+                <li key={item.label}>
+                  <Link
+                    href={item.href}
+                    onClick={onNavigate}
+                    className="flex h-[52px] items-center gap-3 rounded-[10px] px-3 text-[13px] font-medium text-[#99a1af] hover:bg-white/5 hover:text-white"
+                  >
+                    <Clock className="h-4 w-4 shrink-0" strokeWidth={2} />
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate text-[13px] text-[#99a1af]">
+                        {item.label}
+                      </span>
+                      <span className="truncate text-[11px] leading-[16.5px] text-[#6a7282]">
+                        {item.subLabel}
+                      </span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </nav>
     </aside>
   );

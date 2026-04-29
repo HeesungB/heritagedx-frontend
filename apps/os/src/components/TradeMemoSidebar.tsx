@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { MembershipTrade, MembershipTradeForm, ClubDetail } from "@/types";
-import { Button, Loading, Textarea, ConfirmModal } from "@heritage-dx/ui";
+import { Button, Loading, ConfirmModal } from "@heritage-dx/ui";
 import { useAppStores } from "@/stores";
-import { useConsultations } from "@heritage-dx/store";
+import { useConsultations, decodeMemoHistory, type MemoHistoryEntry } from "@heritage-dx/store";
+import { useAuth } from "@/contexts/AuthContext";
 import { useSendTradeNotification } from "@/hooks/useSendTradeNotification";
 import { useCustomerEnsureFlow } from "@/hooks/useCustomerEnsureFlow";
 import CustomerAutocomplete from "@/components/CustomerAutocomplete";
@@ -38,7 +39,8 @@ const initialForm: Omit<MembershipTradeForm, "clubId" | "clubName"> = {
 
 export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSidebarProps) {
   const { tradeMemo: tradeMemoStore } = useAppStores();
-  const { items: rawTrades, fetch: fetchFromStore, create, update, remove, toggleDone, isLoading: loading } = useConsultations(tradeMemoStore);
+  const { user } = useAuth();
+  const { items: rawTrades, fetch: fetchFromStore, create, update, remove, toggleDone, appendMemo, isLoading: loading } = useConsultations(tradeMemoStore);
   const { send: sendNotification } = useSendTradeNotification();
   const [activeTab, setActiveTab] = useState<SidebarTab>("create");
   const [form, setForm] = useState(initialForm);
@@ -51,6 +53,9 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
   const [filterType, setFilterType] = useState<"" | "매수" | "매도">("");
   const [filterDone, setFilterDone] = useState<"" | "done" | "progress">("progress");
   const [manualMembershipInput, setManualMembershipInput] = useState(false);
+  const [expandedMemoId, setExpandedMemoId] = useState<string | null>(null);
+  const [memoDraft, setMemoDraft] = useState<Record<string, string>>({});
+  const [memoSubmittingId, setMemoSubmittingId] = useState<string | null>(null);
 
   // 클라이언트 사이드 isDone 필터 (백엔드에서 isDone 쿼리 파라미터 제거됨)
   const trades = rawTrades.filter((t) => {
@@ -74,14 +79,17 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
   }, [searchQuery, filterType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const persistConsultation = async () => {
+    // 메모/특이사항은 폼이 아닌 카드 인라인 입력으로 누적되므로
+    // 수정 시에는 기존 값을 유지하고 신규 등록 시에는 비워둔다.
+    const preservedNotes = editingTrade ? editingTrade.notes ?? null : null;
+    const preservedRemarks = editingTrade ? editingTrade.remarks ?? null : null;
+
     const cleaned = {
       ...form,
       tradeDate: form.tradeDate || null,
       registrationDate: form.registrationDate || null,
       offerPriceNote: form.offerPriceNote || null,
       desiredPriceNote: form.desiredPriceNote || null,
-      notes: form.notes || null,
-      remarks: form.remarks || null,
     };
 
     const input = {
@@ -96,10 +104,10 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
       desiredPriceNote: cleaned.desiredPriceNote,
       depositAmount: cleaned.depositAmount || null,
       accountNumber: cleaned.accountNumber || null,
-      notes: cleaned.notes,
+      notes: preservedNotes,
       registrationDate: cleaned.registrationDate,
       tradeDate: cleaned.tradeDate,
-      remarks: cleaned.remarks,
+      remarks: preservedRemarks,
     };
 
     const wasEditing = !!editingTrade;
@@ -232,6 +240,48 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
     setManualMembershipInput(false);
   };
 
+  const buildMemoEntries = useCallback((trade: MembershipTrade): MemoHistoryEntry[] => {
+    return decodeMemoHistory(trade.notes, {
+      author: trade.createdByName ?? "—",
+      createdAt: trade.createdAt,
+      remarks: trade.remarks,
+    });
+  }, []);
+
+  const handleSubmitMemo = useCallback(
+    async (trade: MembershipTrade) => {
+      const draft = (memoDraft[trade.id] ?? "").trim();
+      if (!draft) return;
+      const authorName = user?.name?.trim() || user?.email || "—";
+      const authorId = user?.id ? String(user.id) : null;
+      setMemoSubmittingId(trade.id);
+      try {
+        const entity = await appendMemo(trade.id, draft, { name: authorName, id: authorId });
+        if (!entity) {
+          setErrorMessage("메모 저장에 실패했습니다.");
+          return;
+        }
+        setMemoDraft((prev) => ({ ...prev, [trade.id]: "" }));
+      } catch (err) {
+        console.error("메모 추가 실패:", err);
+        setErrorMessage("네트워크 오류가 발생했습니다.");
+      } finally {
+        setMemoSubmittingId(null);
+      }
+    },
+    [appendMemo, memoDraft, user?.email, user?.id, user?.name],
+  );
+
+  const formatEntryTimestamp = (iso: string) => {
+    try {
+      const d = new Date(iso);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    } catch {
+      return iso;
+    }
+  };
+
   const formatPrice = (price: number | string | null) => {
     if (price === null) return "-";
     const num = typeof price === "string" ? Number(price) : price;
@@ -334,9 +384,9 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
                       onClick={() => setFilterType(type)}
                       className={`px-2 py-1 text-[11px] font-medium rounded transition-colors whitespace-nowrap ${
                         filterType === type
-                          ? type === "매수" ? "bg-blue-600 text-white shadow-sm"
-                            : type === "매도" ? "bg-red-500 text-white shadow-sm"
-                            : "bg-emerald-600 text-white shadow-sm"
+                          ? type === "매수" ? "bg-emerald-600 text-white shadow-sm"
+                            : type === "매도" ? "bg-rose-600 text-white shadow-sm"
+                            : "bg-gray-900 text-white shadow-sm"
                           : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
@@ -382,8 +432,8 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
                     trade.isDone
                       ? "border-gray-300 border-l-gray-300 bg-gray-50 opacity-60"
                       : trade.tradeType === "매수"
-                        ? "border-gray-200 border-l-blue-600 bg-white shadow-sm hover:shadow"
-                        : "border-gray-200 border-l-red-500 bg-white shadow-sm hover:shadow"
+                        ? "border-gray-200 border-l-emerald-600 bg-white shadow-sm hover:shadow"
+                        : "border-gray-200 border-l-rose-600 bg-white shadow-sm hover:shadow"
                   }`}
                 >
                   {/* 헤더: 뱃지 + 골프장명 + 회원권종류 (1줄) */}
@@ -393,8 +443,10 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
                         trade.isDone
                           ? "bg-gray-200 text-gray-500"
                           : trade.tradeType === "매수"
-                            ? "bg-blue-600 text-white"
-                            : "bg-red-500 text-white"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : trade.tradeType === "매도"
+                              ? "bg-rose-100 text-rose-700"
+                              : "bg-amber-100 text-amber-700"
                       }`}>
                         {trade.tradeType}
                       </span>
@@ -431,13 +483,75 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
                       </div>
                     </div>
 
-                    {/* 메모 / 특이사항 */}
-                    {(trade.notes || trade.remarks) && (
-                      <div className={`border-l-2 pl-2 py-1 text-[11px] leading-snug ${trade.isDone ? "border-l-gray-300 text-gray-400" : "border-l-gray-400 text-gray-700"}`}>
-                        {trade.notes && <p>{trade.notes}</p>}
-                        {trade.remarks && <p className="italic">{trade.remarks}</p>}
-                      </div>
-                    )}
+                    {/* 메모 히스토리 */}
+                    {(() => {
+                      const entries = buildMemoEntries(trade);
+                      const latest = entries.length > 0 ? entries[entries.length - 1] : null;
+                      const expanded = expandedMemoId === trade.id;
+                      const draft = memoDraft[trade.id] ?? "";
+                      const submittingMemo = memoSubmittingId === trade.id;
+                      return (
+                        <div className={`mt-1 mb-1.5 rounded border ${trade.isDone ? "border-gray-200 bg-gray-50/60" : "border-gray-200 bg-gray-50/80"}`}>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedMemoId((prev) => (prev === trade.id ? null : trade.id))}
+                            className="w-full flex items-center justify-between gap-2 px-2 py-1.5 text-left"
+                          >
+                            <span className={`text-[11px] truncate ${trade.isDone ? "text-gray-400" : "text-gray-700"}`}>
+                              {latest ? latest.content : <span className="text-gray-400">메모 없음</span>}
+                            </span>
+                            <span className="shrink-0 text-[10px] text-gray-500 font-medium">
+                              {entries.length > 0 ? `히스토리 ${entries.length}` : ""}
+                            </span>
+                          </button>
+                          {expanded && (
+                            <div className="border-t border-gray-200 px-2 py-2 space-y-2">
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="text"
+                                  value={draft}
+                                  onChange={(e) => setMemoDraft((prev) => ({ ...prev, [trade.id]: e.target.value }))}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                                      e.preventDefault();
+                                      handleSubmitMemo(trade);
+                                    }
+                                  }}
+                                  placeholder="메모 추가… (Enter)"
+                                  disabled={submittingMemo}
+                                  className="flex-1 border border-gray-200 rounded px-2 py-1 text-[11px] focus:outline-none focus:border-gray-400"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleSubmitMemo(trade)}
+                                  disabled={submittingMemo || draft.trim().length === 0}
+                                  className="px-2 py-1 rounded bg-gray-900 text-white text-[10px] font-medium disabled:bg-gray-300"
+                                >
+                                  추가
+                                </button>
+                              </div>
+                              {entries.length === 0 ? (
+                                <p className="text-[11px] text-gray-400">아직 기록된 메모가 없습니다.</p>
+                              ) : (
+                                <ul className="space-y-1.5 max-h-40 overflow-y-auto">
+                                  {[...entries].reverse().map((entry, idx) => (
+                                    <li key={entry.id} className="text-[11px]">
+                                      <div className="flex items-center gap-1 text-gray-500">
+                                        <span>{formatEntryTimestamp(entry.createdAt)}</span>
+                                        {idx === 0 && (
+                                          <span className="ml-1 px-1 py-0.5 rounded bg-amber-100 text-amber-700 text-[9px] font-medium">최신</span>
+                                        )}
+                                      </div>
+                                      <p className="text-gray-700 whitespace-pre-wrap break-words">{entry.content}</p>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* 푸터: 날짜 + 액션 */}
                     <div className="flex items-center justify-between pt-1.5 border-t border-gray-100">
@@ -542,8 +656,8 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
                     className={`flex-1 py-1.5 text-xs rounded border transition-colors ${
                       form.tradeType === type
                         ? type === "매수"
-                          ? "bg-blue-600 text-white border-blue-600"
-                          : "bg-red-600 text-white border-red-600"
+                          ? "bg-emerald-600 text-white border-emerald-600"
+                          : "bg-rose-600 text-white border-rose-600"
                         : "border-gray-300 text-gray-600 hover:bg-gray-50"
                     }`}
                   >
@@ -695,17 +809,6 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
               />
             </div>
 
-            {/* 메모 */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">메모</label>
-              <Textarea
-                value={form.notes}
-                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                minRows={3}
-                placeholder="타회원권 교환 희망 등"
-              />
-            </div>
-
             {/* 등록일 + 거래일 */}
             <div className="grid grid-cols-2 gap-2">
               <div>
@@ -728,16 +831,9 @@ export default function TradeMemoSidebar({ clubDetail, onClose }: TradeMemoSideb
               </div>
             </div>
 
-            {/* 특이사항 */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">특이사항</label>
-              <Textarea
-                value={form.remarks}
-                onChange={(e) => setForm((f) => ({ ...f, remarks: e.target.value }))}
-                minRows={2}
-                placeholder="계약금 입금 완료 등"
-              />
-            </div>
+            <p className="text-[11px] text-gray-400 leading-relaxed">
+              메모와 특이사항은 리스트 카드를 펼쳐 메모 히스토리에 누적 기록할 수 있습니다.
+            </p>
 
             <Button type="submit" disabled={submitting} isLoading={submitting} className="w-full">
               {editingTrade ? "메모 수정" : "메모 저장"}

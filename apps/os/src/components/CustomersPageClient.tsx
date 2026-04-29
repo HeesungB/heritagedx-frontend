@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Search, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAppStores } from "@/stores";
 import { useCustomers } from "@heritage-dx/store";
 import type { CustomerEntity, CustomerHistorySummaryEntity } from "@heritage-dx/store";
@@ -206,98 +207,157 @@ export default function CustomersPageClient() {
   const totalPages = pagination?.totalPages ?? 1;
   const total = pagination?.total ?? 0;
 
-  const renderList = () => {
-    if (isLoading && items.length === 0) {
-      return (
-        <div className="flex justify-center py-20">
-          <Loading />
-        </div>
-      );
+  const pageNumbers = useMemo(() => {
+    const window = 5;
+    if (totalPages <= window) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
     }
-    if (items.length === 0) {
-      return (
-        <div className="text-center py-20 text-gray-500 text-sm">
-          등록된 고객이 없습니다.
-        </div>
-      );
-    }
-    return (
-      <ul className="divide-y divide-gray-200">
-        {items.map((item) => (
-          <li
-            key={item.id}
-            onClick={() => handleSelect(item)}
-            className="px-4 py-3 hover:bg-gray-50 cursor-pointer flex items-center justify-between gap-4"
-          >
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-gray-900">{item.name}</span>
-                <span className="text-sm text-gray-500">{item.contact}</span>
-              </div>
-              {item.memo && (
-                <p className="text-xs text-gray-500 mt-1 truncate">{item.memo}</p>
-              )}
-            </div>
-            <div className="text-xs text-gray-500 text-right shrink-0">
-              <div>담당: {item.createdByName || "-"}</div>
-              <div>{new Date(item.createdAt).toLocaleDateString("ko-KR")}</div>
-            </div>
-          </li>
-        ))}
-      </ul>
-    );
-  };
+    const start = Math.max(1, Math.min(page - 2, totalPages - window + 1));
+    return Array.from({ length: window }, (_, i) => start + i);
+  }, [page, totalPages]);
 
   return (
     <div>
-      <main className="max-w-4xl mx-auto px-4 py-6 sm:py-8">
-        <div className="flex items-center justify-between mb-4">
+      <main className="mx-auto w-full max-w-[1100px] px-6 py-10 lg:px-8">
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">고객 관리</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              총 {total}명의 고객이 등록되어 있습니다.
+            <h1 className="text-[28px] font-bold leading-[36px] tracking-[-0.01em] text-[#101828]">
+              고객 관리
+            </h1>
+            <p className="mt-2 text-[14px] leading-[22px] tracking-[-0.005em] text-[#6a7282]">
+              등록된 고객의 상세 정보를 관리하고 조회할 수 있습니다.
             </p>
           </div>
-          <Button onClick={() => setShowCreateModal(true)}>신규 고객 등록</Button>
+          <button
+            type="button"
+            onClick={() => setShowCreateModal(true)}
+            className="flex h-10 shrink-0 items-center gap-2 rounded-lg bg-[#101828] px-4 text-[13px] font-medium tracking-[-0.005em] text-white hover:bg-black"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2} />
+            신규 고객 등록
+          </button>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="p-4 border-b border-gray-200">
-            <Input
-              placeholder="고객명 또는 연락처로 검색"
-              value={searchInput}
-              onChange={(e) => {
-                setSearchInput(e.target.value);
-                setPage(1);
-              }}
-            />
+        <div className="rounded-2xl border border-[#e5e7eb] bg-white">
+          <div className="flex flex-wrap items-center justify-end gap-3 border-b border-[#f3f4f6] px-5 py-4">
+            <div className="flex h-10 w-full items-center gap-2 rounded-lg border border-[#e5e7eb] bg-white px-3 focus-within:border-[#101828] sm:w-[260px]">
+              <Search className="h-4 w-4 shrink-0 text-[#99a1af]" strokeWidth={2} />
+              <input
+                type="text"
+                value={searchInput}
+                onChange={(e) => {
+                  setSearchInput(e.target.value);
+                  setPage(1);
+                }}
+                placeholder="테이블 내 검색..."
+                className="h-full flex-1 bg-transparent text-[13px] tracking-[-0.005em] text-[#101828] placeholder:text-[#99a1af] focus:outline-none"
+              />
+            </div>
           </div>
-          {isRefreshing && (
-            <div className="px-4 py-1 text-xs text-gray-400">불러오는 중...</div>
+
+          {isLoading && items.length === 0 ? (
+            <div className="flex justify-center py-20">
+              <Loading />
+            </div>
+          ) : items.length === 0 ? (
+            <div className="py-20 text-center text-[13px] text-[#99a1af]">
+              등록된 고객이 없습니다.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13px]">
+                <thead>
+                  <tr className="text-[12px] tracking-[-0.005em] text-[#6a7282]">
+                    <th className="px-4 py-3 text-center font-medium">No.</th>
+                    <th className="px-4 py-3 text-left font-medium">고객명</th>
+                    <th className="px-4 py-3 text-left font-medium">연락처</th>
+                    <th className="px-4 py-3 text-left font-medium">이메일</th>
+                    <th className="px-4 py-3 text-left font-medium">주소</th>
+                    <th className="px-4 py-3 text-left font-medium">등록일</th>
+                    <th className="px-4 py-3 text-left font-medium">메모</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#f3f4f6]">
+                  {items.map((item, index) => (
+                    <tr
+                      key={item.id}
+                      onClick={() => handleSelect(item)}
+                      className="cursor-pointer transition-colors hover:bg-gray-50"
+                    >
+                      <td className="px-4 py-4 text-center text-[#6a7282]">
+                        {(page - 1) * DEFAULT_LIMIT + index + 1}
+                      </td>
+                      <td className="px-4 py-4 font-medium text-[#101828]">
+                        {item.name}
+                      </td>
+                      <td className="px-4 py-4 text-[#4a5565]">
+                        {item.contact}
+                      </td>
+                      <td className="px-4 py-4 text-[#4a5565]">
+                        {item.email || "-"}
+                      </td>
+                      <td className="max-w-[220px] truncate px-4 py-4 text-[#4a5565]">
+                        {item.address || "-"}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-4 text-[#4a5565]">
+                        {new Date(item.createdAt).toLocaleDateString("ko-KR")}
+                      </td>
+                      <td className="max-w-[200px] truncate px-4 py-4 text-[#6a7282]">
+                        {item.memo || "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
-          {renderList()}
-        </div>
 
-        {totalPages > 1 && (
-          <div className="flex justify-center items-center gap-2 mt-4">
-            <Button
-              variant="outline"
-              disabled={!pagination?.hasPrev}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              이전
-            </Button>
-            <span className="text-sm text-gray-600">
-              {pagination?.page ?? 1} / {totalPages}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#f3f4f6] px-5 py-4">
+            <span className="text-[13px] tracking-[-0.005em] text-[#6a7282]">
+              총{" "}
+              <strong className="font-bold text-[#101828]">{total}명</strong>의
+              고객이 있습니다.
             </span>
-            <Button
-              variant="outline"
-              disabled={!pagination?.hasNext}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              다음
-            </Button>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={!pagination?.hasPrev}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="flex h-8 w-8 items-center justify-center rounded-md border border-[#e5e7eb] bg-white text-[#4a5565] disabled:cursor-not-allowed disabled:text-[#d1d5db] hover:enabled:bg-gray-50"
+                  aria-label="이전 페이지"
+                >
+                  <ChevronLeft className="h-4 w-4" strokeWidth={2} />
+                </button>
+                {pageNumbers.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPage(p)}
+                    className={`h-8 w-8 rounded-md text-[13px] font-medium transition-colors ${
+                      p === page
+                        ? "bg-[#101828] text-white"
+                        : "border border-[#e5e7eb] bg-white text-[#4a5565] hover:bg-gray-50"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  disabled={!pagination?.hasNext}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="flex h-8 w-8 items-center justify-center rounded-md border border-[#e5e7eb] bg-white text-[#4a5565] disabled:cursor-not-allowed disabled:text-[#d1d5db] hover:enabled:bg-gray-50"
+                  aria-label="다음 페이지"
+                >
+                  <ChevronRight className="h-4 w-4" strokeWidth={2} />
+                </button>
+              </div>
+            )}
           </div>
+        </div>
+        {isRefreshing && (
+          <p className="mt-2 text-[11px] text-[#99a1af]">불러오는 중...</p>
         )}
       </main>
 

@@ -19,7 +19,7 @@
 - **OperationId**: `AdminKpiController_getConsultationKpi`
 - **인증**: 필요 (쿠키 `hdx_access_token`)
 
-기간 내 상담 생성, 승인 요청, 계약금 기준 1차 승인, 거래내역 전환, 최종 완료, 파기 건수를 조회합니다. userId를 지정하면 해당 직원 기준으로 필터링합니다.
+기간 내 상담 생성, 승인 요청, 계약금 기준 1차 승인, 거래내역 전환, 최종 완료 건수를 조회합니다. userId를 지정하면 해당 직원 기준으로 필터링합니다.
 
 #### 파라미터
 
@@ -50,8 +50,7 @@ Cookie: hdx_access_token=<JWT>
     "approvalRequestedCount": 8,
     "depositBasedFirstApprovedCount": 4,
     "tradeConvertedCount": 4,
-    "finalCompletedCount": 2,
-    "destroyedCount": 2
+    "finalCompletedCount": 2
   },
   "timestamp": "2026-04-17T11:39:59.504Z"
 }
@@ -71,7 +70,6 @@ Cookie: hdx_access_token=<JWT>
 |---|---|---|---|---|
 | `query` | `startDate` | string | ✓ | 시작일 (YYYY-MM-DD) _예: `2025-01-01`_ |
 | `query` | `endDate` | string | ✓ | 종료일 (YYYY-MM-DD) _예: `2025-12-31`_ |
-| `query` | `dateField` | `contractDate` \| `createdAt` |  | 날짜 필터 기준 (기본: contractDate) |
 | `query` | `employeeField` | `createdByUserId` \| `manager` |  | 직원 필터 기준. 미입력 시 전체 조회. createdByUserId → userId 필수, manager → managerName 필수 |
 | `query` | `userId` | string (uuid) |  | 직원 UUID (employeeField=createdByUserId일 때 필수) _예: `550e8400-e29b-41d4-a716-446655440000`_ |
 | `query` | `managerName` | string |  | 담당자 이름 (employeeField=manager일 때 필수) _예: `김담당`_ |
@@ -114,7 +112,6 @@ Cookie: hdx_access_token=<JWT>
 | `depositBasedFirstApprovedCount` | number | ✓ | 계약금이 입력된 1차 승인 수 (firstApprovedAt 기준) _예: `50`_ |
 | `tradeConvertedCount` | number | ✓ | 상담에서 거래내역으로 전환된 수 (firstApprovedAt 기준) _예: `50`_ |
 | `finalCompletedCount` | number | ✓ | 거래 최종 완료 수 (finalApprovedAt 기준) _예: `35`_ |
-| `destroyedCount` | number | ✓ | 파기 수 (상담 rejectedAt + 거래 finalRejectedAt 기준, 현재 REJECTED 상태) _예: `10`_ |
 | `userId` | string |  | 직원 UUID (필터 적용 시) |
 
 ### ConsultationKpiResponseDto

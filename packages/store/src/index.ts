@@ -35,6 +35,9 @@ export type {
   CustomerHistorySummaryEntity,
   CustomerHistoryRecentConsultationEntity,
   CustomerHistoryRecentMembershipTradeEntity,
+  MemoHistoryEntry,
+  MemoHistoryLegacyFallback,
+  MemoHistoryAppendInput,
 } from "./entities/index";
 export {
   scenarioMatchesFilters,
@@ -46,6 +49,11 @@ export {
   isDocumentExpired,
   isDocumentDownloadable,
   collectMissingConsultationApprovalFields,
+  MEMO_MARKER,
+  decodeMemoHistory,
+  encodeMemoHistory,
+  appendMemoEntry,
+  getLatestMemoEntry,
 } from "./entities/index";
 
 // Stores

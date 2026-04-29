@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import ClubProfile from "@/components/ClubProfile";
-import ClubDirectory, {
+import ClubSearchPanel from "@/components/club-search/ClubSearchPanel";
+import {
   INITIALS,
   getKoreanInitial,
   normalizeInitial,
@@ -102,36 +103,27 @@ export default function HomeClient({
   const isDirectoryView = !selectedClub;
 
   return (
-    <div className="flex h-[calc(100vh-72px)] flex-col bg-gray-100 overflow-hidden print:h-auto print:overflow-visible print:bg-white">
+    <div className="flex min-h-0 flex-1 flex-col bg-[#f5f5f5] print:bg-white">
       {isDirectoryView ? (
-        /* 디렉토리 뷰: 골프장 목록 전체 화면 */
-        clubsLoading ? (
-          <div className="flex-1 flex items-center justify-center">
+        clubsLoading && clubs.length === 0 ? (
+          <div className="flex flex-1 items-center justify-center py-20">
             <Loading text="골프장 목록 로딩 중..." />
           </div>
         ) : (
-          <ClubDirectory clubs={clubs} totalCount={totalCount} onClubSelect={handleClubSelect} />
+          <ClubSearchPanel
+            onSelect={(code) => {
+              const c = clubs.find((cl) => cl.code === code);
+              if (c) handleClubSelect(c);
+            }}
+          />
         )
       ) : (
         <>
-          {/* 데스크탑 레이아웃 */}
-          <div className="hidden lg:flex flex-1 min-h-0 print:block print:min-h-0">
-            {/* 왼쪽: 골프장 목록 */}
-            <div className="h-full print:hidden">
-              <ClubListSidebarWithData
-                initialClubs={clubs}
-                totalCount={totalCount}
-                selectedClubCode={selectedClubCode}
-                onClubSelect={handleClubSelect}
-              />
-            </div>
-
-            {/* 오른쪽: 골프장 프로필 + 메모 사이드바 */}
+          <div className="hidden flex-1 lg:flex print:block">
             <ClubProfile detail={clubDetail} loading={detailLoading} clubs={clubs} onClubNavigate={(code) => { const c = clubs.find(cl => cl.code === code); if (c) handleClubSelect(c); }} />
           </div>
 
-          {/* 모바일 컨텐츠 */}
-          <div className="lg:hidden flex-1 min-h-0 flex flex-col pb-16 print:hidden">
+          <div className="flex flex-1 flex-col pb-16 lg:hidden print:hidden">
             {mobileView === "clubs" && (
               <MobileClubList
                 initialClubs={clubs}
@@ -145,7 +137,6 @@ export default function HomeClient({
             )}
           </div>
 
-          {/* 모바일 네비게이션 */}
           <MobileNavigation
             currentView={mobileView}
             onViewChange={handleMobileViewChange}
@@ -154,240 +145,6 @@ export default function HomeClient({
         </>
       )}
     </div>
-  );
-}
-
-// 초기 데이터를 받는 ClubListSidebar
-function ClubListSidebarWithData({
-  initialClubs,
-  totalCount,
-  selectedClubCode,
-  onClubSelect,
-}: {
-  initialClubs: Club[];
-  totalCount: number;
-  selectedClubCode: string | null;
-  onClubSelect: (club: Club) => void;
-}) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterMode, setFilterMode] = useState<"initial" | "region" | null>(null);
-  const [selectedInitial, setSelectedInitial] = useState<string | null>(null);
-  const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
-
-  const regionGroups = useMemo(() => {
-    const groupSet = new Set<string>();
-    for (const club of initialClubs) {
-      const effective = getEffectiveRegion(club.region, club.address);
-      if (effective) {
-        const group = getRegionGroup(effective);
-        if (group) groupSet.add(group);
-      }
-    }
-    return REGION_GROUPS.filter((g) => groupSet.has(g));
-  }, [initialClubs]);
-
-  const initialsWithClubs = useMemo(() => {
-    const set = new Set<string>();
-    for (const club of initialClubs) {
-      set.add(normalizeInitial(getKoreanInitial(club.name)));
-    }
-    return set;
-  }, [initialClubs]);
-
-  const filteredClubs = useMemo(() => {
-    let result = initialClubs;
-
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(
-        (club) =>
-          club.name?.toLowerCase().includes(query) ||
-          club.code?.toLowerCase().includes(query) ||
-          club.region?.toLowerCase().includes(query) ||
-          club.address?.toLowerCase().includes(query)
-      );
-    }
-
-    if (filterMode === "initial" && selectedInitial) {
-      result = result.filter((club) => normalizeInitial(getKoreanInitial(club.name)) === selectedInitial);
-    }
-
-    if (filterMode === "region" && selectedRegion) {
-      result = result.filter((club) => getRegionGroup(getEffectiveRegion(club.region, club.address)) === selectedRegion);
-    }
-
-    const sorted = result.sort((a, b) => a.name.localeCompare(b.name, "ko"));
-    if (selectedClubCode) {
-      const idx = sorted.findIndex((c) => c.code === selectedClubCode);
-      if (idx > 0) {
-        const [selected] = sorted.splice(idx, 1);
-        sorted.unshift(selected);
-      }
-    }
-    return sorted;
-  }, [initialClubs, searchQuery, filterMode, selectedInitial, selectedRegion, selectedClubCode]);
-
-  const handleInitialClick = (initial: string) => {
-    if (filterMode === "initial" && selectedInitial === initial) {
-      setSelectedInitial(null);
-      setFilterMode(null);
-    } else {
-      setSelectedInitial(initial);
-      setSelectedRegion(null);
-      setFilterMode("initial");
-    }
-  };
-
-  const handleRegionClick = (region: string) => {
-    if (filterMode === "region" && selectedRegion === region) {
-      setSelectedRegion(null);
-      setFilterMode(null);
-    } else {
-      setSelectedRegion(region);
-      setSelectedInitial(null);
-      setFilterMode("region");
-    }
-  };
-
-  return (
-    <aside className="w-64 h-full min-h-0 border-r border-gray-200 bg-white flex flex-col">
-      {/* 헤더 */}
-      <div className="p-4 border-b border-gray-100">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 22V4a2 2 0 012-2h8a2 2 0 012 2v18M6 12H4a2 2 0 00-2 2v6a2 2 0 002 2h2M18 9h2a2 2 0 012 2v9a2 2 0 01-2 2h-2M10 6h4M10 10h4M10 14h4M10 18h4" />
-            </svg>
-            <span className="font-semibold text-gray-900">골프장</span>
-          </div>
-        </div>
-
-        {/* 검색 */}
-        <div className="relative mb-3">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            type="text"
-            placeholder="골프장 검색..."
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              if (e.target.value.trim()) {
-                setFilterMode(null);
-                setSelectedInitial(null);
-                setSelectedRegion(null);
-              }
-            }}
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-          />
-        </div>
-
-        {/* 초성 필터 */}
-        <div className="mb-2">
-          <div className="text-[11px] text-gray-500 mb-1">가나다</div>
-          <div className="flex flex-wrap gap-1">
-            {INITIALS.map((initial) => {
-              const hasClubs = initialsWithClubs.has(initial);
-              const isActive = filterMode === "initial" && selectedInitial === initial;
-              return (
-                <button
-                  key={initial}
-                  onClick={() => handleInitialClick(initial)}
-                  disabled={!hasClubs}
-                  className={`w-[30px] h-7 text-xs rounded border transition-colors ${
-                    isActive
-                      ? "bg-gray-900 text-white border-gray-900"
-                      : hasClubs
-                        ? "border-gray-300 text-gray-700 hover:bg-gray-100"
-                        : "border-gray-100 text-gray-300 cursor-not-allowed"
-                  }`}
-                >
-                  {initial}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* 지역 필터 */}
-        <div>
-          <div className="text-[11px] text-gray-500 mb-1">지역</div>
-          <div className="flex flex-wrap gap-1">
-            {regionGroups.map((group) => {
-              const isActive = filterMode === "region" && selectedRegion === group;
-              return (
-                <button
-                  key={group}
-                  onClick={() => handleRegionClick(group)}
-                  className={`px-2 py-1 text-xs rounded border transition-colors ${
-                    isActive
-                      ? "bg-gray-900 text-white border-gray-900"
-                      : "border-gray-300 text-gray-600 hover:bg-gray-100"
-                  }`}
-                >
-                  {group}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* 골프장 목록 */}
-      <div className="flex-1 overflow-y-auto">
-        {filteredClubs.length === 0 ? (
-          <div className="px-4 py-8 text-sm text-gray-500 text-center">
-            {searchQuery || filterMode ? "검색 결과가 없습니다" : "등록된 골프장이 없습니다"}
-          </div>
-        ) : (
-          filteredClubs.map((club) => {
-            const isSelected = selectedClubCode === club.code;
-            return (
-              <div
-                key={club.code}
-                onClick={() => onClubSelect(club)}
-                className={`border-l-2 cursor-pointer transition-colors ${
-                  isSelected
-                    ? "bg-gray-50 border-l-gray-900"
-                    : "border-l-transparent hover:bg-gray-50"
-                }`}
-              >
-                <div className="px-4 py-3">
-                  <div className="flex items-center gap-1.5">
-                    <span className={`text-sm font-medium ${isSelected ? "text-gray-900" : "text-gray-900"}`}>
-                      {club.name}
-                    </span>
-                    {club.operationTypes?.map((type) => (
-                      <span
-                        key={type}
-                        className={`inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded ${
-                          type === "MEMBERSHIP"
-                            ? "bg-blue-100 text-blue-700"
-                            : "bg-green-100 text-green-700"
-                        }`}
-                      >
-                        {type === "MEMBERSHIP" ? "회원제" : type === "PUBLIC" ? "퍼블릭" : type}
-                      </span>
-                    ))}
-                  </div>
-                  <div className={`text-xs ${isSelected ? "text-gray-500" : "text-gray-500"}`}>
-                    {club.region || (club.address ? extractRegionFromAddress(club.address) : "")}{club.holes ? ` · ${club.holes}` : ""}
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      {/* 하단 정보 */}
-      <div className="p-3 border-t border-gray-100 bg-gray-50">
-        <div className="flex items-center justify-end text-xs text-gray-500">
-          <span>{filteredClubs.length}개 표시 / 총 {totalCount}개</span>
-        </div>
-      </div>
-    </aside>
   );
 }
 

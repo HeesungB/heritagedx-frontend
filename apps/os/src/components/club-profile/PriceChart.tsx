@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import {
   LineChart,
   Line,
@@ -15,17 +15,20 @@ import type { MarketPricePeriod } from "@heritage-dx/store";
 
 interface PriceChartProps {
   membershipId: string;
+  period?: MarketPricePeriod;
 }
 
-const PERIODS: { key: MarketPricePeriod; label: string }[] = [
+export const PRICE_CHART_PERIODS: { key: MarketPricePeriod; label: string }[] = [
   { key: "1w", label: "1주" },
   { key: "1m", label: "1개월" },
   { key: "3m", label: "3개월" },
   { key: "1y", label: "1년" },
 ];
 
-export default function PriceChart({ membershipId }: PriceChartProps) {
-  const [period, setPeriod] = useState<MarketPricePeriod>("3m");
+export default function PriceChart({
+  membershipId,
+  period = "3m",
+}: PriceChartProps) {
   const { prices, isLoading, isError } = useMarketPrices(membershipId, period);
 
   const data = useMemo(
@@ -52,27 +55,7 @@ export default function PriceChart({ membershipId }: PriceChartProps) {
   const formatManwon = (value: number) => `${value.toLocaleString()}`;
 
   return (
-    <div className="border-t border-gray-300">
-      <div className="bg-gray-50 border-b border-gray-300 px-3 py-2 flex items-center justify-between">
-        <span className="text-sm font-medium text-gray-700">
-          시세 추이 (단위: 만원)
-        </span>
-        <div className="flex gap-1">
-          {PERIODS.map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setPeriod(key)}
-              className={`px-2.5 py-1 text-xs rounded transition-colors ${
-                period === key
-                  ? "bg-gray-900 text-white"
-                  : "border border-gray-300 text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
+    <div>
       <div className="p-3">
         {isLoading ? (
           <div className="flex items-center justify-center h-[280px] text-sm text-gray-500">

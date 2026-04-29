@@ -4,14 +4,14 @@ import type { ApprovalStatus, WorkflowStatus } from "@heritage-dx/store";
 // 정확한 enum 이름은 백엔드 신규 스펙(Phase B)에서 확정 후 정렬한다.
 const LABEL: Record<string, string> = {
   IN_CONSULTATION: "상담중",
-  PENDING_DEPOSIT: "계약금 대기",
-  DEPOSIT_APPROVED: "계약금 승인",
+  PENDING_DEPOSIT: "승인 대기",
+  DEPOSIT_APPROVED: "계약 완료",
   TAX_FILING: "세무신고",
   COMPLETED: "완료",
   // deprecated — 과거 데이터 호환
   DRAFT: "상담중",
-  PENDING_APPROVAL: "계약금 대기",
-  FIRST_APPROVED: "계약금 승인",
+  PENDING_APPROVAL: "승인 대기",
+  FIRST_APPROVED: "계약 완료",
   ON_HOLD: "보류",
   REJECTED: "반려",
 };

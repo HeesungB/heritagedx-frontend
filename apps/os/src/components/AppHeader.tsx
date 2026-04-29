@@ -1,24 +1,27 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import Link from "next/link";
-import { Search, ChevronRight, User as UserIcon, Menu, LogOut } from "lucide-react";
+import { Menu, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { getPageTitle } from "@/lib/breadcrumb";
+import { useHeaderActions } from "@/contexts/HeaderActionsContext";
+
+const ROLE_LABELS: Record<string, string> = {
+  SUPER_ADMIN: "Super Admin",
+  ORG_ADMIN: "Org Admin",
+  EDITOR: "Editor",
+};
 
 export default function AppHeader({
   onMenuClick,
 }: {
   onMenuClick?: () => void;
 }) {
-  const pathname = usePathname();
   const { user, logout } = useAuth();
-  const title = getPageTitle(pathname);
+  const { actions } = useHeaderActions();
+  const roleLabel = user?.role ? ROLE_LABELS[user.role] ?? null : null;
 
   return (
-    <header className="sticky top-0 z-20 flex h-[72px] items-center justify-between border-b border-[#e5e7eb] bg-white px-4 lg:px-8">
-      <div className="flex items-center gap-3">
-        {/* 모바일 햄버거 */}
+    <header className="flex h-[57px] shrink-0 items-center justify-between border-b border-[#e5e7eb] bg-white px-4 lg:px-8">
+      <div className="flex min-w-0 items-center gap-3">
         {onMenuClick && (
           <button
             type="button"
@@ -29,53 +32,26 @@ export default function AppHeader({
             <Menu className="h-5 w-5" strokeWidth={2} />
           </button>
         )}
-
-        {/* Breadcrumb */}
-        <nav className="flex items-center gap-2.5 text-[13px] tracking-[-0.005em]">
-          <Link href="/" className="text-[#6a7282] hover:text-black">
-            홈
-          </Link>
-          {title && title !== "홈" && (
-            <>
-              <ChevronRight className="h-3.5 w-3.5 text-[#6a7282]" strokeWidth={2} />
-              <span className="font-bold text-black">{title}</span>
-            </>
-          )}
-        </nav>
+        {actions && <div className="flex items-center gap-2">{actions}</div>}
       </div>
 
-      <div className="flex items-center gap-6">
-        {/* 검색 pill (placeholder) */}
-        <div
-          aria-hidden
-          className="hidden h-10 w-[320px] items-center gap-3 rounded-full bg-[#f3f4f6] px-4 text-[14px] tracking-[-0.01em] text-[#99a1bf] sm:flex"
+      <div className="flex shrink-0 items-center gap-4">
+        {roleLabel && (
+          <span className="hidden text-[13px] font-medium tracking-[-0.005em] text-[#4a5565] sm:inline">
+            {roleLabel}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            void logout();
+          }}
+          aria-label="로그아웃"
+          className="flex h-8 items-center gap-2 rounded-lg px-3 text-[13px] font-medium tracking-[-0.005em] text-[#4a5565] hover:bg-gray-100 hover:text-black"
         >
-          <Search className="h-4 w-4" strokeWidth={2} />
-          <span className="select-none">고객명, 연락처, 담당자 검색...</span>
-        </div>
-
-        <div className="hidden h-6 w-px bg-[#e5e7eb] sm:block" />
-
-        {/* 사용자 */}
-        <div className="flex items-center gap-2">
-          <span className="grid h-8 w-8 place-items-center rounded-full bg-[#f3f4f6] text-[#4a5565]">
-            <UserIcon className="h-4 w-4" strokeWidth={2} />
-          </span>
-          <span className="hidden text-[13px] font-bold tracking-[-0.005em] text-[#4a5565] sm:block">
-            {user?.name ?? "사용자"}
-          </span>
-          <button
-            type="button"
-            onClick={() => {
-              void logout();
-            }}
-            aria-label="로그아웃"
-            title="로그아웃"
-            className="ml-1 flex h-8 w-8 items-center justify-center rounded-md text-[#6a7282] hover:bg-gray-100 hover:text-black"
-          >
-            <LogOut className="h-4 w-4" strokeWidth={2} />
-          </button>
-        </div>
+          <LogOut className="h-4 w-4" strokeWidth={2} />
+          <span className="hidden sm:inline">로그아웃</span>
+        </button>
       </div>
     </header>
   );

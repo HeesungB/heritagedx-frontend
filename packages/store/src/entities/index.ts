@@ -12,6 +12,18 @@ export type {
   ConsultationApprovalMissingFields,
 } from "./consultation";
 export { collectMissingConsultationApprovalFields } from "./consultation";
+export type {
+  MemoHistoryEntry,
+  LegacyFallback as MemoHistoryLegacyFallback,
+  AppendInput as MemoHistoryAppendInput,
+} from "./memo-history";
+export {
+  MEMO_MARKER,
+  decodeMemoHistory,
+  encodeMemoHistory,
+  appendMemoEntry,
+  getLatestMemoEntry,
+} from "./memo-history";
 export type { MembershipTradeEntity } from "./membership-trade";
 export type { MembershipEntity } from "./membership";
 export type {

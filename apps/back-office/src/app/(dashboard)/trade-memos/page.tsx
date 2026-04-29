@@ -9,9 +9,6 @@ import {
   Loader2,
   MessageSquare,
   Edit3,
-  CheckCircle2,
-  RotateCcw,
-  ExternalLink,
 } from "lucide-react";
 import {
   PageLoading,
@@ -27,7 +24,11 @@ import {
   Badge,
   ClubSearchSelect,
 } from "@heritage-dx/ui";
-import { useConsultationAdminRepository, useClubRepository, useCustomerRepository } from "@heritage-dx/api";
+import {
+  useConsultationAdminRepository,
+  useClubRepository,
+  useCustomerRepository,
+} from "@heritage-dx/api";
 import type { Consultation, Club, Pagination, CustomerHistorySummary } from "@heritage-dx/types";
 import type { ApprovalStatus } from "@heritage-dx/store";
 import { canDeleteConsultation } from "@heritage-dx/store";
@@ -741,17 +742,27 @@ export default function ConsultationsPage() {
                     <tr key={trade.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors group cursor-pointer ${trade.isDone ? "opacity-50" : ""}`} onClick={() => handleRowClick(trade)}>
                       <td className="py-2.5 pr-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1.5">
-                          {(trade.approvalStatus === "PENDING_DEPOSIT" || trade.approvalStatus === "PENDING_APPROVAL") && (() => {
+                          {(trade.approvalStatus === "IN_CONSULTATION" ||
+                            trade.approvalStatus === "DRAFT") && (
+                            <span
+                              className="text-xs text-gray-400"
+                              title="OS 에서 승인 요청 시 처리 가능"
+                            >
+                              상담중
+                            </span>
+                          )}
+                          {(trade.approvalStatus === "PENDING_DEPOSIT" ||
+                            trade.approvalStatus === "PENDING_APPROVAL") && (() => {
                             const hasDeposit = !!trade.depositAmount && trade.depositAmount > 0;
                             return (
                               <button
                                 type="button"
                                 disabled={approvalBusyId === trade.id || !hasDeposit}
                                 onClick={() => runApprovalAction(trade, "APPROVE_FIRST")}
-                                className="p-1 rounded hover:bg-emerald-50 text-emerald-600 disabled:opacity-30 disabled:cursor-not-allowed"
-                                title={hasDeposit ? "승인 (거래 자동 생성)" : "계약금 입력 후 승인 가능"}
+                                className="px-2 py-0.5 text-xs font-medium rounded border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                                title={hasDeposit ? "계약금 확인 후 거래 자동 생성" : "계약금 입력 후 확인 가능"}
                               >
-                                <CheckCircle2 className="w-4 h-4" />
+                                계약금 확인
                               </button>
                             );
                           })()}
@@ -761,19 +772,19 @@ export default function ConsultationsPage() {
                                 type="button"
                                 disabled={approvalBusyId === trade.id}
                                 onClick={() => setReasonModal({ memoId: trade.id })}
-                                className="p-1 rounded hover:bg-amber-50 text-amber-700 disabled:opacity-50"
-                                title="다시 열기 (계약금 입/송금 무산 시)"
+                                className="px-2 py-0.5 text-xs font-medium rounded border border-amber-200 text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                                title="계약금 입/송금 무산 시"
                               >
-                                <RotateCcw className="w-4 h-4" />
+                                다시 열기
                               </button>
                               {trade.linkedTradeId && (
                                 <a
                                   href={`/trade-records?highlight=${trade.linkedTradeId}`}
                                   onClick={(e) => e.stopPropagation()}
-                                  className="p-1 rounded hover:bg-emerald-50 text-emerald-700"
-                                  title="연결된 거래 보기"
+                                  className="px-2 py-0.5 text-xs font-medium rounded border border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                                  title="연결된 거래 페이지로 이동"
                                 >
-                                  <ExternalLink className="w-4 h-4" />
+                                  거래 보기
                                 </a>
                               )}
                             </>

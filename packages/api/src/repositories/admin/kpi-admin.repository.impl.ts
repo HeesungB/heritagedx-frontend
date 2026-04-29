@@ -18,7 +18,6 @@ export class KpiAdminRepository implements IKpiAdminRepository {
     const sp = new URLSearchParams();
     sp.set("startDate", params.startDate);
     sp.set("endDate", params.endDate);
-    if (params.dateField) sp.set("dateField", params.dateField);
     if (params.employeeField) sp.set("employeeField", params.employeeField);
     if (params.userId) sp.set("userId", params.userId);
     if (params.managerName) sp.set("managerName", params.managerName);

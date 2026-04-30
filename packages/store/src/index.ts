@@ -10,6 +10,12 @@ export type {
   ConsultationApprovalStructuralField,
   ConsultationApprovalFillableField,
   ConsultationApprovalMissingFields,
+  ConsultationAiInput,
+  ConsultationAiDraft,
+  ConsultationAiCandidate,
+  ConsultationAiMatchInfo,
+  ConsultationAiMissingField,
+  ConsultationAiResponse,
   MembershipTradeEntity,
   MembershipEntity,
   ScenarioEntity,
@@ -106,8 +112,19 @@ export {
   useNoticeMutations,
   useMarketPrices,
   useCustomers,
+  useFavoriteConsultations,
+  useRecentSearches,
 } from "./hooks";
-export type { ScenarioOptionsData, ScenarioDocumentsData, NoticesPagination, MarketPricePeriod, MarketPricePoint } from "./hooks";
+export type {
+  ScenarioOptionsData,
+  ScenarioDocumentsData,
+  NoticesPagination,
+  MarketPricePeriod,
+  MarketPricePoint,
+  UseFavoriteConsultationsResult,
+  UseRecentSearchesResult,
+  RecentSearchItem,
+} from "./hooks";
 
 // Auth domain
 export {

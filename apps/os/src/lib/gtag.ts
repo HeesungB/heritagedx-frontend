@@ -2,7 +2,17 @@ export const GA_MEASUREMENT_ID =
   process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "";
 
 type OSEventMap = {
-  trade_memo_create: { club_name?: string; trade_type?: string };
+  trade_memo_create: {
+    club_name?: string;
+    trade_type?: string;
+    via_ai?: boolean;
+  };
+  trade_memo_ai_draft_submit: { length: number; club?: string };
+  trade_memo_ai_applied: {
+    matched_club: boolean;
+    matched_membership: boolean;
+    missing_count: number;
+  };
   membership_trade_create: { club_name?: string; trade_type?: string };
   club_view: { club_name: string };
   club_search: { club_name: string };

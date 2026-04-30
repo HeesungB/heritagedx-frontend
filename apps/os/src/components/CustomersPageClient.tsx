@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Search, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAppStores } from "@/stores";
-import { useCustomers } from "@heritage-dx/store";
+import { useCustomers, useRecentSearches } from "@heritage-dx/store";
 import type { CustomerEntity, CustomerHistorySummaryEntity } from "@heritage-dx/store";
 import { useCustomerRepository } from "@heritage-dx/api";
 import {
@@ -59,6 +60,9 @@ export default function CustomersPageClient() {
   } = useCustomers(customerStore);
 
   const customerRepo = useCustomerRepository();
+  const searchParams = useSearchParams();
+  const customerIdFromUrl = searchParams.get("customerId");
+  const { push: pushRecentCustomer } = useRecentSearches("customers");
 
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -111,22 +115,42 @@ export default function CustomersPageClient() {
     [customerRepo],
   );
 
-  const handleSelect = (item: CustomerEntity) => {
-    setSelected(item);
-    setEditForm({
-      name: item.name,
-      contact: item.contact,
-      email: item.email ?? "",
-      address: item.address ?? "",
-      memo: item.memo ?? "",
-      ageBracket: item.ageBracket ?? "",
-      occupation: item.occupation ?? "",
-      ownedMembershipSummary: item.ownedMembershipSummary ?? "",
-      residenceArea: item.residenceArea ?? "",
-    });
-    setEditError(null);
-    loadHistory(item.id);
-  };
+  const handleSelect = useCallback(
+    (item: CustomerEntity) => {
+      setSelected(item);
+      setEditForm({
+        name: item.name,
+        contact: item.contact,
+        email: item.email ?? "",
+        address: item.address ?? "",
+        memo: item.memo ?? "",
+        ageBracket: item.ageBracket ?? "",
+        occupation: item.occupation ?? "",
+        ownedMembershipSummary: item.ownedMembershipSummary ?? "",
+        residenceArea: item.residenceArea ?? "",
+      });
+      setEditError(null);
+      loadHistory(item.id);
+      pushRecentCustomer({
+        label: item.name?.trim() || item.contact || item.id,
+        value: item.id,
+        kind: "customer",
+      });
+    },
+    [loadHistory, pushRecentCustomer],
+  );
+
+  // 사이드바 최근 항목에서 ?customerId=<id> 진입 시 현재 페이지에 있으면 자동 선택.
+  const autoSelectedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!customerIdFromUrl) return;
+    if (autoSelectedRef.current === customerIdFromUrl) return;
+    const match = items.find((c: CustomerEntity) => c.id === customerIdFromUrl);
+    if (match) {
+      autoSelectedRef.current = customerIdFromUrl;
+      handleSelect(match);
+    }
+  }, [customerIdFromUrl, items, handleSelect]);
 
   const handleCloseDrawer = () => {
     setSelected(null);

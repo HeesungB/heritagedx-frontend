@@ -14,24 +14,13 @@ import {
   PanelLeftOpen,
   type LucideIcon,
 } from "lucide-react";
+import { useFavoriteConsultations, useRecentSearches } from "@heritage-dx/store";
 
 const NAV_ITEMS = [
   { href: "/clubs", label: "골프장 검색", icon: Flag },
   { href: "/customers", label: "고객 관리", icon: Users },
   { href: "/trades", label: "상담일지", icon: BookOpen },
   { href: "/claims", label: "건의 사항", icon: MessageSquare },
-] as const;
-
-// TODO: 추후 packages/store 의 즐겨찾기/최근 방문 store 로 이전
-const FAVORITES = [
-  { label: "김민준 고객 상담", href: "#" },
-  { label: "VIP 라운드 예약", href: "#" },
-] as const;
-
-const RECENTS = [
-  { label: "이서연", subLabel: "— 4월 23일", href: "#" },
-  { label: "박지호", subLabel: "— 4월 24일", href: "#" },
-  { label: "정유진", subLabel: "— 4월 25일", href: "#" },
 ] as const;
 
 const STORAGE_KEY = "heritage-os.sidebar.collapsed";
@@ -92,6 +81,8 @@ export default function Sidebar({
 }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const { favoriteItems } = useFavoriteConsultations();
+  const { recents: recentCustomers } = useRecentSearches("customers");
 
   useEffect(() => {
     if (forceExpanded) return;
@@ -172,43 +163,62 @@ export default function Sidebar({
         {!isCollapsed && (
           <>
             <SectionLabel>즐겨찾기</SectionLabel>
-            <ul className="space-y-0.5">
-              {FAVORITES.map((item) => (
-                <li key={item.label}>
-                  <Link
-                    href={item.href}
-                    onClick={onNavigate}
-                    className="flex h-9 items-center gap-3 rounded-[10px] px-3 text-[13px] font-medium text-[#99a1af] hover:bg-white/5 hover:text-white"
-                  >
-                    <Star className="h-4 w-4 shrink-0" strokeWidth={2} />
-                    <span className="truncate">{item.label}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            {favoriteItems.length === 0 ? (
+              <p className="px-3 py-1.5 text-[12px] leading-[18px] text-[#6a7282]">
+                즐겨찾기한 상담일지가 없습니다.
+              </p>
+            ) : (
+              <ul className="space-y-0.5">
+                {favoriteItems.map((item) => (
+                  <li key={item.id}>
+                    <Link
+                      href={item.href}
+                      onClick={onNavigate}
+                      title={item.label}
+                      className={[
+                        "flex items-center gap-3 rounded-[10px] px-3 text-[13px] font-medium text-[#99a1af] hover:bg-white/5 hover:text-white",
+                        item.subLabel ? "h-[52px]" : "h-9",
+                      ].join(" ")}
+                    >
+                      <Star className="h-4 w-4 shrink-0" strokeWidth={2} />
+                      <span className="flex min-w-0 flex-col">
+                        <span className="truncate text-[13px] text-[#99a1af]">
+                          {item.label}
+                        </span>
+                        {item.subLabel && (
+                          <span className="truncate text-[11px] leading-[16.5px] text-[#6a7282]">
+                            {item.subLabel}
+                          </span>
+                        )}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
 
             <SectionLabel>최근 항목</SectionLabel>
-            <ul className="space-y-0.5">
-              {RECENTS.map((item) => (
-                <li key={item.label}>
-                  <Link
-                    href={item.href}
-                    onClick={onNavigate}
-                    className="flex h-[52px] items-center gap-3 rounded-[10px] px-3 text-[13px] font-medium text-[#99a1af] hover:bg-white/5 hover:text-white"
-                  >
-                    <Clock className="h-4 w-4 shrink-0" strokeWidth={2} />
-                    <span className="flex min-w-0 flex-col">
-                      <span className="truncate text-[13px] text-[#99a1af]">
-                        {item.label}
-                      </span>
-                      <span className="truncate text-[11px] leading-[16.5px] text-[#6a7282]">
-                        {item.subLabel}
-                      </span>
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            {recentCustomers.length === 0 ? (
+              <p className="px-3 py-1.5 text-[12px] leading-[18px] text-[#6a7282]">
+                최근 본 고객이 없습니다.
+              </p>
+            ) : (
+              <ul className="space-y-0.5">
+                {recentCustomers.map((item) => (
+                  <li key={item.value}>
+                    <Link
+                      href={`/customers?customerId=${encodeURIComponent(item.value)}`}
+                      onClick={onNavigate}
+                      title={item.label}
+                      className="flex h-9 items-center gap-3 rounded-[10px] px-3 text-[13px] font-medium text-[#99a1af] hover:bg-white/5 hover:text-white"
+                    >
+                      <Clock className="h-4 w-4 shrink-0" strokeWidth={2} />
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
           </>
         )}
       </nav>

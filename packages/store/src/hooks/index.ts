@@ -24,3 +24,11 @@ export { useNoticeMutations } from "./useNoticeMutations";
 export { useMarketPrices } from "./useMarketPrices";
 export type { MarketPricePeriod, MarketPricePoint } from "./useMarketPrices";
 export { useCustomers } from "./useCustomers";
+export { useFavoriteConsultations } from "./useFavoriteConsultations";
+export type {
+  UseFavoriteConsultationsResult,
+  FavoriteConsultationItem,
+  FavoriteConsultationMeta,
+} from "./useFavoriteConsultations";
+export { useRecentSearches } from "./useRecentSearches";
+export type { UseRecentSearchesResult, RecentSearchItem } from "./useRecentSearches";

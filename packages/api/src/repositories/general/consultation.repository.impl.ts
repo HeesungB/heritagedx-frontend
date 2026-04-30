@@ -3,6 +3,8 @@ import type {
   ApiResponse,
   ApprovalActionInput,
   Consultation,
+  ConsultationAiInput,
+  ConsultationAiResponse,
   ConsultationInput,
   ConsultationsResponse,
   UserConsultationAction,
@@ -57,5 +59,11 @@ export class ConsultationRepository implements IConsultationRepository {
       `/consultations/${id}/approval-action`,
       body,
     );
+  }
+
+  async createDraftFromText(
+    input: ConsultationAiInput,
+  ): Promise<ApiResponse<ConsultationAiResponse>> {
+    return this.api.post<ConsultationAiResponse>("/consultations/ai", input);
   }
 }

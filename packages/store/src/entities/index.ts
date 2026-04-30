@@ -13,6 +13,14 @@ export type {
 } from "./consultation";
 export { collectMissingConsultationApprovalFields } from "./consultation";
 export type {
+  ConsultationAiInput,
+  ConsultationAiDraft,
+  ConsultationAiCandidate,
+  ConsultationAiMatchInfo,
+  ConsultationAiMissingField,
+  ConsultationAiResponse,
+} from "./consultation-ai";
+export type {
   MemoHistoryEntry,
   LegacyFallback as MemoHistoryLegacyFallback,
   AppendInput as MemoHistoryAppendInput,

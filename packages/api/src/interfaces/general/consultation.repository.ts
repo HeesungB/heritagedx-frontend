@@ -2,6 +2,8 @@ import type {
   ApiResponse,
   ApprovalActionInput,
   Consultation,
+  ConsultationAiInput,
+  ConsultationAiResponse,
   ConsultationInput,
   ConsultationsResponse,
   UserConsultationAction,
@@ -18,4 +20,8 @@ export interface IConsultationRepository {
     id: string,
     body: ApprovalActionInput<UserConsultationAction>,
   ): Promise<ApiResponse<Consultation>>;
+  // 자연어 텍스트 → 상담일지 초안 추출 (AI)
+  createDraftFromText(
+    input: ConsultationAiInput,
+  ): Promise<ApiResponse<ConsultationAiResponse>>;
 }

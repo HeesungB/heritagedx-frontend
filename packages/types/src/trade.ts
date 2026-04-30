@@ -44,6 +44,57 @@ export interface ConsultationsResponse {
   pagination: Pagination;
 }
 
+// ──────────────────────────────────────────────────────────────────────────
+// AI 자연어 → 상담일지 초안 추출 (POST /api/consultations/ai)
+// ──────────────────────────────────────────────────────────────────────────
+
+export interface ConsultationAiInput {
+  text: string;
+}
+
+export interface ConsultationAiDraft {
+  club: string | null;
+  membership: string | null;
+  tradeType: TradeType;
+  customerName: string;
+  contact: string;
+  desiredPrice: number | null;
+  customFields: Record<string, unknown>;
+  isShared: boolean;
+}
+
+export interface ConsultationAiCandidate {
+  id: string;
+  name: string;
+  membershipType?: "개인" | "법인";
+}
+
+export interface ConsultationAiMatchInfo {
+  matched: boolean;
+  ambiguous: boolean;
+  id: string | null;
+  name: string | null;
+  membershipType?: "개인" | "법인";
+  candidates: ConsultationAiCandidate[];
+}
+
+export type ConsultationAiMissingField =
+  | "club"
+  | "membership"
+  | "customerName"
+  | "contact"
+  | "tradeType";
+
+export interface ConsultationAiResponse {
+  draft: ConsultationAiDraft;
+  matches: {
+    club: ConsultationAiMatchInfo;
+    membership: ConsultationAiMatchInfo;
+  };
+  missingRequiredFields: ConsultationAiMissingField[];
+  warnings: string[];
+}
+
 // 상담 생성/수정 입력. 백엔드가 isDone 필드를 거부하므로 입력 페이로드에서 제외한다.
 // (응답 Consultation 에는 isDone 이 그대로 존재 — 표시용)
 export interface ConsultationInput {

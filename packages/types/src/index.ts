@@ -62,6 +62,12 @@ export type {
   MembershipTradesResponse,
   MembershipTradeInput,
   TradeType,
+  ConsultationAiInput,
+  ConsultationAiDraft,
+  ConsultationAiCandidate,
+  ConsultationAiMatchInfo,
+  ConsultationAiMissingField,
+  ConsultationAiResponse,
 } from "./trade";
 
 export {

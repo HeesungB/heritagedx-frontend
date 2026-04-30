@@ -30,11 +30,33 @@ import {
   useCustomerRepository,
 } from "@heritage-dx/api";
 import type { Consultation, Club, Pagination, CustomerHistorySummary } from "@heritage-dx/types";
-import type { ApprovalStatus } from "@heritage-dx/store";
-import { canDeleteConsultation } from "@heritage-dx/store";
+import {
+  canDeleteConsultation,
+  decodeMemoHistory,
+  type ApprovalStatus,
+  type MemoHistoryEntry,
+} from "@heritage-dx/store";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import { ActionReasonModal } from "@/components/approval/ActionReasonModal";
+
+function buildMemoEntries(memo: Consultation): MemoHistoryEntry[] {
+  return decodeMemoHistory(memo.notes ?? null, {
+    author: memo.createdByName ?? "—",
+    createdAt: memo.createdAt,
+    remarks: memo.remarks ?? null,
+  });
+}
+
+function formatMemoTimestamp(iso: string) {
+  try {
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } catch {
+    return iso;
+  }
+}
 
 const formatPrice = (price: string | number | null) => {
   if (!price) return "-";
@@ -800,7 +822,23 @@ export default function ConsultationsPage() {
                       <td className="hidden md:table-cell py-2.5 pr-3 text-gray-500 whitespace-nowrap">{trade.contact}</td>
                       <td className="py-2.5 pr-3 text-gray-800 whitespace-nowrap">{formatPrice(trade.offerPrice)}</td>
                       <td className="hidden md:table-cell py-2.5 pr-3 text-gray-800 whitespace-nowrap">{formatPrice(trade.desiredPrice)}</td>
-                      <td className="hidden md:table-cell py-2.5 pr-3 text-gray-500 max-w-[200px] truncate" title={trade.notes || ""}>{trade.notes || "-"}</td>
+                      <td className="hidden md:table-cell py-2.5 pr-3 text-gray-500 max-w-[220px]">
+                        {(() => {
+                          const entries = buildMemoEntries(trade);
+                          const latest = entries.length > 0 ? entries[entries.length - 1] : null;
+                          if (!latest) return <span className="text-gray-300">메모 없음</span>;
+                          return (
+                            <div className="flex items-center gap-1.5 min-w-0" title={latest.content}>
+                              <span className="truncate">{latest.content}</span>
+                              {entries.length > 1 && (
+                                <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500">
+                                  +{entries.length - 1}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </td>
                       <td className="hidden md:table-cell py-2.5 pr-3 text-gray-400 whitespace-nowrap">{trade.registrationDate || "-"}</td>
                       <td className="hidden md:table-cell py-2.5 pr-3 text-gray-500 whitespace-nowrap">{trade.createdByName || "-"}</td>
                       <td className="hidden md:table-cell py-2.5">
@@ -1102,11 +1140,47 @@ export default function ConsultationsPage() {
                   {selectedMemo.registrationDate}
                 </div>
               )}
-              {selectedMemo.notes && (
-                <div className="mt-2 text-sm text-gray-600">
-                  {selectedMemo.notes}
-                </div>
-              )}
+              {(() => {
+                const entries = buildMemoEntries(selectedMemo);
+                if (entries.length === 0) return null;
+                const ordered = [...entries].reverse();
+                return (
+                  <div className="mt-3 rounded-md border border-gray-200 bg-gray-50/60 p-3">
+                    <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase text-gray-500">
+                      <MessageSquare className="h-3 w-3" />
+                      메모 히스토리 · {entries.length}건
+                    </div>
+                    <div className="relative pl-4">
+                      <div className="absolute left-[7px] top-2 bottom-2 w-px bg-gray-200" />
+                      {ordered.map((entry, idx) => (
+                        <div
+                          key={entry.id}
+                          className={`relative py-2 ${
+                            idx < ordered.length - 1 ? "border-b border-dashed border-gray-200" : ""
+                          }`}
+                        >
+                          <span
+                            className="absolute -left-[10.5px] top-1/2 h-[9px] w-[9px] -translate-y-1/2 rounded-full border-[1.5px] border-gray-900 box-border"
+                            style={{ background: idx === 0 ? "#0A0A0A" : "#fff" }}
+                          />
+                          <div className="flex items-baseline gap-2 text-[11px] text-gray-500">
+                            <span className="font-semibold text-gray-700">{entry.author}</span>
+                            <span className="font-mono text-gray-400">{formatMemoTimestamp(entry.createdAt)}</span>
+                            {idx === 0 && (
+                              <span className="rounded bg-gray-900 px-1.5 py-px text-[10px] font-bold text-white">
+                                최신
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-0.5 whitespace-pre-wrap break-words text-[13px] leading-relaxed text-gray-800">
+                            {entry.content}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* 고객 이력 섹션 */}

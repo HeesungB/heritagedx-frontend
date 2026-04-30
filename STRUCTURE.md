@@ -320,12 +320,12 @@ packages/store/
 │   │   ├── employee.ts       # EmployeeEntity
 │   │   ├── customer.ts       # CustomerEntity (+ ageBracket/occupation/ownedMembershipSummary/customerGrade(read-only)/residenceArea — 2026-04 추가)
 │   │   ├── club-document.ts  # ClubDocumentEntity, ClubScenarioDocumentEntity
-│   │   └── memo-history.ts   # MemoHistoryEntry + decodeMemoHistory/encodeMemoHistory/appendMemoEntry/getLatestMemoEntry — Consultation.notes 컬럼에 `__MEMO_V1__{...}` prefix + JSON 으로 누적 메모 인코딩 (legacy 단일 텍스트는 첫 엔트리로 흡수)
+│   │   └── memo-history.ts   # MemoHistoryEntry + decodeMemoHistory/encodeMemoHistory/appendMemoEntry/getLatestMemoEntry/flattenMemoHistoryNotes — Consultation.notes 컬럼에 `__MEMO_V1__{...}` prefix + JSON 으로 누적 메모 인코딩 (legacy 단일 텍스트는 첫 엔트리로 흡수). 단일 텍스트 필드(예: customer.memo) 에 마커가 흘러들어왔을 때는 `flattenMemoHistoryNotes` 로 entries content 를 시간순 join 한 plain text 로 정규화 (마커 없으면 통과, 파싱 실패 시 데이터 손실 방지로 원본 유지)
 │   ├── mappers/              # DTO ↔ Entity 변환 (순수 함수)
 │   │   ├── index.ts
 │   │   ├── club.mapper.ts
 │   │   ├── consultation.mapper.ts
-│   │   ├── customer.mapper.ts       # mapCustomerDtoToEntity, mapCustomerEntityToInput, mapCustomerEntityToUpdateInput
+│   │   ├── customer.mapper.ts       # mapCustomerDtoToEntity (memo 는 flattenMemoHistoryNotes 로 정규화 — `__MEMO_V1__` 마커가 들어오면 entries.content 시간순 join), mapCustomerEntityToInput, mapCustomerEntityToUpdateInput
 │   │   ├── membership-trade.mapper.ts
 │   │   ├── membership.mapper.ts
 │   │   ├── scenario.mapper.ts

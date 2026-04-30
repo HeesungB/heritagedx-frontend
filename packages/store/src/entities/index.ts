@@ -30,6 +30,7 @@ export {
   decodeMemoHistory,
   encodeMemoHistory,
   appendMemoEntry,
+  flattenMemoHistoryNotes,
   getLatestMemoEntry,
 } from "./memo-history";
 export type { MembershipTradeEntity } from "./membership-trade";

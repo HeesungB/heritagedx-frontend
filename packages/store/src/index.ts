@@ -59,6 +59,7 @@ export {
   decodeMemoHistory,
   encodeMemoHistory,
   appendMemoEntry,
+  flattenMemoHistoryNotes,
   getLatestMemoEntry,
 } from "./entities/index";
 

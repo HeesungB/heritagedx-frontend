@@ -1,5 +1,6 @@
 import type { Customer, CustomerInput, CustomerUpdateInput } from "@heritage-dx/types";
 import type { CustomerEntity } from "../entities/customer";
+import { flattenMemoHistoryNotes } from "../entities/memo-history";
 
 export function mapCustomerDtoToEntity(dto: Customer): CustomerEntity {
   return {
@@ -11,7 +12,9 @@ export function mapCustomerDtoToEntity(dto: Customer): CustomerEntity {
     contact: dto.contact,
     email: dto.email ?? null,
     address: dto.address ?? null,
-    memo: dto.memo ?? null,
+    // customer.memo 는 단일 텍스트 필드지만, 과거 데이터에 메모 히스토리 인코딩이 흘러들어온
+    // 케이스가 있어 표시 단계에서 plain text 로 정규화한다.
+    memo: flattenMemoHistoryNotes(dto.memo ?? null),
     ageBracket: dto.ageBracket ?? null,
     occupation: dto.occupation ?? null,
     ownedMembershipSummary: dto.ownedMembershipSummary ?? null,

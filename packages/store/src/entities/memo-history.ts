@@ -121,6 +121,21 @@ export function appendMemoEntry(
   return { entries, encoded: encoded ?? "" };
 }
 
+// 메모 히스토리 인코딩(`__MEMO_V1__{...}`)이 단일 텍스트 메모 필드(예: customer.memo)에
+// 흘러들어왔을 때, 화면에 raw 마커+JSON 이 그대로 노출되는 것을 막기 위해 entries 의
+// content 만 시간순으로 합쳐 plain text 로 변환한다. 마커가 없으면 입력을 그대로 통과시킨다.
+export function flattenMemoHistoryNotes(notes: string | null | undefined): string | null {
+  if (notes == null || notes === "") return notes ?? null;
+  if (!notes.startsWith(MEMO_MARKER)) return notes;
+  const parsed = tryParseEncoded(notes);
+  if (!parsed) return notes; // 마커는 있지만 JSON 파싱 실패 → 데이터 손실 방지로 원본 유지
+  if (parsed.length === 0) return null;
+  const sorted = [...parsed].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
+  return sorted.map((e) => e.content).join("\n\n");
+}
+
 export function getLatestMemoEntry(entries: MemoHistoryEntry[]): MemoHistoryEntry | null {
   if (entries.length === 0) return null;
   return entries.reduce((latest, current) =>

@@ -1,6 +1,10 @@
 export { coerceToNumber, normalizeGreenFee, normalizePagination } from "./helpers";
 export { mapClubDtoToEntity, mapClubDetailDtoToEntity } from "./club.mapper";
-export { mapConsultationDtoToEntity, mapConsultationEntityToInput } from "./consultation.mapper";
+export {
+  mapConsultationDtoToEntity,
+  mapConsultationEntityToInput,
+  buildClubMembershipPair,
+} from "./consultation.mapper";
 export {
   mapCustomerDtoToEntity,
   mapCustomerEntityToInput,

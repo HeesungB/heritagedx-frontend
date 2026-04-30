@@ -195,6 +195,7 @@ export {
   mapClubDetailDtoToEntity,
   mapConsultationDtoToEntity,
   mapConsultationEntityToInput,
+  buildClubMembershipPair,
   mapMembershipTradeDtoToEntity,
   mapMembershipTradeEntityToInput,
   mapCustomerDtoToEntity,

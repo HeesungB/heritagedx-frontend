@@ -31,6 +31,7 @@ import {
 } from "@heritage-dx/api";
 import type { Consultation, Club, Pagination, CustomerHistorySummary } from "@heritage-dx/types";
 import {
+  buildClubMembershipPair,
   canDeleteConsultation,
   decodeMemoHistory,
   type ApprovalStatus,
@@ -376,8 +377,12 @@ export default function ConsultationsPage() {
     setIsSaving(true);
     try {
       const response = await consultationsRepo.create({
-        club: form.clubId || form.clubName,
-        membership: form.membershipId || form.membershipType,
+        ...buildClubMembershipPair({
+          clubId: form.clubId,
+          clubName: form.clubName,
+          membershipId: form.membershipId,
+          membershipType: form.membershipType,
+        }),
         tradeType: form.tradeType,
         customerName: form.customerName,
         contact: form.contact,
@@ -415,8 +420,12 @@ export default function ConsultationsPage() {
     setIsSaving(true);
     try {
       const response = await consultationsRepo.update(editingMemo.id, {
-        club: form.clubId || form.clubName,
-        membership: form.membershipId || form.membershipType,
+        ...buildClubMembershipPair({
+          clubId: form.clubId,
+          clubName: form.clubName,
+          membershipId: form.membershipId,
+          membershipType: form.membershipType,
+        }),
         tradeType: form.tradeType,
         customerName: form.customerName,
         contact: form.contact,

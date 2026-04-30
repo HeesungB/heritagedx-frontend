@@ -382,6 +382,7 @@ packages/store/
 - 순수 함수: `mapClubDtoToEntity(dto)`, `mapConsultationDtoToEntity(dto)`, `mapMembershipTradeDtoToEntity(dto)` 등
 - 역방향: `mapConsultationEntityToInput(entity)`, `mapMembershipTradeEntityToInput(entity)` (쓰기용)
 - 상담 매퍼는 응답의 `offerPrice`/`desiredPrice` (string numeric) → `coerceToNumber`로 `number | null` 변환
+- `buildClubMembershipPair({ clubId, clubName, membershipId, membershipType })` — 백엔드가 `club`/`membership`을 모두 UUID 또는 모두 텍스트로만 받기 때문에, 두 ID가 모두 있을 때만 ID 모드로 보내고 하나라도 빠지면 텍스트 모드로 다운그레이드한다. 상담일지 생성/수정 페이로드 빌더(`mapConsultationEntityToInput`, 백오피스 `trade-memos/page.tsx`)에서 공용 사용
 - API 포맷 변경 시 Mapper만 수정 → Entity/컴포넌트 영향 없음
 
 **Store (Zustand):**

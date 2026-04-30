@@ -38,12 +38,33 @@ export function mapConsultationDtoToEntity(dto: Consultation): ConsultationEntit
   };
 }
 
+// 백엔드는 club / membership 두 필드가 모두 UUID(ID 모드)이거나 모두 텍스트(이름 모드)일
+// 때만 수락한다. 두 ID가 모두 있을 때만 ID 모드로 보내고, 하나라도 빠지면 텍스트 모드로
+// 일치시켜 INVALID_INPUT_MODE 응답을 방지한다.
+export function buildClubMembershipPair(args: {
+  clubId?: string | null;
+  clubName?: string | null;
+  membershipId?: string | null;
+  membershipType?: string | null;
+}): { club: string; membership: string } {
+  const { clubId, clubName, membershipId, membershipType } = args;
+  if (clubId && membershipId) {
+    return { club: clubId, membership: membershipId };
+  }
+  return { club: clubName ?? "", membership: membershipType ?? "" };
+}
+
 export function mapConsultationEntityToInput(
   entity: Partial<ConsultationEntity>,
 ): ConsultationInput {
+  const pair = buildClubMembershipPair({
+    clubId: entity.clubId,
+    clubName: entity.clubName,
+    membershipId: entity.membershipId,
+    membershipType: entity.membershipType,
+  });
   return {
-    club: entity.clubId || entity.clubName || "",
-    membership: entity.membershipId || entity.membershipType || "",
+    ...pair,
     tradeType: entity.tradeType ?? "매수",
     customerName: (entity.customerName ?? "").trim(),
     contact: (entity.contact ?? "").trim(),

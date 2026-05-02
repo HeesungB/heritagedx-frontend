@@ -5,6 +5,7 @@ import { Check, Pencil, Sparkles, X } from "lucide-react";
 import { ConfirmModal, Loading } from "@heritage-dx/ui";
 import {
   appendMemoEntry,
+  buildClubMembershipPair,
   useClubDetail,
   useClubs,
   useConsultations,
@@ -203,9 +204,15 @@ export default function TradesCreatePanel({
       notesPayload = encoded;
     }
     const preservedRemarks = editingTrade ? editingTrade.remarks ?? null : null;
+    const { club, membership } = buildClubMembershipPair({
+      clubId: form.clubId,
+      clubName: form.clubName,
+      membershipId: form.membershipId,
+      membershipType: form.membershipType,
+    });
     const input = {
-      club: form.clubId || form.clubName,
-      membership: form.membershipId || form.membershipType,
+      club,
+      membership,
       tradeType: form.tradeType,
       customerName: form.customerName.trim(),
       contact: form.contact.trim(),

@@ -8,6 +8,7 @@ import { useAppStores } from "@/stores";
 import {
   useConsultations,
   appendMemoEntry,
+  buildClubMembershipPair,
   type ConsultationAiResponse,
 } from "@heritage-dx/store";
 import { useAuth } from "@/contexts/AuthContext";
@@ -101,9 +102,16 @@ export default function TradeMemoSidebar({
       notesPayload = encoded;
     }
 
+    const { club, membership } = buildClubMembershipPair({
+      clubId: form.clubId || clubDetail.id,
+      clubName: form.clubName || clubDetail.name,
+      membershipId: form.membershipId,
+      membershipType: form.membershipType,
+    });
+
     const input = {
-      club: form.clubId || form.clubName || clubDetail.id,
-      membership: form.membershipId || form.membershipType,
+      club,
+      membership,
       tradeType: form.tradeType,
       customerName: form.customerName,
       contact: form.contact,

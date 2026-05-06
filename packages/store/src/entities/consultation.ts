@@ -1,4 +1,4 @@
-import type { ApprovalStatus } from "@heritage-dx/types";
+import type { ApprovalStatus, ConsultationNoteEntry } from "@heritage-dx/types";
 
 export interface ConsultationEntity {
   id: string;
@@ -17,7 +17,8 @@ export interface ConsultationEntity {
   depositAmount: number | null;
   accountNumber: string | null;
   customFields: Record<string, unknown>;
-  notes: string | null;
+  // 백엔드 notes JSONB 의 entries 만 평탄화. 빈 상담은 [] 로 들어온다.
+  notes: ConsultationNoteEntry[];
   registrationDate: string | null;
   tradeDate: string | null;
   remarks: string | null;

@@ -83,7 +83,7 @@ export default function ClubSearchSelect({
   }, [isOpen]);
 
   const baseText = compact ? "text-xs" : "text-sm";
-  const basePadding = compact ? "px-2.5 py-1.5" : "px-3 py-2";
+  const basePadding = compact ? "h-8 px-2.5" : "h-10 px-3";
   const baseWidth = compact ? "min-w-[140px]" : "min-w-[160px]";
   const iconSize = compact ? "w-3 h-3" : "w-3.5 h-3.5";
 

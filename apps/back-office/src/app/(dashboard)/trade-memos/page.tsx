@@ -29,24 +29,27 @@ import {
   useClubRepository,
   useCustomerRepository,
 } from "@heritage-dx/api";
-import type { Consultation, Club, Pagination, CustomerHistorySummary } from "@heritage-dx/types";
+import type {
+  Consultation,
+  ConsultationNoteEntry,
+  Club,
+  Pagination,
+  CustomerHistorySummary,
+} from "@heritage-dx/types";
 import {
   buildClubMembershipPair,
   canDeleteConsultation,
-  decodeMemoHistory,
   type ApprovalStatus,
-  type MemoHistoryEntry,
 } from "@heritage-dx/store";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import { ActionReasonModal } from "@/components/approval/ActionReasonModal";
+import MatchedCustomerCard from "@/components/trade-memos/MatchedCustomerCard";
 
-function buildMemoEntries(memo: Consultation): MemoHistoryEntry[] {
-  return decodeMemoHistory(memo.notes ?? null, {
-    author: memo.createdByName ?? "—",
-    createdAt: memo.createdAt,
-    remarks: memo.remarks ?? null,
-  });
+// 신규 notes JSONB 응답({entries:[...]}) 의 entries 만 추출. 과거 응답이 일시적으로
+// 섞여 들어와도 [] 로 흡수해 화면 크래시를 막는다.
+function buildMemoEntries(memo: Consultation): ConsultationNoteEntry[] {
+  return Array.isArray(memo.notes?.entries) ? memo.notes.entries : [];
 }
 
 function formatMemoTimestamp(iso: string) {
@@ -376,6 +379,7 @@ export default function ConsultationsPage() {
     }
     setIsSaving(true);
     try {
+      const trimmedNote = form.notes.trim();
       const response = await consultationsRepo.create({
         ...buildClubMembershipPair({
           clubId: form.clubId,
@@ -392,7 +396,8 @@ export default function ConsultationsPage() {
         desiredPriceNote: form.desiredPriceNote || null,
         depositAmount: form.depositAmount ? Number(form.depositAmount) : null,
         accountNumber: form.accountNumber || null,
-        notes: form.notes || null,
+        // 신규 API: notes 문자열은 백엔드가 첫 entry 로 자동 변환. 비어있으면 omit.
+        ...(trimmedNote ? { notes: trimmedNote } : {}),
         registrationDate: form.registrationDate || null,
         tradeDate: form.tradeDate || null,
         remarks: form.remarks || null,
@@ -419,6 +424,8 @@ export default function ConsultationsPage() {
     }
     setIsSaving(true);
     try {
+      // PUT 으로는 notes 직접 수정 금지. 메모는 별도 엔드포인트(POST/PATCH/DELETE
+      // /admin/consultations/:id/notes[/:noteId]) 사용 — update 페이로드에서 omit.
       const response = await consultationsRepo.update(editingMemo.id, {
         ...buildClubMembershipPair({
           clubId: form.clubId,
@@ -435,7 +442,6 @@ export default function ConsultationsPage() {
         desiredPriceNote: form.desiredPriceNote || null,
         depositAmount: form.depositAmount ? Number(form.depositAmount) : null,
         accountNumber: form.accountNumber || null,
-        notes: form.notes || null,
         registrationDate: form.registrationDate || null,
         tradeDate: form.tradeDate || null,
         remarks: form.remarks || null,
@@ -488,7 +494,8 @@ export default function ConsultationsPage() {
       desiredPriceNote: trade.desiredPriceNote || "",
       depositAmount: trade.depositAmount ? String(trade.depositAmount) : "",
       accountNumber: trade.accountNumber || "",
-      notes: trade.notes || "",
+      // 편집 모드에서 notes 직접 수정은 PUT 으로 금지됨. 폼은 비워두고 메모는 별도 CRUD 사용.
+      notes: "",
       registrationDate: trade.registrationDate || new Date().toISOString().split("T")[0],
       tradeDate: trade.tradeDate || "",
       remarks: trade.remarks || "",
@@ -1020,6 +1027,9 @@ export default function ConsultationsPage() {
               <Input value={form.contact} onChange={(e) => setForm((f) => ({ ...f, contact: e.target.value }))} placeholder="010-1234-5678" />
             </div>
           </div>
+          {/* 매칭된 고객 카드 — 수정 모드에서 editingMemo.customerId 가 있을 때만 노출.
+              추가 모드(editingMemo === null)에는 customerId 가 없어 자동으로 숨겨진다. */}
+          <MatchedCustomerCard customerId={editingMemo?.customerId ?? null} />
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">제시가 (원)</label>
             <div className="flex gap-2">
@@ -1399,14 +1409,20 @@ export default function ConsultationsPage() {
                         {related.registrationDate && (
                           <span>{related.registrationDate}</span>
                         )}
-                        {related.notes && (
-                          <>
-                            <span>·</span>
-                            <span className="text-gray-500 truncate max-w-[200px]">
-                              {related.notes}
-                            </span>
-                          </>
-                        )}
+                        {(() => {
+                          const latest = related.notes?.entries?.[
+                            related.notes.entries.length - 1
+                          ];
+                          if (!latest?.content) return null;
+                          return (
+                            <>
+                              <span>·</span>
+                              <span className="text-gray-500 truncate max-w-[200px]">
+                                {latest.content}
+                              </span>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   ))}

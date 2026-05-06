@@ -11,9 +11,8 @@ import {
   useFavoriteConsultations,
   useRecentSearches,
   canDeleteConsultation,
-  decodeMemoHistory,
   collectMissingConsultationApprovalFields,
-  type MemoHistoryEntry,
+  type ConsultationNoteEntry,
   type ApprovalStatus,
   type ConsultationApprovalFillableField,
   type ConsultationApprovalStructuralField,
@@ -74,7 +73,7 @@ export default function TradesPageClient() {
     pagination,
     fetch: fetchFromStore,
     remove,
-    appendMemo,
+    addNote,
     requestApproval,
     isLoading: loading,
   } = useConsultations(tradeMemoStore);
@@ -167,23 +166,19 @@ export default function TradesPageClient() {
     return filtered;
   }, [rawTrades, dateFrom, dateTo, filter]);
 
-  const buildMemoEntries = useCallback((trade: MembershipTrade): MemoHistoryEntry[] => {
-    return decodeMemoHistory(trade.notes, {
-      author: trade.createdByName ?? "—",
-      createdAt: trade.createdAt,
-      remarks: trade.remarks,
-    });
+  // 새 notes JSONB 응답은 mapper 단계에서 entries 배열로 평탄화되므로, 뷰는 trade.notes 를
+  // 그대로 사용한다. legacy `__MEMO_V1__` 인코딩/디코딩 경로는 더 이상 필요하지 않다.
+  const buildMemoEntries = useCallback((trade: MembershipTrade): ConsultationNoteEntry[] => {
+    return Array.isArray(trade.notes) ? trade.notes : [];
   }, []);
 
   const handleSubmitMemo = useCallback(
     async (trade: MembershipTrade) => {
       const draft = (memoDraft[trade.id] ?? "").trim();
       if (!draft) return;
-      const authorName = user?.name?.trim() || user?.email || "—";
-      const authorId = user?.id ? String(user.id) : null;
       setMemoSubmittingId(trade.id);
       try {
-        const entity = await appendMemo(trade.id, draft, { name: authorName, id: authorId });
+        const entity = await addNote(trade.id, draft);
         if (!entity) {
           setErrorMessage("메모 저장에 실패했습니다.");
           return;
@@ -203,7 +198,7 @@ export default function TradesPageClient() {
         setMemoSubmittingId(null);
       }
     },
-    [appendMemo, memoDraft, user?.email, user?.id, user?.name],
+    [addNote, memoDraft],
   );
 
   const handleDelete = async (id: string) => {
@@ -854,7 +849,7 @@ export default function TradesPageClient() {
 // ─── Memo cell (collapsed) ─────────────────────────────────────────
 
 interface MemoCellProps {
-  latestEntry: MemoHistoryEntry | null;
+  latestEntry: ConsultationNoteEntry | null;
   totalCount: number;
   expanded: boolean;
   onToggle: () => void;
@@ -904,7 +899,7 @@ function MemoCell({ latestEntry, totalCount, expanded, onToggle }: MemoCellProps
 
 interface MemoHistoryRowProps {
   trade: MembershipTrade;
-  entries: MemoHistoryEntry[];
+  entries: ConsultationNoteEntry[];
   draft: string;
   onDraftChange: (v: string) => void;
   onSubmit: () => void;
@@ -962,7 +957,6 @@ function MemoHistoryRow({ trade, entries, draft, onDraftChange, onSubmit, submit
                   style={{ background: idx === 0 ? "#0A0A0A" : "#fff" }}
                 />
                 <div className="flex items-baseline gap-2.5">
-                  <span className="text-[12px] font-semibold text-gray-900">{entry.author}</span>
                   <span className="font-mono text-[11px] text-gray-400">{formatEntryTimestamp(entry.createdAt)}</span>
                   {idx === 0 && (
                     <span className="rounded bg-gray-900 px-1.5 py-px text-[10px] font-bold text-white">최신</span>

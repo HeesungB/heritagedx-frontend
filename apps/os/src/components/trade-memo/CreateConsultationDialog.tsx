@@ -2,7 +2,7 @@
 
 import { useEffect, type FormEvent } from "react";
 import { Check, X } from "lucide-react";
-import { Loading } from "@heritage-dx/ui";
+import { Loading, type ClubSearchItem } from "@heritage-dx/ui";
 import type { ClubDetail, MembershipTrade, MembershipTradeForm } from "@/types";
 import AiResultBanner, {
   type AiDraftMeta,
@@ -12,7 +12,7 @@ import type { ConsultationAiCandidate } from "@heritage-dx/store";
 
 interface CreateConsultationDialogProps {
   isOpen: boolean;
-  clubDetail: ClubDetail;
+  clubDetail: ClubDetail | null;
   form: MembershipTradeForm;
   setForm: (updater: (prev: MembershipTradeForm) => MembershipTradeForm) => void;
   manualMembershipInput: boolean;
@@ -28,6 +28,11 @@ interface CreateConsultationDialogProps {
   onSubmit: (e: FormEvent) => void;
   onClose: () => void;
   formRef?: React.RefObject<HTMLFormElement | null>;
+  /** 골프장 input 의 lock 여부. ClubProfile 컨텍스트(=true) vs 리스트(=false). */
+  clubLocked?: boolean;
+  clubs?: ClubSearchItem[];
+  selectedClubCode?: string;
+  onClubChange?: (code: string) => void;
 }
 
 export default function CreateConsultationDialog({
@@ -48,6 +53,10 @@ export default function CreateConsultationDialog({
   onSubmit,
   onClose,
   formRef,
+  clubLocked = true,
+  clubs,
+  selectedClubCode,
+  onClubChange,
 }: CreateConsultationDialogProps) {
   useEffect(() => {
     if (!isOpen) return;
@@ -144,8 +153,8 @@ export default function CreateConsultationDialog({
           {aiDraftMeta && (
             <AiResultBanner
               meta={aiDraftMeta}
-              currentClubId={clubDetail.id}
-              currentClubName={clubDetail.name}
+              currentClubId={clubDetail?.id ?? ""}
+              currentClubName={clubDetail?.name ?? ""}
               onDismiss={onDismissAiBanner}
               onPickClub={pickClubFromCandidate}
               onPickMembership={pickMembershipFromCandidate}
@@ -161,6 +170,10 @@ export default function CreateConsultationDialog({
             manualClubInput={manualClubInput}
             setManualClubInput={setManualClubInput}
             editingTrade={!!editingTrade}
+            clubLocked={clubLocked}
+            clubs={clubs}
+            selectedClubCode={selectedClubCode}
+            onClubChange={onClubChange}
           />
         </div>
 

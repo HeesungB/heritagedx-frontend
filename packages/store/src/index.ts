@@ -41,9 +41,7 @@ export type {
   CustomerHistorySummaryEntity,
   CustomerHistoryRecentConsultationEntity,
   CustomerHistoryRecentMembershipTradeEntity,
-  MemoHistoryEntry,
-  MemoHistoryLegacyFallback,
-  MemoHistoryAppendInput,
+  CustomerGradeKey,
 } from "./entities/index";
 export {
   scenarioMatchesFilters,
@@ -55,13 +53,13 @@ export {
   isDocumentExpired,
   isDocumentDownloadable,
   collectMissingConsultationApprovalFields,
-  MEMO_MARKER,
-  decodeMemoHistory,
-  encodeMemoHistory,
-  appendMemoEntry,
   flattenMemoHistoryNotes,
-  getLatestMemoEntry,
+  decodeMemoEntries,
+  appendCustomerMemoEntry,
+  CUSTOMER_GRADE_LABEL,
+  getCustomerGradeLabel,
 } from "./entities/index";
+export type { CustomerMemoEntry } from "./entities/index";
 
 // Stores
 export {
@@ -200,6 +198,7 @@ export {
   mapMembershipTradeDtoToEntity,
   mapMembershipTradeEntityToInput,
   mapCustomerDtoToEntity,
+  mapCustomerHistorySummaryDtoToEntity,
   mapCustomerEntityToInput,
   mapCustomerEntityToUpdateInput,
   normalizePagination,
@@ -217,4 +216,14 @@ export type {
   AdminConsultationAction,
   AdminTradeAction,
   ApprovalActionInput,
+} from "@heritage-dx/types";
+
+// 고객 update 입력 타입 — 뷰의 인라인 편집(`InlineField`) 콜백에서 사용
+export type { CustomerUpdateInput } from "@heritage-dx/types";
+
+// 상담 메모 (notes JSONB) 타입 — 뷰는 @heritage-dx/store 경유로만 import
+export type {
+  ConsultationNoteEntry,
+  ConsultationNotes,
+  ConsultationNoteInput,
 } from "@heritage-dx/types";

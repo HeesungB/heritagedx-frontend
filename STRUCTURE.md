@@ -23,11 +23,11 @@ heritage-dx/
 │   ├── os/                          # 공개 사이트 (포트 3000)
 │   │   ├── src/
 │   │   │   ├── app/                 # Next.js App Router (loading/error: clubs, trades, claims, customers)
-│   │   │   ├── components/          # 41개 컴포넌트 (top-level 30 + club-profile/ 11) — Sidebar/AppHeader/AppShell shell + 페이지 컴포넌트들
+│   │   │   ├── components/          # 42개 컴포넌트 (top-level 30 + club-profile/ 12) — Sidebar/AppHeader/AppShell shell + 페이지 컴포넌트들
 │   │   │   │   ├── club-profile/        # ClubBasicInfoTable, MembershipInfoSection,
 │   │   │   │   │                        #   EstimateSection, CostCalculatorSection, GreenFeeField, InfoField,
 │   │   │   │   │                        #   BenefitsSheetSection, DocumentsSection, MarketPriceSummary,
-│   │   │   │   │                        #   NearbyClubPrices, PriceChart
+│   │   │   │   │                        #   NearbyClubPrices, PriceChart, SectionCard, ClubSwitcher, SoldPriceBanner
 │   │   │   ├── contexts/            # AuthContext, RepositoryContext
 │   │   │   ├── hooks/               # useOrganization, useTaxSettings (localStorage 세율 오버라이드), useSheetStorage, useMarketPriceSummary, useSendTradeNotification, useGeocode, useCustomerEnsureFlow
 │   │   │   ├── lib/                 # server-repositories.ts, authApi.ts, firebase-admin.ts, gtag.ts
@@ -134,7 +134,7 @@ heritage-dx/
 | `membership.ts` | `Membership`, `MembershipDocument`, `MembershipType` (`"개인"` \| `"법인"`) — 준회원/가족회원/위임 13필드는 스펙 부재로 제거 |
 | `document.ts` | `Document`, `ClubDocument`, `GlobalDocument`, `CustomerDocument`, `ClubScenarioDocument`, `DocumentsSummary` |
 | `scenario.ts` | `Scenario`, `ScenarioSide`, `ScenarioOwnerType` (`Personal`\|`Corporate`\|`Family`\|`Special`\|`All`), `ScenarioConditions`, `ScenarioWithDocuments`, `AvailableFilters` |
-| `trade.ts` | `Consultation`, `ConsultationInput`, `MembershipTrade`, `MembershipTradeInput`, `TradeType` (`"매도"` \| `"매수"`), AI 자연어 추출용 `ConsultationAiInput`/`ConsultationAiDraft`/`ConsultationAiCandidate`/`ConsultationAiMatchInfo`/`ConsultationAiMissingField`/`ConsultationAiResponse` — pagination 은 공용 `Pagination` 사용. AI 타입은 `packages/store/src/entities/consultation-ai.ts` 에서 re-export 되어 뷰는 `@heritage-dx/store` 로만 import |
+| `trade.ts` | `Consultation`, `ConsultationInput`, `ConsultationNoteEntry`/`ConsultationNotes`/`ConsultationNoteInput`(notes JSONB 메모 entry), `MembershipTrade`, `MembershipTradeInput`, `TradeType` (`"매도"` \| `"매수"`), AI 자연어 추출용 `ConsultationAiInput`/`ConsultationAiDraft`/`ConsultationAiCandidate`/`ConsultationAiMatchInfo`/`ConsultationAiMissingField`/`ConsultationAiResponse` — pagination 은 공용 `Pagination` 사용. `Consultation.notes` 는 `{ entries: ConsultationNoteEntry[] }` 구조이며 메모 CRUD 는 별도 엔드포인트(`POST/PATCH/DELETE /consultations/:id/notes[/:noteId]`) 로만 수행한다. `ConsultationInput.notes` 는 **상담 생성 시에만** 첫 entry 텍스트로 사용(서버 자동 변환), `PUT /consultations/:id` 에서는 omit 필수. AI 타입은 `packages/store/src/entities/consultation-ai.ts` 에서 re-export 되어 뷰는 `@heritage-dx/store` 로만 import |
 | `approval.ts` | `APPROVAL_STATUS`, `APPROVAL_ACTIONS`, `ApprovalStatus`/`WorkflowStatus`/`ApprovalAction`/`ApprovalActionInput` |
 | `claim.ts` | `Claim`, `ClaimInput` |
 | `customer.ts` | `Customer`, `CustomerInput`, `CustomerUpdateInput`, `CustomersListData`, `CustomerHistory`, `CustomerHistorySummary` — OpenAPI `CustomerResponseDto` 1:1 |
@@ -231,7 +231,7 @@ packages/api/
 |-----------|--------|
 | `IClubRepository` | `getAll(params?)`, `getOne(code)` |
 | `IScenarioRepository` | `getByClub(clubCode)`, `match(conditions)`, `getDocuments(...)` |
-| `IConsultationRepository` | `getAll(params?)`, `create(data)`, `update(id, data)`, `delete(id)`, `approvalAction(id, body)`, `createDraftFromText(input)` (POST `/consultations/ai` — 자연어 → 상담 초안 추출) |
+| `IConsultationRepository` | `getAll(params?)`, `create(data)`, `update(id, data)`, `delete(id)`, `approvalAction(id, body)`, `createDraftFromText(input)` (POST `/consultations/ai`), 메모 CRUD: `addNote(id, {content})` / `updateNote(id, noteId, {content})` / `deleteNote(id, noteId)` — 응답으로 갱신된 `Consultation` 반환. content 1-500자/최대 100 entry/작성자 본인·관리자만 수정 삭제 가능/완료 거래 연결 시 차단 등은 서버 검증. `IConsultationAdminRepository` 도 동일 메소드 노출(`/admin/consultations/:id/notes` 경로) — 관리자는 작성자 제한 없이 모든 메모 수정 가능 |
 | `IMembershipTradeRepository` | `getAll(params?)`, `create(data)`, `update(id, data)`, `delete(id)`, `workflowAction(id, body)` |
 | `IClaimRepository` | `create(data)` |
 | `IMarketPriceRepository` | `listByMembership(membershipId, { from, to })` |
@@ -320,7 +320,7 @@ packages/store/
 │   │   ├── employee.ts       # EmployeeEntity
 │   │   ├── customer.ts       # CustomerEntity (+ ageBracket/occupation/ownedMembershipSummary/customerGrade(read-only)/residenceArea — 2026-04 추가)
 │   │   ├── club-document.ts  # ClubDocumentEntity, ClubScenarioDocumentEntity
-│   │   └── memo-history.ts   # MemoHistoryEntry + decodeMemoHistory/encodeMemoHistory/appendMemoEntry/getLatestMemoEntry/flattenMemoHistoryNotes — Consultation.notes 컬럼에 `__MEMO_V1__{...}` prefix + JSON 으로 누적 메모 인코딩 (legacy 단일 텍스트는 첫 엔트리로 흡수). 단일 텍스트 필드(예: customer.memo) 에 마커가 흘러들어왔을 때는 `flattenMemoHistoryNotes` 로 entries content 를 시간순 join 한 plain text 로 정규화 (마커 없으면 통과, 파싱 실패 시 데이터 손실 방지로 원본 유지)
+│   │   └── memo-history.ts   # `flattenMemoHistoryNotes(notes)` 만 — 백엔드가 notes JSONB 로 정규화되면서 client-side `__MEMO_V1__` 인코딩/디코딩 경로는 폐기. 단일 텍스트 필드(예: customer.memo) 에 과거 마커가 흘러들어왔을 때 `flattenMemoHistoryNotes` 로 entries content 를 시간순 join 한 plain text 로 정규화 (마커 없으면 통과, 파싱 실패 시 데이터 손실 방지로 원본 유지)
 │   ├── mappers/              # DTO ↔ Entity 변환 (순수 함수)
 │   │   ├── index.ts
 │   │   ├── club.mapper.ts
@@ -340,11 +340,11 @@ packages/store/
 │   ├── stores/               # Zustand 스토어 (stale-while-revalidate)
 │   │   ├── index.ts
 │   │   ├── club.store.ts     # 목록 캐시 + 상세 캐시 (Map<code, detail>)
-│   │   ├── consultation.store.ts           # general — requestApproval (REQUEST_APPROVAL 만) + appendMemo(id, content, author) — 메모 히스토리 누적 후 update 호출. REOPEN/HOLD/REJECT 모두 제거됨
+│   │   ├── consultation.store.ts           # general — requestApproval (REQUEST_APPROVAL 만) + 메모 CRUD: addNote/updateNote/deleteNote(id, [noteId,] content) — 각각 `repos.consultations.{addNote|updateNote|deleteNote}` 호출 → 응답 entity 로 items 동기화. REOPEN/HOLD/REJECT 모두 제거됨
 │   │   ├── membership-trade.store.ts       # general — read-only (mutation 메서드 모두 제거)
 │   │   ├── consultation-admin.store.ts     # admin — approveFirst / reopen 만 (HOLD/REJECT/REQUEST_APPROVAL 제거)
 │   │   ├── membership-trade-admin.store.ts # admin — advanceToTaxFiling / advanceToCompleted / reject (REJECT는 응답 후 로컬 목록에서 제거)
-│   │   └── customer.store.ts               # CRUD + searchByQuery (자동완성용)
+│   │   └── customer.store.ts               # CRUD + searchByQuery + getOne/getHistorySummary
 │   └── hooks/                # 컴포넌트용 편의 훅
 │       ├── index.ts
 │       ├── useClubs.ts
@@ -368,7 +368,7 @@ packages/store/
 │       ├── useNotices.ts           # 공지사항 목록 조회 (read)
 │       ├── useNoticeMutations.ts   # 공지사항 CRUD (write)
 │       ├── useMarketPrices.ts      # 회원권 시세 추이 조회 (membershipId, period)
-│       ├── useCustomers.ts         # 고객 CRUD + searchByQuery (자동완성/목록)
+│       ├── useCustomers.ts         # 고객 CRUD + searchByQuery + getOne/getHistorySummary
 │       ├── useFavoriteConsultations.ts  # localStorage 즐겨찾기 (heritage-dx:consultation-favorites) — `FavoriteConsultationItem[]` ({id,label,subLabel?,href}) 저장. `toggleFavorite(id, meta?)` 시그니처 + 사이드바용 `favoriteItems` export. 레거시 string[] 자동 마이그레이션
 │       └── useRecentSearches.ts    # localStorage 최근 검색어 (heritage-dx:recent-searches:${scope}, 최대 8건). 사용 scope: `trades`(상담일지 페이지 검색/고객 chip), `customers`(사이드바 최근 항목 — `CustomersPageClient.handleSelect` 에서 push)
 ```
@@ -391,7 +391,7 @@ packages/store/
 - `createMembershipTradeStore(generalRepos)` — CRUD + `requestFinalReview`
 - `createConsultationAdminStore(adminRepos)` — CRUD + `approvalAction`/`approveFirst`/`hold`/`reject`/`reopen`
 - `createMembershipTradeAdminStore(adminRepos)` — CRUD + `workflowAction`/`approveFirst`/`hold`/`reject`/`reopen`
-- `createCustomerStore(generalRepos)` — 고객 CRUD + `searchByQuery(query, limit)` (자동완성에서 소비). `create` 결과는 `{ success, entity?, conflict?, errorMessage? }` 형태로 409(연락처 중복)를 플래그로 전달한다.
+- `createCustomerStore(generalRepos)` — 고객 CRUD + `searchByQuery(query, limit)` (자동완성에서 소비) + `getOne(id)` (단건 조회 후 `mapCustomerDtoToEntity`) + `getHistorySummary(id)` (`mapCustomerHistorySummaryDtoToEntity` 적용해 `recentConsultations`/`recentMembershipTrades` 반환). `create` 결과는 `{ success, entity?, conflict?, errorMessage? }` 형태로 409(연락처 중복)를 플래그로 전달한다. `getOne`/`getHistorySummary` 는 신규 상담일지 작성 패널의 `MatchedCustomerCard` 가 소비.
 - 패턴: 캐시 히트 → stale 데이터 즉시 반환 + 백그라운드 refresh
 
 **Exports:**
@@ -505,7 +505,7 @@ ESLint 9 flat config 공유 패키지. `eslint-config-next`의 `core-web-vitals`
 ```
 /app
 ├── layout.tsx                    # 루트 레이아웃 (+ next/font: Inter + Noto Sans KR)
-├── page.tsx                      # 홈 (골프장 목록 + 지도)
+├── page.tsx                      # 홈 대시보드 (DashboardClient — 골프장 정보 hub + 공지사항)
 ├── error.tsx                     # 에러 바운더리
 ├── global-error.tsx              # 글로벌 에러 핸들러
 ├── login/page.tsx                # 로그인
@@ -515,34 +515,42 @@ ESLint 9 flat config 공유 패키지. `eslint-config-next`의 `core-web-vitals`
 │   ├── page.tsx                  # 골프장 디렉토리/검색
 │   └── loading.tsx               # 로딩 스켈레톤
 ├── trades/page.tsx               # 거래 메모 (상담 기록)
-├── customers/page.tsx            # 고객 관리 (CRUD + 이력 Drawer)
+├── customers/
+│   ├── page.tsx                  # 고객 관리 목록 (CRUD)
+│   └── [id]/page.tsx             # 고객 상세 페이지 (시안 적용 + 인라인 편집)
 └── claims/page.tsx               # 건의사항
 ```
 
-#### 컴포넌트 (41개 — top-level 30, `club-profile/` 11)
+#### 컴포넌트 (42개 — top-level 30, `club-profile/` 12)
 
 **코어:**
 `AuthGuard`, `ClientLayout`, `AppShell`, `Sidebar`, `AppHeader`, `MobileNavigation`, `GoogleAnalytics`
 
-**레이아웃 셸**: `ClientLayout` 안 `AuthGuard` 안에 `AppShell` 을 둔다. `AppShell` 은 `pathname === "/login"` 일 때 children 만 통과(풀스크린 로그인 페이지). 그 외에는 좌측 `Sidebar`(다크 #1a1a1a, 헤더 보더 #2a2a2a)와 상단 `AppHeader`(57px, 흰색, 좌측 라우트 아이콘+페이지 제목 / 우측 사용자 role 라벨 + 로그아웃 텍스트 버튼) 를 렌더한다. 사이드바는 데스크톱에서 218px(확장) ↔ 64px(축소) 두 상태를 헤더 토글 버튼(`PanelLeftClose`/`PanelLeftOpen`)으로 전환하며 상태는 `localStorage["heritage-os.sidebar.collapsed"]` 에 영속화. 메뉴는 `골프장 검색(/clubs, Flag)`, `고객 관리(/customers, Users)`, `상담일지(/trades, BookOpen)`, `건의 사항(/claims, MessageSquare)` 순. 확장 상태에서만 "즐겨찾기"·"최근 항목" 섹션이 노출되며 둘 다 `@heritage-dx/store` 의 localStorage 훅에 연결된다 — **즐겨찾기**는 `useFavoriteConsultations().favoriteItems` (TradesPageClient 별 아이콘 토글에서 `{label: 고객명·골프장명, subLabel: 유형·일자, href: /trades?expand=<id>}` 메타 저장. 클릭 시 `/trades?expand=<id>` 로 이동하면 해당 행이 자동 펼쳐짐), **최근 항목**은 `useRecentSearches("customers")` (CustomersPageClient 행 선택 시 push, 클릭 시 `/customers?customerId=<id>` 진입 → 현재 페이지 목록에 있으면 자동 선택). 빈 상태일 땐 한 줄 안내 텍스트가 노출된다. 모바일(`< lg`)에서는 햄버거 → 슬라이드 오버레이로 항상 확장 상태 표시(`<Sidebar forceExpanded />`). 페이지 제목 매핑은 `apps/os/src/lib/breadcrumb.ts`(`getPageTitle`), 라우트 아이콘·role 라벨 매핑은 `AppHeader` 내부 상수(`PAGE_ICONS`, `ROLE_LABELS`).
+**레이아웃 셸**: `ClientLayout` 안 `AuthGuard` 안에 `AppShell` 을 둔다. `AppShell` 은 `pathname === "/login"` 일 때 children 만 통과(풀스크린 로그인 페이지). 그 외에는 좌측 `Sidebar`(다크 #1a1a1a, 헤더 보더 #2a2a2a)와 상단 `AppHeader`(57px, 흰색, 좌측 라우트 아이콘+페이지 제목 / 우측 사용자 role 라벨 + 로그아웃 텍스트 버튼) 를 렌더한다. 사이드바는 데스크톱에서 218px(확장) ↔ 64px(축소) 두 상태를 헤더 토글 버튼(`PanelLeftClose`/`PanelLeftOpen`)으로 전환하며 상태는 `localStorage["heritage-os.sidebar.collapsed"]` 에 영속화. 메뉴는 `홈(/, Home)`, `골프장 검색(/clubs, Flag)`, `고객 관리(/customers, Users)`, `상담일지(/trades, BookOpen)`, `건의 사항(/claims, MessageSquare)` 순 — 홈만 정확 경로(`pathname === "/"`)에서 활성화되고 나머지는 prefix 매칭. 확장 상태에서만 "즐겨찾기"·"최근 항목" 섹션이 노출되며 둘 다 `@heritage-dx/store` 의 localStorage 훅에 연결된다 — **즐겨찾기**는 `useFavoriteConsultations().favoriteItems` (TradesPageClient 별 아이콘 토글에서 `{label: 고객명·골프장명, subLabel: 유형·일자, href: /trades?expand=<id>}` 메타 저장. 클릭 시 `/trades?expand=<id>` 로 이동하면 해당 행이 자동 펼쳐짐), **최근 항목**은 `useRecentSearches("customers")` (행 클릭으로 `/customers/<id>` 진입 시 `CustomerDetailClient` 가 push, 사이드바 클릭 시 동일 라우트로 이동). 빈 상태일 땐 한 줄 안내 텍스트가 노출된다. 모바일(`< lg`)에서는 햄버거 → 슬라이드 오버레이로 항상 확장 상태 표시(`<Sidebar forceExpanded />`). 페이지 제목 매핑은 `apps/os/src/lib/breadcrumb.ts`(`getPageTitle`), 라우트 아이콘·role 라벨 매핑은 `AppHeader` 내부 상수(`PAGE_ICONS`, `ROLE_LABELS`).
 
 **골프장:**
 `ClubProfile`, `ClubDirectory`, `GolfClubDetail`, `GolfClubTable`, `GolfClubSearch`, `NaverMap`, `MapSidebar`
 
+**골프장 검색** (`club-search/`):
+`ClubSearchPanel` — `/clubs` 디렉토리 뷰. 검색 입력 + 7지역 칩(전체/수도권/강원/충청/전라/경상/제주) + 한글 초성 박스(`@heritage-dx/utils` `INITIALS` + `0-9` 디바이더) + 카드 그리드. 그리드는 뷰포트 폭에 따라 단계적으로 컬럼 수가 변하는 반응형(`grid-cols-1 sm:2 lg:3 xl:4 2xl:5`). 카드는 지역/운영타입/홀수 배지 + 골프장명 + 주소 + 연락처. 컨테이너 `max-w-[1500px]`. `useClubs(clubStore)` 로 전체 목록을 받고 검색·필터링은 클라이언트에서 메모이즈
+
 **골프장 프로필 섹션** (`club-profile/`):
-`ClubBasicInfoTable`, `MembershipInfoSection`, `EstimateSection`, `CostCalculatorSection`, `GreenFeeField`, `InfoField`, `BenefitsSheetSection`, `DocumentsSection`, `MarketPriceSummary`, `NearbyClubPrices`, `PriceChart`
+`ClubBasicInfoTable`, `MembershipInfoSection`, `EstimateSection`, `CostCalculatorSection`, `GreenFeeField`, `InfoField`, `BenefitsSheetSection`, `DocumentsSection`, `MarketPriceSummary`, `NearbyClubPrices`, `PriceChart`, `SectionCard`, `ClubSwitcher`, `SoldPriceBanner`
+
+**ClubProfile 화면 구조 (2026-05 detail.html V3 기반 재설계)**: 글로벌 `AppHeader` 의 actions 슬롯은 비우고(`setActions(null)`) `ClubSwitcher` 는 본문 sticky 툴바로 이동. ClubProfile 본문 최상단은 단일 sticky 툴바 한 줄로 `ClubSwitcher (88CC + 다른 골프장으로 이동)` · `36홀` · `[개인|법인]` 사각 토글 · `[membershipName ...]` pill 토글(필터된 `memberships[]` 을 회색 트랙 안 흰색 active pill 로 노출 — 데이터에 정/준회원 외 다양한 종류가 있어도 모두 동적 렌더) · 우측 `매물 시세 · 갱신일` · `[지도]` · `[상담일지]` 버튼. 그 아래 `SoldPriceBanner` (선택 회원권 `dealerPriceRange` + `{개인|법인}-{membershipName} 기준` 컨텍스트), 탭 바 `회원권 정보 / 혜택지 / 견적서`, 회원권 정보 탭은 6개 `SectionCard` 2열 그리드(`01 골프장 정보` / `02 회원권 정보` / `03 그린피 정보` / `04 시세 추이` / `05 기타 비용` / `06 구비서류`). 회원권 선택은 `selectedMembershipIndex` (filtered 인덱스) 로 단일 source-of-truth, `ownerType` 또는 `detail.code` 변경 시 0으로 리셋.
 
 **회원권/거래:**
-`MembershipCalculator`, `MembershipInfoSheet`, `RequiredDocuments`, `TradesPageClient`, `TransactionTypeForm`, `TradeMemoSidebar` — `TradesPageClient` 의 메모 입력은 단일 `notes`/`remarks` 텍스트 필드를 폼에서 제거하고, 행을 펼치면 나타나는 인라인 패널에서 메모 히스토리(`MemoHistoryEntry[]`)에 누적 기록한다. 저장은 `appendMemo` 훅이 `decodeMemoHistory` → append → `__MEMO_V1__` JSON 인코딩 후 기존 update 엔드포인트로 전달. **TradesPageClient (2026-04 시안 적용)**: 페이지 셸은 좌(스크롤되는 main, 필터 카드 + 테이블 카드) / 우(560px 인라인 push aside `TradesCreatePanel`) flex 행 구조. 인라인 폼은 제거되고 새/수정은 push panel 로 통일. 필터 카드는 (1) 상단 큰 검색 바 + 클리어 버튼 + `/` 단축키 힌트, (2) 최근 검색어 chip(`useRecentSearches('trades')` 로컬 저장 — `RecentSearchItem { label, value, kind }` 객체 형식. text 검색은 Enter 로 push, 고객 검색은 행에서 고객명/연락처 클릭 시 `{label: 고객명, value: customerId, kind: 'customer'}` push 하면서 `customerFilter` 활성화 → fetch 시 `customerId` 파라미터로 전송. 활성 chip 은 gray-900 배경으로 강조), (3) 유형 pill(전체/매수/매도/미정 + 카운트 배지) · 승인 상태 select(상담중/계약금 대기/계약금 승인 모두 노출) · 기간 picker · 정렬 select 로 구성 — 진행 상태(완료/진행중)·골프장·회원권·승인내역 포함 토글은 의도적으로 제거하여 결과를 항상 전체 노출. 테이블은 13컬럼(즐겨찾기/유형/상태/골프장/회원권/고객명/연락처/메모/제시가/희망가/등록일/승인 요청/관리). 즐겨찾기는 `useFavoriteConsultations` (localStorage `heritage-dx:consultation-favorites`) 로컬 토글, 표시 전용. 메모 셀은 chevron + (메모가 있으면 최신 한 줄 + `+N` 카운트 + 시각, 없으면 "메모가 없습니다 — 클릭해서 추가" placeholder) 형태로 클릭 시 행을 펼친다. 입력은 표 내부에 직접 두지 않고, 펼친 행의 `MemoHistoryRow`(빠른 추가 input + 타임라인)에서만 처리. 승인 컬럼은 `ApprovalPillButton` (orange/amber/emerald/red pill) — IN_CONSULTATION 만 클릭 가능, 클릭 시 기존 `requestApproval` + `ApprovalRequirementsModal` 흐름 그대로 호출. 키보드 단축키: `n`/`N` 새 상담일지 push panel open, `/` 검색 input focus(input/textarea 포커스 시 무시). **TradeMemoSidebar (2026-04 재설계)**: 클럽 프로필에서 호출되는 사이드바(`lg:w-96` 384px)는 두 탭(`AI 입력 (beta)` / `일반 입력`)으로 구성. 기존 `list` 탭(메모 목록·검색·인라인 메모 추가)은 제거. **AI 탭에서 제출하면 사이드바 폼을 채우지 않고 별도 다이얼로그(centered modal, max-w-[640px], max-h-[90vh])가 열려** 응답을 검토·수정한 뒤 저장한다. **일반 입력 탭은 사이드바 안에서 직접 폼을 작성·저장**한다. 하위 컴포넌트는 `apps/os/src/components/trade-memo/` 디렉토리에 분리:
+`MembershipCalculator`, `MembershipInfoSheet`, `RequiredDocuments`, `TradesPageClient`, `TransactionTypeForm`, `TradeMemoSidebar` — `TradesPageClient` 의 메모 입력은 단일 `notes`/`remarks` 텍스트 필드를 폼에서 제거하고, 행을 펼치면 나타나는 인라인 패널에서 메모 entry(`ConsultationNoteEntry[]`)에 누적 기록한다. 저장은 `addNote(id, content)` 훅이 `POST /consultations/:id/notes` 호출 후 응답으로 entity 동기화 — 더 이상 클라이언트가 인코딩/디코딩하지 않는다(서버가 JSONB 로 보유). **TradesPageClient (2026-04 시안 적용)**: 페이지 셸은 좌(스크롤되는 main, 필터 카드 + 테이블 카드) / 우(560px 인라인 push aside `TradesCreatePanel`) flex 행 구조. 인라인 폼은 제거되고 새/수정은 push panel 로 통일. 필터 카드는 (1) 상단 큰 검색 바 + 클리어 버튼 + `/` 단축키 힌트, (2) 최근 검색어 chip(`useRecentSearches('trades')` 로컬 저장 — `RecentSearchItem { label, value, kind }` 객체 형식. text 검색은 Enter 로 push, 고객 검색은 행에서 고객명/연락처 클릭 시 `{label: 고객명, value: customerId, kind: 'customer'}` push 하면서 `customerFilter` 활성화 → fetch 시 `customerId` 파라미터로 전송. 활성 chip 은 gray-900 배경으로 강조), (3) 유형 pill(전체/매수/매도/미정 + 카운트 배지) · 승인 상태 select(상담중/계약금 대기/계약금 승인 모두 노출) · 기간 picker · 정렬 select 로 구성 — 진행 상태(완료/진행중)·골프장·회원권·승인내역 포함 토글은 의도적으로 제거하여 결과를 항상 전체 노출. 테이블은 13컬럼(즐겨찾기/유형/상태/골프장/회원권/고객명/연락처/메모/제시가/희망가/등록일/승인 요청/관리). 즐겨찾기는 `useFavoriteConsultations` (localStorage `heritage-dx:consultation-favorites`) 로컬 토글, 표시 전용. 메모 셀은 chevron + (메모가 있으면 최신 한 줄 + `+N` 카운트 + 시각, 없으면 "메모가 없습니다 — 클릭해서 추가" placeholder) 형태로 클릭 시 행을 펼친다. 입력은 표 내부에 직접 두지 않고, 펼친 행의 `MemoHistoryRow`(빠른 추가 input + 타임라인)에서만 처리. 승인 컬럼은 `ApprovalPillButton` (orange/amber/emerald/red pill) — IN_CONSULTATION 만 클릭 가능, 클릭 시 기존 `requestApproval` + `ApprovalRequirementsModal` 흐름 그대로 호출. 키보드 단축키: `n`/`N` 새 상담일지 push panel open, `/` 검색 input focus(input/textarea 포커스 시 무시). **TradeMemoSidebar (2026-04 재설계)**: 클럽 프로필에서 호출되는 사이드바(`lg:w-96` 384px)는 두 탭(`AI 입력 (beta)` / `일반 입력`)으로 구성. 기존 `list` 탭(메모 목록·검색·인라인 메모 추가)은 제거. **AI 탭에서 제출하면 사이드바 폼을 채우지 않고 별도 다이얼로그(centered modal, max-w-[640px], max-h-[90vh])가 열려** 응답을 검토·수정한 뒤 저장한다. **일반 입력 탭은 사이드바 안에서 직접 폼을 작성·저장**한다. 하위 컴포넌트는 `apps/os/src/components/trade-memo/` 디렉토리에 분리:
 - `AiConsultationDraftPanel` — 자연어 textarea(자동 확장, min 6rem / max 18rem, 최대 2000자), `useConsultationRepository().createDraftFromText({ text })` 호출, 응답을 부모로 전달. `Cmd/Ctrl+Enter` 단축키 지원.
-- `ConsultationFormSections` — 5섹션(거래 정보 / 고객 정보 / 금액 정보 / 일정 / 메모·특이사항) 폼 본체를 chrome 없이 렌더. `compact` prop 으로 좁은 사이드바에서는 모든 Row 를 단일 컬럼으로 스택, 다이얼로그에서는 `1fr 200px` / `1fr 1.4fr` 등 다중 컬럼 레이아웃 사용. 거래유형 토글(매수 `#1E429F` / 매도 `#B23232`), 골프장·회원권 직접입력 토글, 회원권 select 는 `membershipName` 기준 dedup 후 `id` 를 key 로 사용(중복 이름 대응).
-- `ManualConsultationPanel` — 사이드바 일반 입력 탭용 form wrapper. `ConsultationFormSections compact` + 단순 footer(저장 버튼)만 렌더.
-- `CreateConsultationDialog` — AI 응답 적용 후 열리는 다이얼로그. `ConsultationFormSections` + `AiResultBanner` + 풀 footer(취소/저장). `isOpen`/`onClose` props 로 제어. Escape 닫기, `Cmd/Ctrl+Enter` 저장, body scroll lock 지원. 사이드바는 단일 클럽 컨텍스트지만 AI 매칭 결과로 다른 클럽 ID 가 들어올 수 있어 `form.clubId/clubName` 을 source-of-truth 로 사용. 신규 작성 시 메모 textarea 입력은 `appendMemoEntry` 로 `__MEMO_V1__` 인코딩 후 첫 메모 엔트리로 저장.
+- `ConsultationFormSections` — 5섹션(거래 정보 / 고객 정보 / 금액 정보 / 일정 / 메모·특이사항) 폼 본체를 chrome 없이 렌더. `compact` prop 으로 좁은 사이드바에서는 모든 Row 를 단일 컬럼으로 스택, 다이얼로그에서는 `1fr 200px` / `1fr 1.4fr` 등 다중 컬럼 레이아웃 사용. 거래유형 토글(매수 `#1E429F` / 매도 `#B23232`), 골프장·회원권 직접입력 토글, 회원권 select 는 `membershipName` 기준 dedup 후 `id` 를 key 로 사용(중복 이름 대응). 고객 정보 섹션은 `CustomerAutocomplete` 아래에 `MatchedCustomerCard` 를 렌더 — `form.customerId` 가 채워진 시점에만 노출되어 작성 패널·사이드바 양쪽에서 자동 동작. 골프장 input 은 `clubLocked` prop 으로 두 모드 전환: `clubLocked=true`(default, ClubProfile 컨텍스트) 면 disabled 텍스트 input + 직접입력 토글, `clubLocked=false`(`/trades` 리스트) 면 `ClubSearchSelect` picker + 직접입력 토글. 후자에서는 부모가 `clubs`/`selectedClubCode`/`onClubChange` 를 함께 전달. `clubDetail` 은 `ClubDetail | null` — picker 모드에서 클럽 미선택 시 null 가능, 회원권 dropdown 은 빈 상태에서 자동으로 직접입력으로 전환.
+- `MatchedCustomerCard` — 자동완성에서 선택된 고객의 collapsible 요약 카드(헤더: 아바타·이름·등급 Pill·등록일·거주지). 펼치면 3탭(`기본 정보` / `보유 회원권` / `상담 히스토리`). 데이터는 `useCustomers().getOne(id)` + `useCustomers().getHistorySummary(id)` 병렬 fetch — store.items 캐시가 있으면 즉시 노출 후 신선한 값으로 덮어쓴다. 보유 회원권 탭은 `customer.ownedMembershipSummary` 텍스트 + "행 데이터는 추후 연동 예정" 빈 상태(행 단위 회원권 API 미연동). 상담 히스토리는 `recentConsultations` 최근 3건 타임라인 + 총 건수가 더 많으면 `/customers/[id]` 링크 노출.
+- `ManualConsultationPanel` — 사이드바 일반 입력 탭용 form wrapper. `ConsultationFormSections compact` + 단순 footer(저장 버튼)만 렌더. `editingTrade`/`clubLocked`/`clubs`/`selectedClubCode`/`onClubChange` 를 그대로 패스스루 — 골프장 상세(`TradeMemoSidebar`)와 `/trades` 리스트(`TradesCreatePanel`) 양쪽이 동일한 wrapper 를 공유한다.
+- `CreateConsultationDialog` — AI 응답 적용 후 열리는 다이얼로그. `ConsultationFormSections` + `AiResultBanner` + 풀 footer(취소/저장). `isOpen`/`onClose` props 로 제어. Escape 닫기, `Cmd/Ctrl+Enter` 저장, body scroll lock 지원. 사이드바는 단일 클럽 컨텍스트지만 AI 매칭 결과로 다른 클럽 ID 가 들어올 수 있어 `form.clubId/clubName` 을 source-of-truth 로 사용. 신규 작성 시 메모 textarea 입력은 `ConsultationInput.notes` 로 그대로 전달되고 백엔드가 첫 entry 로 자동 변환한다. 비어있으면 `notes` 필드 자체를 omit.
 - `AiResultBanner` — `missingRequiredFields`(빨간), `warnings`(노란), club 차이 안내(파란), ambiguous club/membership 후보 칩(주황) 을 조건부 렌더. 다이얼로그 폼 상단에 표시.
 폼 state(`form`/`manualMembershipInput`/`manualClubInput`/`aiDraftMeta`)는 `TradeMemoSidebar` 단일 소스에서 관리하고 일반 입력 패널/다이얼로그 양쪽이 공유. `useCustomerEnsureFlow` 미등록 고객 ensure 흐름은 그대로 유지.
 
 **`apps/os/src/components/trades/` (2026-04 시안 신규)** — `/trades` 전용 컴포넌트.
-- `TradesCreatePanel` — 560px 인라인 push aside (slide-in 220ms). AI/일반 입력 탭(편집 모드에서는 일반 입력만), 5섹션 폼(거래·고객·금액·일정·메모/특이사항). 신규 시 `create`, 편집 시 `update` 호출. 골프장 picker는 `ClubSearchSelect`(클럽 컨텍스트 없는 `/trades` 전용). `Esc` 닫기, `Cmd/Ctrl+Enter` 저장. `useCustomerEnsureFlow` 미등록 고객 ensure + `useSendTradeNotification` notify 통합.
+- `TradesCreatePanel` — 560px 인라인 push aside (slide-in 220ms). 내부 폼 본체는 자체 구현이 아니라 `trade-memo/` 신형 공유 컴포넌트(`AiConsultationDraftPanel` + `ManualConsultationPanel` + `CreateConsultationDialog` + `ConsultationFormSections`) 를 재사용 — 골프장 상세의 `TradeMemoSidebar` 와 동일한 컴포넌트 트리. 차이는 두 가지: (1) `clubLocked={false}` 로 골프장을 사용자가 직접 선택(`ClubSearchSelect`); (2) `editingTrade` prop 으로 수정 모드를 지원하여 `update()` 호출. AI 탭 적용 시 `CreateConsultationDialog` 모달이 열려 검토 후 저장(신규 모드 한정, 수정 모드에서는 탭 자체 미노출). `useCustomerEnsureFlow` + `useSendTradeNotification` 통합은 동일.
 - `Pill` — 활성/비활성 toggle pill + 카운트 배지(필터 chip 용).
 - `TypeBadge` — 매수(blue `#E6EFFB/#1E429F`) · 매도(red `#FCE7E7/#B23232`) · 미정(gray) 파스텔 뱃지. `isUndecided`/`isDone` flag 지원.
 - `FavoriteStar` — `useFavoriteConsultations` 로컬 토글 별 아이콘.
@@ -555,13 +563,19 @@ ESLint 9 flat config 공유 패키지. `eslint-config-next`의 `core-web-vitals`
 `ClaimsPageClient`
 
 **고객:**
-`CustomersPageClient`, `CustomerAutocomplete` — `/customers` 페이지 CRUD + 상담/거래 폼에서 재사용되는 이름/연락처 자동완성. 미등록 고객 저장 시에는 `useCustomerEnsureFlow` 훅이 `ConfirmModal`을 띄워 `POST /customers` → `POST /consultations` 를 순차 실행한다.
+`CustomersPageClient`, `CustomerDetailClient`, `CustomerAutocomplete` — `/customers` 목록 (`CustomersPageClient` — CRUD, 행 클릭 시 `/customers/<id>` 라우트 push) / `/customers/[id]` 상세 (`CustomerDetailClient` — `useCustomerRepository().getOne(id)` 단일 조회 + `update(id, partial)` 인라인 편집, 단일 컬럼 풀폭 시안 1:1 적용. 상단 PersonCard(이름 + 등급/거래 의사 dot 태그 + 연락처/이메일/등록일 메타) → BasicInfoCard(8행: 고객명·연락처·이메일·직장/직업·연령대·거주지·고객 등급·거래 의사. 고객 등급/거래 의사는 칩 그룹 read-only — 백엔드 enum 미정. 나머지는 InlineField 클릭 편집. 우측 상단 "편집" 토글) → MembershipCard(시안 표 헤더만 — 데이터 없을 때 "등록된 보유 회원권이 없습니다", "+ 회원권 추가" 버튼은 disabled) → NotesCard(textarea + 검정 "기록 저장" 버튼 → memo 텍스트 누적, 하단 이력 표시). 우측 보조 컬럼·탭은 시안에 없음). 시안 카드 컴포넌트는 `apps/os/src/components/customer-detail/` 에 분리 — `PersonCard`, `BasicInfoCard`, `MembershipCard`, `NotesCard`, `EmptyCard`, `InlineField` (hover→연필→input→체크/X 저장 primitive), `styles.ts` (시안 cdStyles + tagStyle 헬퍼). CSS 변수(`--bg`/`--text`/`--text-2`/`--text-3`/`--line`/`--line-soft`/`--green-soft`/`--green-text`/`--slate-soft`)는 `apps/os/src/app/globals.css` 에 정의. `CustomerAutocomplete` — 상담/거래 폼에서 재사용되는 이름/연락처 자동완성. 미등록 고객 저장 시에는 `useCustomerEnsureFlow` 훅이 `ConfirmModal`을 띄워 `POST /customers` → `POST /consultations` 를 순차 실행한다.
 
 **모달/시트:**
 `PasswordChangeModal`, `TaxGuideModal`, `TaxSettingsModal`, `EstimateSheet`, `ApprovalRequirementsModal` — `TradesPageClient`에서 "승인 요청" 클릭 시 `collectMissingConsultationApprovalFields(trade)` 로 누락 필드를 감지해, 채울 수 있는 필드(`customerName`/`contact`/`offerPrice`/`depositAmount`)만 동적으로 입력받는다. 구조 필드(`tradeType`/`clubId`/`membershipId`)가 비면 승인을 차단하고 상담 편집을 유도. 제출된 patch는 스토어 `requestApproval(id, patch)`에 전달되어 update+approvalAction을 순차 수행
 
 **유틸리티:**
 `HomeClient`, `DashboardClient`, `SearchInput`, `OperatorNotice`, `SystemNotice`
+
+**홈 대시보드 (`DashboardClient` — 2026-05 V3 디자인 적용)**: 루트 `/` 가 렌더하는 메인 페이지. 30:70 grid (`lg:grid-cols-[30%_1fr]`) 로 좌우 분할.
+- **좌 — 골프장 정보 hub** (`bg-[#0a0a0a]` 검정 카드, 우상단 radial gradient overlay): 큰 골프 깃발 squircle 아이콘 + "골프장 정보" 26px 타이틀 + 1줄 설명 + dashed 구분선 위 CTA "골프장 검색으로 이동" 화살표 → `Link href="/clubs"`. 하단에 "최근 검색한 골프장" 섹션 — `useRecentSearches("clubs", 4)` 신규 scope (현재 push 호출 없음, 빈 상태가 기본). 각 항목 클릭 시 `/clubs?club=<value>` 로 이동, hover 시 X 버튼으로 단건 제거, "모두 지우기" 버튼으로 일괄 clear.
+- **우 — 공지사항 카드** (`bg-white rounded-2xl shadow-card`): Megaphone 아이콘 + "공지사항" 28px 헤더 + admin 한정 "새 공지" 버튼. 검색 input(`f9fafb` 배경, 300ms 디바운스) + 정렬 select(최신순/오래된순). 본문은 **Hero 카드(최신 1건)** — 파스텔 그라데이션 배경 + 민트 "최신" Pin 태그 + 17px 제목 + 1줄 프리뷰 + 나머지 5건은 `grid-cols-[60px_1fr_100px_16px]` 형태(No / 제목+프리뷰 / 날짜 / chevron) 리스트. 푸터에 `range / total건` 표시 + 페이지네이션(활성 검정 배경 pill).
+- **상세 슬라이드 패널**: 행 클릭 시 우측 fixed `w-[420px]` 슬라이드인. 헤더(날짜 + X) + 제목 + 본문(`whitespace-pre-wrap`) + admin 푸터(수정 ghost / 삭제 `bg-red-50 text-red-700` 2단계 confirm). 스크림 클릭으로 닫기.
+- **공지 작성/수정**: 별도 `Modal`(`@heritage-dx/ui`) 로 분리. `useNoticeMutations`/`useNotices`/`canManageOrg` 사용은 변경 없음. 페이지 사이즈는 `PAGE_SIZE = 6`.
 
 #### 서버사이드 데이터 페칭 + ISR 캐싱
 
@@ -637,7 +651,7 @@ getInitialData()    // 초기 데이터 프리로드
     ├── my-organization/page.tsx          # 조직 설정
     ├── notifications/page.tsx            # 알림 목록
     ├── kpi/page.tsx                       # KPI 통계 대시보드
-    ├── trade-memos/page.tsx              # 상담 기록 (승인 UI — useConsultationAdminRepository). 메모 컬럼은 OS 와 동일한 `decodeMemoHistory` 로 `__MEMO_V1__` JSON 을 파싱해 최신 한 줄 + `+N` 카운트 표시. 행 클릭 시 우측 Drawer 에 메모 히스토리 타임라인(최신 dot 강조 + dashed 구분선) + 고객 이력 + 반대매매 리스트가 함께 노출.
+    ├── trade-memos/page.tsx              # 상담 기록 (승인 UI — useConsultationAdminRepository). 메모 컬럼은 `Consultation.notes.entries` 를 그대로 사용해 최신 한 줄 + `+N` 카운트 표시(서버 JSONB 응답을 직접 소비). 행 클릭 시 우측 Drawer 에 메모 히스토리 타임라인(최신 dot 강조 + dashed 구분선) + 고객 이력 + 반대매매 리스트가 함께 노출. 편집 모드에서는 `notes` 폼 필드를 비워두며 update 페이로드에서 omit — 메모 변경은 별도 엔드포인트로만. **상담일지 추가/수정 Drawer** 안 고객명/연락처 입력 grid 바로 아래에 `MatchedCustomerCard` (apps/back-office/src/components/trade-memos/) 를 배치 — 수정 모드에서 `editingMemo.customerId` 가 있을 때만 카드를 노출(추가 모드는 자동 숨김). 카드는 `useCustomerRepository().getOne` + `getHistorySummary` 를 직접 호출하고 `mapCustomerDtoToEntity`/`mapCustomerHistorySummaryDtoToEntity` 로 entity 변환 — OS 의 `apps/os/src/components/trade-memo/MatchedCustomerCard` 와 시각·매핑 1:1 동일(추후 packages/ui 통합 후보).
     ├── trade-records/page.tsx            # 거래 내역 (승인 UI — useMembershipTradeAdminRepository)
     ├── customers/page.tsx                # 고객 목록 + 담당자 필터 + 이력 Drawer (useCustomerRepository)
     └── users/page.tsx                    # 사용자 관리

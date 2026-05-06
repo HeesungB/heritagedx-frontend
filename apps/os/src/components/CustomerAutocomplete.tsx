@@ -82,34 +82,38 @@ export default function CustomerAutocomplete({
   };
 
   return (
-    <div className="relative space-y-3">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          고객명 *
-        </label>
-        <Input
-          value={nameQuery}
-          onChange={(e) => handleNameChange(e.target.value)}
-          onFocus={() => setActiveField("name")}
-          onBlur={() => setTimeout(() => setActiveField((f) => (f === "name" ? null : f)), 150)}
-          placeholder="고객명 입력 (2자 이상 검색)"
-          disabled={disabled}
-          autoComplete="off"
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          연락처 *
-        </label>
-        <Input
-          value={contactQuery}
-          onChange={(e) => handleContactChange(e.target.value)}
-          onFocus={() => setActiveField("contact")}
-          onBlur={() => setTimeout(() => setActiveField((f) => (f === "contact" ? null : f)), 150)}
-          placeholder="010-1234-5678"
-          disabled={disabled}
-          autoComplete="off"
-        />
+    <div className="relative">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1.5 flex items-center gap-1 text-[12.5px] font-semibold text-[#3f3f46]">
+            고객명
+            <span className="text-[#DC2626]">*</span>
+          </label>
+          <Input
+            value={nameQuery}
+            onChange={(e) => handleNameChange(e.target.value)}
+            onFocus={() => setActiveField("name")}
+            onBlur={() => setTimeout(() => setActiveField((f) => (f === "name" ? null : f)), 150)}
+            placeholder="고객명 입력 (2자 이상 검색)"
+            disabled={disabled}
+            autoComplete="off"
+          />
+        </div>
+        <div>
+          <label className="mb-1.5 flex items-center gap-1 text-[12.5px] font-semibold text-[#3f3f46]">
+            연락처
+            <span className="text-[#DC2626]">*</span>
+          </label>
+          <Input
+            value={contactQuery}
+            onChange={(e) => handleContactChange(e.target.value)}
+            onFocus={() => setActiveField("contact")}
+            onBlur={() => setTimeout(() => setActiveField((f) => (f === "contact" ? null : f)), 150)}
+            placeholder="010-1234-5678"
+            disabled={disabled}
+            autoComplete="off"
+          />
+        </div>
       </div>
 
       {activeField && (searching || results.length > 0) && (
@@ -147,7 +151,7 @@ export default function CustomerAutocomplete({
       )}
 
       {value.customerId && (
-        <p className="text-xs text-emerald-600">
+        <p className="mt-2 text-xs text-emerald-600">
           ✓ 등록된 고객이 선택되었습니다.
         </p>
       )}

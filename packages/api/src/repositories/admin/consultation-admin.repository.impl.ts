@@ -5,6 +5,7 @@ import type {
   ApprovalActionInput,
   Consultation,
   ConsultationInput,
+  ConsultationNoteInput,
   ConsultationsResponse,
 } from "@heritage-dx/types";
 import type { IConsultationAdminRepository } from "../../interfaces/admin/consultation-admin.repository";
@@ -60,6 +61,36 @@ export class ConsultationAdminRepository implements IConsultationAdminRepository
     return this.api.patch<Consultation>(
       `/admin/consultations/${id}/approval-action`,
       body,
+    );
+  }
+
+  async addNote(
+    id: string,
+    input: ConsultationNoteInput,
+  ): Promise<ApiResponse<Consultation>> {
+    return this.api.post<Consultation>(
+      `/admin/consultations/${id}/notes`,
+      input,
+    );
+  }
+
+  async updateNote(
+    id: string,
+    noteId: string,
+    input: ConsultationNoteInput,
+  ): Promise<ApiResponse<Consultation>> {
+    return this.api.patch<Consultation>(
+      `/admin/consultations/${id}/notes/${noteId}`,
+      input,
+    );
+  }
+
+  async deleteNote(
+    id: string,
+    noteId: string,
+  ): Promise<ApiResponse<Consultation>> {
+    return this.api.delete<Consultation>(
+      `/admin/consultations/${id}/notes/${noteId}`,
     );
   }
 }

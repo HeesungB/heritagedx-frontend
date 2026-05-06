@@ -12,6 +12,8 @@ export function useCustomers(store: CustomerStore) {
   const update = useStore(store, (s) => s.update);
   const remove = useStore(store, (s) => s.remove);
   const searchByQuery = useStore(store, (s) => s.searchByQuery);
+  const getOne = useStore(store, (s) => s.getOne);
+  const getHistorySummary = useStore(store, (s) => s.getHistorySummary);
   const hydrate = useStore(store, (s) => s.hydrate);
 
   return {
@@ -25,6 +27,8 @@ export function useCustomers(store: CustomerStore) {
     update,
     remove,
     searchByQuery,
+    getOne,
+    getHistorySummary,
     hydrate,
   };
 }

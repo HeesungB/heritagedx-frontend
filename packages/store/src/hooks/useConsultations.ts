@@ -12,7 +12,9 @@ export function useConsultations(store: ConsultationStore) {
   const update = useStore(store, (s) => s.update);
   const remove = useStore(store, (s) => s.remove);
   const toggleDone = useStore(store, (s) => s.toggleDone);
-  const appendMemo = useStore(store, (s) => s.appendMemo);
+  const addNote = useStore(store, (s) => s.addNote);
+  const updateNote = useStore(store, (s) => s.updateNote);
+  const deleteNote = useStore(store, (s) => s.deleteNote);
   const requestApproval = useStore(store, (s) => s.requestApproval);
   const hydrate = useStore(store, (s) => s.hydrate);
 
@@ -27,7 +29,9 @@ export function useConsultations(store: ConsultationStore) {
     update,
     remove,
     toggleDone,
-    appendMemo,
+    addNote,
+    updateNote,
+    deleteNote,
     requestApproval,
     hydrate,
   };

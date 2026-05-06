@@ -7,11 +7,9 @@ import { ConfirmModal } from "@heritage-dx/ui";
 import { useAppStores } from "@/stores";
 import {
   useConsultations,
-  appendMemoEntry,
   buildClubMembershipPair,
   type ConsultationAiResponse,
 } from "@heritage-dx/store";
-import { useAuth } from "@/contexts/AuthContext";
 import { useSendTradeNotification } from "@/hooks/useSendTradeNotification";
 import { useCustomerEnsureFlow } from "@/hooks/useCustomerEnsureFlow";
 import { trackEvent } from "@/lib/gtag";
@@ -53,12 +51,11 @@ export default function TradeMemoSidebar({
   onClose,
 }: TradeMemoSidebarProps) {
   const { tradeMemo: tradeMemoStore } = useAppStores();
-  const { user } = useAuth();
   const { create } = useConsultations(tradeMemoStore);
   const { send: sendNotification } = useSendTradeNotification();
   const ensureFlow = useCustomerEnsureFlow();
 
-  const [activeTab, setActiveTab] = useState<SidebarTab>("ai");
+  const [activeTab, setActiveTab] = useState<SidebarTab>("manual");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<MembershipTradeForm>(() =>
     buildInitialForm(clubDetail),
@@ -85,23 +82,6 @@ export default function TradeMemoSidebar({
   };
 
   const persistConsultation = async () => {
-    const authorName = user?.name?.trim() || user?.email || "—";
-    const authorId = user?.id ? String(user.id) : null;
-
-    let notesPayload: string | null = null;
-    if (form.notes.trim().length > 0) {
-      const { encoded } = appendMemoEntry(
-        null,
-        {
-          author: authorName,
-          authorId,
-          content: form.notes.trim(),
-        },
-        { author: authorName, createdAt: new Date().toISOString() },
-      );
-      notesPayload = encoded;
-    }
-
     const { club, membership } = buildClubMembershipPair({
       clubId: form.clubId || clubDetail.id,
       clubName: form.clubName || clubDetail.name,
@@ -109,6 +89,9 @@ export default function TradeMemoSidebar({
       membershipType: form.membershipType,
     });
 
+    // 신규 API: 상담 생성 시 notes 문자열은 백엔드가 첫 entry 로 자동 변환한다.
+    // 비어있으면 omit (서버에서 { entries: [] } 로 초기화).
+    const trimmedNote = form.notes.trim();
     const input = {
       club,
       membership,
@@ -121,7 +104,7 @@ export default function TradeMemoSidebar({
       desiredPriceNote: form.desiredPriceNote || null,
       depositAmount: form.depositAmount || null,
       accountNumber: form.accountNumber || null,
-      notes: notesPayload,
+      ...(trimmedNote ? { notes: trimmedNote } : {}),
       registrationDate: form.registrationDate || null,
       tradeDate: form.tradeDate || null,
       remarks: form.remarks.trim() ? form.remarks : null,
@@ -241,18 +224,25 @@ export default function TradeMemoSidebar({
 
   return (
     <>
-      <aside className="fixed inset-0 z-40 flex h-full min-h-0 w-full flex-col border-l border-gray-200 bg-white print:hidden lg:static lg:inset-auto lg:z-auto lg:w-96">
-        {/* 헤더 */}
-        <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-3 py-2.5">
-          <h3 className="text-sm font-bold text-gray-900">상담일지</h3>
+      <aside className="fixed inset-0 z-40 flex h-full min-h-0 w-full flex-col border-l border-gray-200 bg-white print:hidden lg:static lg:inset-auto lg:z-auto lg:w-[560px]">
+        {/* 헤더 — 상담일지 작성 / 클럽명 / X */}
+        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-5">
+          <div className="flex flex-col gap-1">
+            <h3 className="text-[18px] font-bold tracking-[-0.01em] text-[#0a0a0a]">
+              상담일지 작성
+            </h3>
+            <span className="text-[12px] text-[#71717a]">
+              {clubDetail.name}
+            </span>
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded p-0.5 transition-colors hover:bg-gray-200"
+            className="flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 text-[#52525b] transition-colors hover:bg-gray-50"
             title="닫기"
           >
             <svg
-              className="h-4 w-4 text-gray-500"
+              className="h-4 w-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -267,12 +257,12 @@ export default function TradeMemoSidebar({
           </button>
         </div>
 
-        {/* 탭 */}
-        <div className="flex border-b border-gray-200">
+        {/* 탭 (간소화) */}
+        <div className="flex border-b border-gray-200 px-6">
           <button
             type="button"
             onClick={() => handleSwitchTab("ai")}
-            className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 py-2.5 text-xs font-semibold transition-colors ${
+            className={`flex items-center gap-1.5 border-b-2 px-2 py-2.5 text-[12px] font-semibold transition-colors ${
               activeTab === "ai"
                 ? "border-violet-600 text-gray-900"
                 : "border-transparent text-gray-400 hover:text-gray-700"
@@ -287,7 +277,7 @@ export default function TradeMemoSidebar({
           <button
             type="button"
             onClick={() => handleSwitchTab("manual")}
-            className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 py-2.5 text-xs font-semibold transition-colors ${
+            className={`flex items-center gap-1.5 border-b-2 px-2 py-2.5 text-[12px] font-semibold transition-colors ${
               activeTab === "manual"
                 ? "border-gray-900 text-gray-900"
                 : "border-transparent text-gray-400 hover:text-gray-700"
@@ -328,6 +318,7 @@ export default function TradeMemoSidebar({
               errorMessage={errorMessage}
               onClearError={() => setErrorMessage(null)}
               onSubmit={handleSubmit}
+              onCancel={onClose}
             />
           )}
         </div>

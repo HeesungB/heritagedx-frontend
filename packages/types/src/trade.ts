@@ -4,6 +4,27 @@ import type { Pagination } from "./api";
 // 거래 유형 (OpenAPI 스펙 enum)
 export type TradeType = "매도" | "매수";
 
+// 상담 메모 entry (notes JSONB 구조)
+// - id, author, authorId, createdAt: 서버 자동 채움
+// - updatedAt, updatedByUserId: 최초 null, 메모 수정 시 갱신
+export interface ConsultationNoteEntry {
+  id: string;
+  author: string;
+  authorId: string | null;
+  content: string;
+  createdAt: string;
+  updatedAt: string | null;
+  updatedByUserId: string | null;
+}
+
+export interface ConsultationNotes {
+  entries: ConsultationNoteEntry[];
+}
+
+export interface ConsultationNoteInput {
+  content: string;
+}
+
 // 상담 (OpenAPI ConsultationResponseDto)
 export interface Consultation {
   id: string;
@@ -23,7 +44,7 @@ export interface Consultation {
   depositAmount: number | null;
   accountNumber: string | null;
   customFields: Record<string, unknown>;
-  notes: string | null;
+  notes: ConsultationNotes;
   registrationDate: string | null;
   tradeDate: string | null;
   remarks: string | null;
@@ -95,8 +116,11 @@ export interface ConsultationAiResponse {
   warnings: string[];
 }
 
-// 상담 생성/수정 입력. 백엔드가 isDone 필드를 거부하므로 입력 페이로드에서 제외한다.
-// (응답 Consultation 에는 isDone 이 그대로 존재 — 표시용)
+// 상담 생성/수정 입력.
+// - 백엔드가 isDone 필드를 거부하므로 입력 페이로드에서 제외 (응답 Consultation 에는 표시용으로 존재).
+// - notes 는 **상담 생성 시에만** 1개의 첫 entry 텍스트로 사용. PUT /consultations/:id 에서는
+//   notes 직접 수정이 금지되어 있으므로 update 호출 시에는 반드시 omit 해야 한다.
+//   메모 추가/수정/삭제는 별도 엔드포인트(POST/PATCH/DELETE /consultations/:id/notes[/:noteId]) 사용.
 export interface ConsultationInput {
   club: string;
   membership: string;
@@ -110,7 +134,7 @@ export interface ConsultationInput {
   depositAmount?: number | null;
   accountNumber?: string | null;
   customFields?: Record<string, unknown>;
-  notes?: string | null;
+  notes?: string;
   registrationDate?: string | null;
   tradeDate?: string | null;
   remarks?: string | null;

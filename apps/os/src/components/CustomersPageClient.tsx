@@ -1,19 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Search, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAppStores } from "@/stores";
-import { useCustomers, useRecentSearches } from "@heritage-dx/store";
-import type { CustomerEntity, CustomerHistorySummaryEntity } from "@heritage-dx/store";
-import { useCustomerRepository } from "@heritage-dx/api";
+import { useCustomers } from "@heritage-dx/store";
 import {
   Button,
   Input,
   Textarea,
   Modal,
-  ConfirmModal,
-  Drawer,
   Loading,
 } from "@heritage-dx/ui";
 
@@ -43,10 +39,10 @@ const emptyForm: CustomerFormState = {
   residenceArea: "",
 };
 
-// 연령대 select 후보. 백엔드 enum이 확정되면 정렬·라벨 정렬.
 const AGE_BRACKET_OPTIONS = ["20대", "30대", "40대", "50대", "60대", "70대 이상"] as const;
 
 export default function CustomersPageClient() {
+  const router = useRouter();
   const { customer: customerStore } = useAppStores();
   const {
     items,
@@ -55,14 +51,7 @@ export default function CustomersPageClient() {
     isRefreshing,
     fetch,
     create,
-    update,
-    remove,
   } = useCustomers(customerStore);
-
-  const customerRepo = useCustomerRepository();
-  const searchParams = useSearchParams();
-  const customerIdFromUrl = searchParams.get("customerId");
-  const { push: pushRecentCustomer } = useRecentSearches("customers");
 
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -72,17 +61,6 @@ export default function CustomersPageClient() {
   const [createForm, setCreateForm] = useState<CustomerFormState>(emptyForm);
   const [createSubmitting, setCreateSubmitting] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
-
-  const [selected, setSelected] = useState<CustomerEntity | null>(null);
-  const [editForm, setEditForm] = useState<CustomerFormState>(emptyForm);
-  const [editSubmitting, setEditSubmitting] = useState(false);
-  const [editError, setEditError] = useState<string | null>(null);
-
-  const [deleteTarget, setDeleteTarget] = useState<CustomerEntity | null>(null);
-  const [deleting, setDeleting] = useState(false);
-
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [history, setHistory] = useState<CustomerHistorySummaryEntity | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setSearchQuery(searchInput.trim()), 300);
@@ -98,64 +76,6 @@ export default function CustomersPageClient() {
       order: "DESC",
     });
   }, [page, searchQuery, fetch]);
-
-  const loadHistory = useCallback(
-    async (customerId: string) => {
-      setHistoryLoading(true);
-      setHistory(null);
-      try {
-        const response = await customerRepo.getHistorySummary(customerId);
-        if (response.success && response.data) {
-          setHistory(response.data);
-        }
-      } finally {
-        setHistoryLoading(false);
-      }
-    },
-    [customerRepo],
-  );
-
-  const handleSelect = useCallback(
-    (item: CustomerEntity) => {
-      setSelected(item);
-      setEditForm({
-        name: item.name,
-        contact: item.contact,
-        email: item.email ?? "",
-        address: item.address ?? "",
-        memo: item.memo ?? "",
-        ageBracket: item.ageBracket ?? "",
-        occupation: item.occupation ?? "",
-        ownedMembershipSummary: item.ownedMembershipSummary ?? "",
-        residenceArea: item.residenceArea ?? "",
-      });
-      setEditError(null);
-      loadHistory(item.id);
-      pushRecentCustomer({
-        label: item.name?.trim() || item.contact || item.id,
-        value: item.id,
-        kind: "customer",
-      });
-    },
-    [loadHistory, pushRecentCustomer],
-  );
-
-  // 사이드바 최근 항목에서 ?customerId=<id> 진입 시 현재 페이지에 있으면 자동 선택.
-  const autoSelectedRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!customerIdFromUrl) return;
-    if (autoSelectedRef.current === customerIdFromUrl) return;
-    const match = items.find((c: CustomerEntity) => c.id === customerIdFromUrl);
-    if (match) {
-      autoSelectedRef.current = customerIdFromUrl;
-      handleSelect(match);
-    }
-  }, [customerIdFromUrl, items, handleSelect]);
-
-  const handleCloseDrawer = () => {
-    setSelected(null);
-    setHistory(null);
-  };
 
   const handleCreate = async () => {
     if (!createForm.name.trim() || !createForm.contact.trim()) {
@@ -188,46 +108,6 @@ export default function CustomersPageClient() {
     }
   };
 
-  const handleUpdate = async () => {
-    if (!selected) return;
-    if (!editForm.name.trim() || !editForm.contact.trim()) {
-      setEditError("고객명과 연락처를 입력해주세요.");
-      return;
-    }
-    setEditSubmitting(true);
-    setEditError(null);
-    const updated = await update(selected.id, {
-      name: editForm.name.trim(),
-      contact: editForm.contact.trim(),
-      email: editForm.email.trim() || null,
-      address: editForm.address.trim() || null,
-      memo: editForm.memo.trim() || undefined,
-      ageBracket: editForm.ageBracket.trim() || null,
-      occupation: editForm.occupation.trim() || null,
-      ownedMembershipSummary: editForm.ownedMembershipSummary.trim() || null,
-      residenceArea: editForm.residenceArea.trim() || null,
-    });
-    setEditSubmitting(false);
-    if (updated) {
-      setSelected(updated);
-    } else {
-      setEditError("고객 정보 수정에 실패했습니다.");
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    const ok = await remove(deleteTarget.id);
-    setDeleting(false);
-    if (ok) {
-      if (selected?.id === deleteTarget.id) {
-        handleCloseDrawer();
-      }
-      setDeleteTarget(null);
-    }
-  };
-
   const totalPages = pagination?.totalPages ?? 1;
   const total = pagination?.total ?? 0;
 
@@ -242,7 +122,7 @@ export default function CustomersPageClient() {
 
   return (
     <div>
-      <main className="mx-auto w-full max-w-[1100px] px-6 py-10 lg:px-8">
+      <main className="mx-auto w-full max-w-[1500px] px-6 py-10 lg:px-8">
         <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-[28px] font-bold leading-[36px] tracking-[-0.01em] text-[#101828]">
@@ -305,7 +185,7 @@ export default function CustomersPageClient() {
                   {items.map((item, index) => (
                     <tr
                       key={item.id}
-                      onClick={() => handleSelect(item)}
+                      onClick={() => router.push(`/customers/${item.id}`)}
                       className="cursor-pointer transition-colors hover:bg-gray-50"
                     >
                       <td className="px-4 py-4 text-center text-[#6a7282]">
@@ -528,236 +408,6 @@ export default function CustomersPageClient() {
           )}
         </div>
       </Modal>
-
-      <Drawer
-        isOpen={!!selected}
-        onClose={handleCloseDrawer}
-        title={selected ? `${selected.name} 고객 정보` : ""}
-        width="xl"
-      >
-        {selected && (
-          <div className="space-y-6">
-            <section className="space-y-3">
-              <h3 className="text-sm font-semibold text-gray-700">기본 정보</h3>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  고객명
-                </label>
-                <Input
-                  value={editForm.name}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, name: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  연락처
-                </label>
-                <Input
-                  value={editForm.contact}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, contact: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  이메일
-                </label>
-                <Input
-                  type="email"
-                  value={editForm.email}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, email: e.target.value })
-                  }
-                  placeholder="hong@example.com"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  주소
-                </label>
-                <Input
-                  value={editForm.address}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, address: e.target.value })
-                  }
-                  placeholder="서울특별시 강남구 테헤란로 123"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    연령대
-                  </label>
-                  <select
-                    value={editForm.ageBracket}
-                    onChange={(e) => setEditForm({ ...editForm, ageBracket: e.target.value })}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
-                  >
-                    <option value="">선택</option>
-                    {AGE_BRACKET_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    직업
-                  </label>
-                  <Input
-                    value={editForm.occupation}
-                    onChange={(e) => setEditForm({ ...editForm, occupation: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  거주 지역
-                </label>
-                <Input
-                  value={editForm.residenceArea}
-                  onChange={(e) => setEditForm({ ...editForm, residenceArea: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  보유 회원권 요약
-                </label>
-                <Textarea
-                  value={editForm.ownedMembershipSummary}
-                  onChange={(e) => setEditForm({ ...editForm, ownedMembershipSummary: e.target.value })}
-                  rows={2}
-                />
-              </div>
-              {selected.customerGrade && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    영업 등급
-                  </label>
-                  <span className="inline-block text-xs px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    {selected.customerGrade}
-                  </span>
-                  <p className="text-xs text-gray-400 mt-1">거래 라이프사이클에 따라 자동 산정됩니다.</p>
-                </div>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  메모
-                </label>
-                <Textarea
-                  value={editForm.memo}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, memo: e.target.value })
-                  }
-                  rows={3}
-                />
-              </div>
-              {editError && (
-                <p className="text-sm text-red-600">{editError}</p>
-              )}
-              <div className="flex gap-2 justify-end">
-                <Button
-                  variant="danger"
-                  onClick={() => setDeleteTarget(selected)}
-                >
-                  삭제
-                </Button>
-                <Button onClick={handleUpdate} isLoading={editSubmitting}>
-                  저장
-                </Button>
-              </div>
-            </section>
-
-            <section className="space-y-2 border-t pt-4">
-              <h3 className="text-sm font-semibold text-gray-700">고객 이력</h3>
-              {historyLoading ? (
-                <div className="py-6 flex justify-center">
-                  <Loading />
-                </div>
-              ) : history ? (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="bg-gray-50 rounded p-3">
-                      <div className="text-gray-500">상담</div>
-                      <div className="font-bold text-lg text-gray-900">
-                        {history.summary.consultationCount}건
-                      </div>
-                    </div>
-                    <div className="bg-gray-50 rounded p-3">
-                      <div className="text-gray-500">거래</div>
-                      <div className="font-bold text-lg text-gray-900">
-                        {history.summary.membershipTradeCount}건
-                      </div>
-                    </div>
-                  </div>
-
-                  {history.recentConsultations.length > 0 && (
-                    <div>
-                      <h4 className="text-xs font-semibold text-gray-500 mt-2 mb-1">
-                        최근 상담
-                      </h4>
-                      <ul className="space-y-1 text-sm">
-                        {history.recentConsultations.map((c) => (
-                          <li key={c.id} className="text-gray-700">
-                            {c.clubName} · {c.membershipName} ·{" "}
-                            <span className="text-gray-500">
-                              {c.tradeType} / {c.registrationDate ?? "-"}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {history.recentMembershipTrades.length > 0 && (
-                    <div>
-                      <h4 className="text-xs font-semibold text-gray-500 mt-2 mb-1">
-                        최근 거래
-                      </h4>
-                      <ul className="space-y-1 text-sm">
-                        {history.recentMembershipTrades.map((t) => (
-                          <li key={t.id} className="text-gray-700">
-                            {t.clubName} · {t.membershipName} ·{" "}
-                            <span className="text-gray-500">
-                              {t.tradeType} / {t.contractDate ?? "-"}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">이력이 없습니다.</p>
-              )}
-            </section>
-
-            <section className="text-xs text-gray-500 border-t pt-3 space-y-1">
-              <div>등록자: {selected.createdByName}</div>
-              <div>
-                등록일: {new Date(selected.createdAt).toLocaleString("ko-KR")}
-              </div>
-            </section>
-          </div>
-        )}
-      </Drawer>
-
-      <ConfirmModal
-        isOpen={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
-        title="고객 삭제"
-        message={
-          deleteTarget
-            ? `${deleteTarget.name}(${deleteTarget.contact}) 고객을 삭제하시겠습니까?`
-            : ""
-        }
-        confirmText="삭제"
-        variant="danger"
-        isLoading={deleting}
-      />
     </div>
   );
 }

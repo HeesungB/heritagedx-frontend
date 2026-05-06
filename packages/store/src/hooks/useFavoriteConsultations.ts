@@ -69,6 +69,22 @@ function writeItems(items: FavoriteConsultationItem[]) {
   }
 }
 
+// 같은 탭 내에서 toggleFavorite 가 다른 컴포넌트(예: Sidebar)에 즉시 반영되도록
+// 모듈 수준 listener Set 을 둔다. localStorage 의 `storage` 이벤트는 cross-tab 만
+// 동작하므로 별도 통지가 필요.
+const listeners = new Set<() => void>();
+
+function notify() {
+  listeners.forEach((fn) => fn());
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
 export interface UseFavoriteConsultationsResult {
   favorites: Set<string>;
   favoriteItems: FavoriteConsultationItem[];
@@ -86,23 +102,32 @@ export function useFavoriteConsultations(): UseFavoriteConsultationsResult {
     // Re-persist if normalization upgraded legacy string entries so the next
     // read is fast and shape-consistent.
     if (initial.length > 0) writeItems(initial);
+
+    const unsub = subscribe(() => setItems(readItems()));
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY) setItems(readItems());
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      unsub();
+      window.removeEventListener("storage", onStorage);
+    };
   }, []);
 
   const toggleFavorite = useCallback((id: string, meta?: FavoriteConsultationMeta) => {
-    setItems((prev) => {
-      const exists = prev.some((it) => it.id === id);
-      let next: FavoriteConsultationItem[];
-      if (exists) {
-        next = prev.filter((it) => it.id !== id);
-      } else {
-        const item: FavoriteConsultationItem = meta
-          ? { id, label: meta.label, subLabel: meta.subLabel, href: meta.href }
-          : legacyFallback(id);
-        next = [item, ...prev];
-      }
-      writeItems(next);
-      return next;
-    });
+    const prev = readItems();
+    const exists = prev.some((it) => it.id === id);
+    let next: FavoriteConsultationItem[];
+    if (exists) {
+      next = prev.filter((it) => it.id !== id);
+    } else {
+      const item: FavoriteConsultationItem = meta
+        ? { id, label: meta.label, subLabel: meta.subLabel, href: meta.href }
+        : legacyFallback(id);
+      next = [item, ...prev];
+    }
+    writeItems(next);
+    notify();
   }, []);
 
   const favorites = useMemo(() => new Set(items.map((it) => it.id)), [items]);

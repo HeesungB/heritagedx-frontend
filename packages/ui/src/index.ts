@@ -10,3 +10,4 @@ export { default as Table } from "./Table";
 export { default as Loading, PageLoading } from "./Loading";
 export { default as Tabs } from "./Tabs";
 export { default as ClubSearchSelect } from "./ClubSearchSelect";
+export type { ClubSearchItem } from "./ClubSearchSelect";

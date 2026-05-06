@@ -7,6 +7,7 @@ export {
 } from "./consultation.mapper";
 export {
   mapCustomerDtoToEntity,
+  mapCustomerHistorySummaryDtoToEntity,
   mapCustomerEntityToInput,
   mapCustomerEntityToUpdateInput,
 } from "./customer.mapper";

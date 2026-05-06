@@ -16,7 +16,7 @@ import { getEffectiveRegion } from "@heritage-dx/utils";
 import MobileNavigation from "@/components/MobileNavigation";
 import { Club, ClubDetail } from "@/types";
 import { useAppStores } from "@/stores";
-import { useClubs, useClubDetail } from "@heritage-dx/store";
+import { useClubs, useClubDetail, useRecentSearches } from "@heritage-dx/store";
 import { Loading } from "@heritage-dx/ui";
 
 interface HomeClientProps {
@@ -62,6 +62,17 @@ export default function HomeClient({
     () => clubs.find((c) => c.code === selectedClubCode) ?? null,
     [clubs, selectedClubCode]
   );
+
+  // 사용자가 골프장에 진입할 때마다 사이드바 / 홈 hub 의 "최근 검색한 골프장" 에 기록
+  const { push: pushRecentClub } = useRecentSearches("clubs", 10);
+  useEffect(() => {
+    if (!selectedClub) return;
+    pushRecentClub({
+      label: selectedClub.name,
+      value: selectedClub.code,
+      kind: getEffectiveRegion(selectedClub.region, selectedClub.address) ?? undefined,
+    });
+  }, [selectedClub, pushRecentClub]);
 
   // ref로 현재 clubs를 추적 (popstate 핸들러에서 사용)
   const clubsRef = useRef(clubs);

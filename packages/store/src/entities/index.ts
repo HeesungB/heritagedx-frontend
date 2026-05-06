@@ -20,19 +20,12 @@ export type {
   ConsultationAiMissingField,
   ConsultationAiResponse,
 } from "./consultation-ai";
-export type {
-  MemoHistoryEntry,
-  LegacyFallback as MemoHistoryLegacyFallback,
-  AppendInput as MemoHistoryAppendInput,
-} from "./memo-history";
 export {
-  MEMO_MARKER,
-  decodeMemoHistory,
-  encodeMemoHistory,
-  appendMemoEntry,
   flattenMemoHistoryNotes,
-  getLatestMemoEntry,
+  decodeMemoEntries,
+  appendCustomerMemoEntry,
 } from "./memo-history";
+export type { CustomerMemoEntry } from "./memo-history";
 export type { MembershipTradeEntity } from "./membership-trade";
 export type { MembershipEntity } from "./membership";
 export type {
@@ -68,5 +61,7 @@ export type {
   CustomerHistorySummaryEntity,
   CustomerHistoryRecentConsultationEntity,
   CustomerHistoryRecentMembershipTradeEntity,
+  CustomerGradeKey,
 } from "./customer";
+export { CUSTOMER_GRADE_LABEL, getCustomerGradeLabel } from "./customer";
 export type { ClubDocumentEntity, ClubScenarioDocumentEntity } from "./club-document";

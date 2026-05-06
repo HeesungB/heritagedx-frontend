@@ -22,6 +22,7 @@ import EstimateSection from "./club-profile/EstimateSection";
 import PriceChart, { PRICE_CHART_PERIODS } from "./club-profile/PriceChart";
 import SectionCard from "./club-profile/SectionCard";
 import ClubSwitcher from "./club-profile/ClubSwitcher";
+import SoldPriceBanner from "./club-profile/SoldPriceBanner";
 import { useHeaderActions } from "@/contexts/HeaderActionsContext";
 import type { MarketPricePeriod } from "@heritage-dx/store";
 import { trackEvent } from "@/lib/gtag";
@@ -354,6 +355,7 @@ export default function ClubProfile({
   const [activeTab, setActiveTab] = useState<ProfileTab>("membership");
   const [isMemoSidebarOpen, setIsMemoSidebarOpen] = useState(false);
   const [isMapSidebarOpen, setIsMapSidebarOpen] = useState(false);
+  const isAnySidebarOpen = isMemoSidebarOpen || isMapSidebarOpen;
   const [ownerType, setOwnerType] = useState<OwnerType>("personal");
   const [selectedMembershipIndex, setSelectedMembershipIndex] = useState(0);
   const [chartPeriod, setChartPeriod] = useState<MarketPricePeriod>("3m");
@@ -390,27 +392,11 @@ export default function ClubProfile({
     }
   }, [detail, loading]);
 
+  // ClubSwitcher 는 본문 sticky 툴바에서 렌더하므로 글로벌 헤더 actions 슬롯은 비운다.
   useEffect(() => {
-    if (!detail) {
-      setActions(null);
-      return;
-    }
-    setActions(
-      <div className="flex items-center gap-3">
-        <ClubSwitcher
-          currentClub={{ code: detail.code, name: detail.name }}
-          clubs={clubs ?? []}
-          onSelect={(code) => onClubNavigate?.(code)}
-        />
-        {detail.basicInfo.holes && (
-          <span className="text-[13px] text-[#6a7282]">
-            {detail.basicInfo.holes}
-          </span>
-        )}
-      </div>,
-    );
+    setActions(null);
     return () => setActions(null);
-  }, [detail, clubs, onClubNavigate, setActions]);
+  }, [setActions]);
 
   if (loading) {
     return (
@@ -451,11 +437,6 @@ export default function ClubProfile({
     { id: "estimate", label: "견적서" },
   ];
 
-  const initialSaleSummary = selectedMembership
-    ? [selectedMembership.initialSalePrice, selectedMembership.initialSaleMethod]
-        .filter(Boolean)
-        .join(" · ")
-    : "";
   const reservationNotesText =
     selectedMembership?.reservationNotes ??
     detail.registration.reservationNotes ??
@@ -465,138 +446,113 @@ export default function ClubProfile({
     : -1;
   const safeIndexInAll = idxInAll >= 0 ? idxInAll : 0;
 
+  const ownerLabel = ownerType === "personal" ? "개인" : "법인";
+  const selectedTypeLabel =
+    selectedMembership?.membershipName || selectedMembership?.membershipType;
+  const soldContextLabel = [ownerLabel, selectedTypeLabel]
+    .filter(Boolean)
+    .join(" · ");
+  const soldAsOf = selectedMembership?.recentPriceUpdateDate
+    ? `${selectedMembership.recentPriceUpdateDate} 기준`
+    : null;
+
   return (
     <div className="flex min-w-0 flex-1 print:block">
       <div className="flex-1 min-w-0 bg-[#f5f5f5] print:p-0">
-        {/* 헤더 */}
-        <div className="border-b border-[#e5e7eb] bg-white">
-          <div className="px-6 pt-4 pb-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-[24px] font-bold tracking-[-0.01em] text-[#101828]">
-                {detail.name}
-              </h2>
-              {detail.basicInfo.holes && (
-                <span className="text-[14px] text-[#6a7282]">
-                  {detail.basicInfo.holes}
-                </span>
-              )}
-              {selectedMembership?.recentPriceUpdateDate && (
-                <span className="text-[12px] text-[#99a1af]">
-                  매물 시세 · {selectedMembership.recentPriceUpdateDate} 기준
-                </span>
-              )}
+        {/* 헤더 (sticky) — 1행: picker·홀·개인/법인 + 매물시세·지도·상담일지 / 2행: 회원권 pill 토글 / 3행: 탭 */}
+        <div className="sticky top-0 z-20 border-b border-[#e5e7eb] bg-white">
+          <div className="flex flex-wrap items-center gap-3 px-6 pt-4">
+            <ClubSwitcher
+              currentClub={{ code: detail.code, name: detail.name }}
+              clubs={clubs ?? []}
+              onSelect={(code) => onClubNavigate?.(code)}
+            />
+            {detail.basicInfo.holes && (
+              <span className="text-[13px] font-medium text-[#52525b]">
+                {detail.basicInfo.holes}
+              </span>
+            )}
 
-              <div className="ml-auto flex items-center gap-2">
-                {!isMapSidebarOpen && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsMapSidebarOpen(true);
-                      setIsMemoSidebarOpen(false);
-                    }}
-                    className="flex h-8 items-center gap-1.5 rounded-lg border border-emerald-600 bg-white px-3 text-[12px] font-medium text-emerald-700 hover:bg-emerald-50"
-                  >
-                    <MapPin className="h-3.5 w-3.5" strokeWidth={2} />
-                    지도
-                  </button>
-                )}
-                {!isMemoSidebarOpen && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsMemoSidebarOpen(true);
-                      setIsMapSidebarOpen(false);
-                    }}
-                    className="flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-[12px] font-medium text-white hover:bg-emerald-700"
-                  >
-                    <ScrollText className="h-3.5 w-3.5" strokeWidth={2} />
-                    상담일지
-                  </button>
-                )}
-              </div>
-            </div>
-
+            {/* 개인/법인 — 사각 토글 (검정 배경 active) */}
             {allMemberships.length > 0 && (
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <div className="inline-flex h-8 items-center rounded-lg border border-[#e5e7eb] bg-white p-0.5">
-                  {(["personal", "corporate"] as const).map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setOwnerType(t)}
-                      className={`h-7 rounded-md px-3 text-[12px] font-medium transition-colors ${
-                        ownerType === t
-                          ? "bg-[#101828] text-white"
-                          : "text-[#6a7282] hover:text-[#101828]"
-                      }`}
-                    >
-                      {t === "personal" ? "개인" : "법인"}
-                    </button>
-                  ))}
-                </div>
-                {filteredMemberships.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {filteredMemberships.map((m, index) => (
-                      <button
-                        key={m.id || index}
-                        type="button"
-                        onClick={() => setSelectedMembershipIndex(index)}
-                        className={`h-7 rounded-md border px-3 text-[12px] font-medium transition-colors ${
-                          selectedMembershipIndex === index
-                            ? "border-[#101828] bg-[#101828] text-white"
-                            : "border-[#e5e7eb] bg-white text-[#4a5565] hover:bg-gray-50"
-                        }`}
-                      >
-                        {m.membershipName || m.membershipType || `회원권 ${index + 1}`}
-                      </button>
-                    ))}
-                  </div>
-                )}
+              <div className="inline-flex h-8 overflow-hidden rounded-lg border border-[#d4d4d8] bg-white">
+                {(["personal", "corporate"] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setOwnerType(t)}
+                    className={`px-4 text-[13px] font-medium transition-colors ${
+                      ownerType === t
+                        ? "bg-[#0a0a0a] text-white"
+                        : "text-[#3f3f46] hover:bg-gray-50"
+                    }`}
+                  >
+                    {t === "personal" ? "개인" : "법인"}
+                  </button>
+                ))}
               </div>
             )}
 
-            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-              <div className="rounded-xl border border-[#e5e7eb] bg-white p-4">
-                <p className="text-[11px] tracking-[-0.005em] text-[#6a7282]">
-                  회원권
-                </p>
-                <p className="mt-1 text-[18px] font-bold tracking-[-0.01em] text-[#101828]">
-                  {selectedMembership?.membershipName ||
-                    selectedMembership?.membershipType ||
-                    "-"}
-                </p>
-                {initialSaleSummary && (
-                  <p className="mt-1 text-[11px] text-[#6a7282]">
-                    {initialSaleSummary}
-                  </p>
-                )}
-              </div>
-              <div className="rounded-xl border border-[#e5e7eb] bg-white p-4">
-                <p className="text-[11px] font-medium tracking-[-0.005em] text-[#dc2626]">
-                  매수
-                </p>
-                <p className="mt-1 text-[26px] font-bold tracking-[-0.01em] text-[#dc2626]">
-                  {selectedMembership?.recentMarketPrice ||
-                    detail.marketInfo.recentMarketPrice ||
-                    "-"}
-                </p>
-                <p className="mt-1 text-[11px] text-[#6a7282]">단위: 만원</p>
-              </div>
-              <div className="rounded-xl border border-[#e5e7eb] bg-white p-4">
-                <p className="text-[11px] font-medium tracking-[-0.005em] text-[#2563eb]">
-                  매도
-                </p>
-                <p className="mt-1 text-[26px] font-bold tracking-[-0.01em] text-[#2563eb]">
-                  {selectedMembership?.dealerPriceRange ||
-                    detail.marketInfo.dealerPriceRange ||
-                    "-"}
-                </p>
-                <p className="mt-1 text-[11px] text-[#6a7282]">단위: 만원</p>
-              </div>
+            <div className="ml-auto flex items-center gap-2">
+              {soldAsOf && (
+                <span className="text-[11.5px] text-[#71717a]">
+                  매물 시세 · {soldAsOf}
+                </span>
+              )}
+              {!isMapSidebarOpen && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMapSidebarOpen(true);
+                    setIsMemoSidebarOpen(false);
+                  }}
+                  className="flex h-8 items-center gap-1.5 rounded-lg border border-[#d4d4d8] bg-white px-3 text-[12px] font-medium text-[#3f3f46] hover:bg-gray-50"
+                >
+                  <MapPin className="h-3.5 w-3.5" strokeWidth={2} />
+                  지도
+                </button>
+              )}
+              {!isMemoSidebarOpen && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMemoSidebarOpen(true);
+                    setIsMapSidebarOpen(false);
+                  }}
+                  className="flex h-8 items-center gap-1.5 rounded-lg bg-[#0a0a0a] px-3 text-[12px] font-medium text-white hover:bg-[#1f2937]"
+                >
+                  <ScrollText className="h-3.5 w-3.5" strokeWidth={2} />
+                  상담일지
+                </button>
+              )}
             </div>
           </div>
 
-          <div className="mt-4 px-6">
+          {/* 2행: 회원권 — pill 토글 (gray 트랙, 흰색 active pill, 가로 스크롤) */}
+          {filteredMemberships.length > 0 && (
+            <div className="px-6 pt-3">
+              <div className="inline-flex h-8 max-w-full items-center gap-0.5 overflow-x-auto rounded-full bg-[#e4e4e7] p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {filteredMemberships.map((m, index) => (
+                  <button
+                    key={m.id || index}
+                    type="button"
+                    onClick={() => setSelectedMembershipIndex(index)}
+                    className={`h-6 shrink-0 whitespace-nowrap rounded-full px-3 text-[12px] font-medium transition-colors ${
+                      selectedMembershipIndex === index
+                        ? "bg-white text-[#0a0a0a] shadow-sm"
+                        : "text-[#71717a] hover:text-[#0a0a0a]"
+                    }`}
+                  >
+                    {m.membershipName ||
+                      m.membershipType ||
+                      `회원권 ${index + 1}`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="px-6 pt-3">
             <div className="flex gap-1 border-b border-[#f3f4f6]">
               {tabs.map((tab) => (
                 <button
@@ -619,6 +575,20 @@ export default function ClubProfile({
         <div className="px-6 py-4">
           {activeTab === "membership" && (
             <div className="space-y-4">
+              <SoldPriceBanner
+                dealerPriceRange={
+                  selectedMembership?.dealerPriceRange ??
+                  detail.marketInfo.dealerPriceRange
+                }
+                contextLabel={soldContextLabel || ownerLabel}
+                asOf={null}
+              />
+
+              <div
+                className={`grid gap-4 ${
+                  isAnySidebarOpen ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-2"
+                }`}
+              >
               <SectionCard
                 number="01"
                 title="골프장 정보"
@@ -775,6 +745,7 @@ export default function ClubProfile({
                   />
                 </div>
               </SectionCard>
+              </div>
             </div>
           )}
 

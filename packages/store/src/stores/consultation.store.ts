@@ -8,7 +8,6 @@ import type {
   ConsultationApprovalFillableField,
 } from "../entities/consultation";
 import { collectMissingConsultationApprovalFields } from "../entities/consultation";
-import { appendMemoEntry } from "../entities/memo-history";
 
 const FILLABLE_FIELD_SET: ReadonlySet<ConsultationApprovalFillableField> = new Set([
   "customerName",
@@ -39,11 +38,15 @@ export interface ConsultationStoreState {
   update: (id: string, data: ConsultationInput) => Promise<ConsultationEntity | null>;
   remove: (id: string) => Promise<boolean>;
   toggleDone: (id: string, isDone: boolean) => Promise<boolean>;
-  appendMemo: (
+  // 메모(notes JSONB entry) CRUD — 응답으로 갱신된 상담 entity 를 반환하고
+  // store 의 items 도 같이 동기화한다. content 길이/권한/완료 거래 차단 등 검증은 서버 책임.
+  addNote: (id: string, content: string) => Promise<ConsultationEntity | null>;
+  updateNote: (
     id: string,
+    noteId: string,
     content: string,
-    author: { name: string; id: string | null },
   ) => Promise<ConsultationEntity | null>;
+  deleteNote: (id: string, noteId: string) => Promise<ConsultationEntity | null>;
   requestApproval: (
     id: string,
     input?: {
@@ -152,24 +155,52 @@ export function createConsultationStore(repos: GeneralRepositories) {
       return true;
     },
 
-    appendMemo: async (id, content, author) => {
+    addNote: async (id, content) => {
       const trimmed = content.trim();
       if (!trimmed) return null;
-      const current = get().items.find((i) => i.id === id);
-      if (!current) return null;
-      const { encoded } = appendMemoEntry(
-        current.notes,
-        { author: author.name, authorId: author.id, content: trimmed },
-        {
-          author: current.createdByName ?? "—",
-          createdAt: current.createdAt,
-          remarks: current.remarks,
-        },
-      );
-      const base = mapConsultationEntityToInput(current);
-      // 메모 히스토리로 흡수된 remarks 는 더 이상 별도 필드로 보내지 않는다.
-      const payload: ConsultationInput = { ...base, notes: encoded, remarks: null };
-      return get().update(id, payload);
+      try {
+        const response = await repos.consultations.addNote(id, { content: trimmed });
+        if (!response.success || !response.data) return null;
+        const entity = mapConsultationDtoToEntity(response.data);
+        set((s) => ({
+          items: s.items.map((item) => (item.id === id ? entity : item)),
+        }));
+        return entity;
+      } catch {
+        return null;
+      }
+    },
+
+    updateNote: async (id, noteId, content) => {
+      const trimmed = content.trim();
+      if (!trimmed) return null;
+      try {
+        const response = await repos.consultations.updateNote(id, noteId, {
+          content: trimmed,
+        });
+        if (!response.success || !response.data) return null;
+        const entity = mapConsultationDtoToEntity(response.data);
+        set((s) => ({
+          items: s.items.map((item) => (item.id === id ? entity : item)),
+        }));
+        return entity;
+      } catch {
+        return null;
+      }
+    },
+
+    deleteNote: async (id, noteId) => {
+      try {
+        const response = await repos.consultations.deleteNote(id, noteId);
+        if (!response.success || !response.data) return null;
+        const entity = mapConsultationDtoToEntity(response.data);
+        set((s) => ({
+          items: s.items.map((item) => (item.id === id ? entity : item)),
+        }));
+        return entity;
+      } catch {
+        return null;
+      }
     },
 
     requestApproval: async (

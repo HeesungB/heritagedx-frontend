@@ -1,8 +1,20 @@
-import type { Customer, CustomerInput, CustomerUpdateInput } from "@heritage-dx/types";
-import type { CustomerEntity } from "../entities/customer";
-import { flattenMemoHistoryNotes } from "../entities/memo-history";
+import type {
+  Customer,
+  CustomerHistorySummary,
+  CustomerInput,
+  CustomerUpdateInput,
+} from "@heritage-dx/types";
+import type {
+  CustomerEntity,
+  CustomerHistorySummaryEntity,
+} from "../entities/customer";
+import {
+  decodeMemoEntries,
+  flattenMemoHistoryNotes,
+} from "../entities/memo-history";
 
 export function mapCustomerDtoToEntity(dto: Customer): CustomerEntity {
+  const rawMemo = dto.memo ?? null;
   return {
     id: dto.id,
     organizationId: dto.organizationId,
@@ -14,7 +26,9 @@ export function mapCustomerDtoToEntity(dto: Customer): CustomerEntity {
     address: dto.address ?? null,
     // customer.memo 는 단일 텍스트 필드지만, 과거 데이터에 메모 히스토리 인코딩이 흘러들어온
     // 케이스가 있어 표시 단계에서 plain text 로 정규화한다.
-    memo: flattenMemoHistoryNotes(dto.memo ?? null),
+    memo: flattenMemoHistoryNotes(rawMemo),
+    // raw memo 가 __MEMO_V1__ 마커 형태이면 항목별 entries 도 함께 노출.
+    memoEntries: decodeMemoEntries(rawMemo),
     ageBracket: dto.ageBracket ?? null,
     occupation: dto.occupation ?? null,
     ownedMembershipSummary: dto.ownedMembershipSummary ?? null,
@@ -38,6 +52,35 @@ export function mapCustomerEntityToInput(
     occupation: entity.occupation ?? undefined,
     ownedMembershipSummary: entity.ownedMembershipSummary ?? undefined,
     residenceArea: entity.residenceArea ?? undefined,
+  };
+}
+
+export function mapCustomerHistorySummaryDtoToEntity(
+  dto: CustomerHistorySummary,
+): CustomerHistorySummaryEntity {
+  return {
+    customerId: dto.customerId,
+    summary: {
+      consultationCount: dto.summary.consultationCount,
+      membershipTradeCount: dto.summary.membershipTradeCount,
+    },
+    recentConsultations: dto.recentConsultations.map((c) => ({
+      id: c.id,
+      clubName: c.clubName,
+      membershipName: c.membershipName,
+      tradeType: c.tradeType,
+      registrationDate: c.registrationDate ?? null,
+      approvalStatus: c.approvalStatus,
+      accountNumber: c.accountNumber ?? null,
+    })),
+    recentMembershipTrades: dto.recentMembershipTrades.map((t) => ({
+      id: t.id,
+      clubName: t.clubName,
+      membershipName: t.membershipName,
+      tradeType: t.tradeType,
+      contractDate: t.contractDate ?? null,
+      workflowStatus: t.workflowStatus,
+    })),
   };
 }
 

@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo, type ReactNode } from "react";
+import { ClubSearchSelect, type ClubSearchItem } from "@heritage-dx/ui";
 import type { ClubDetail, MembershipTradeForm } from "@/types";
 import CustomerAutocomplete from "@/components/CustomerAutocomplete";
+import MatchedCustomerCard from "@/components/trade-memo/MatchedCustomerCard";
 
 interface ConsultationFormSectionsProps {
-  clubDetail: ClubDetail;
+  clubDetail: ClubDetail | null;
   form: MembershipTradeForm;
   setForm: (updater: (prev: MembershipTradeForm) => MembershipTradeForm) => void;
   manualMembershipInput: boolean;
@@ -15,10 +17,19 @@ interface ConsultationFormSectionsProps {
   editingTrade?: boolean;
   /** true 면 모든 Row 를 단일 컬럼으로 스택. 좁은 사이드바 패널용. */
   compact?: boolean;
+  /**
+   * true(기본) 면 골프장 input 은 disabled (ClubProfile 처럼 컨텍스트가 고정됐을 때).
+   * false 면 ClubSearchSelect picker 를 렌더 (리스트 페이지 신규/수정).
+   */
+  clubLocked?: boolean;
+  /** clubLocked=false 일 때 picker 에 전달할 club 목록·선택 상태·핸들러. */
+  clubs?: ClubSearchItem[];
+  selectedClubCode?: string;
+  onClubChange?: (code: string) => void;
 }
 
 const inputCls =
-  "h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-[13px] text-gray-800 outline-none transition-colors focus:border-gray-900 disabled:bg-gray-50 disabled:text-gray-500";
+  "h-10 w-full rounded-md border border-[#d4d4d8] bg-white px-3 text-[13px] text-[#18181b] outline-none transition-colors focus:border-[#0a0a0a] disabled:bg-gray-50 disabled:text-gray-500";
 
 const numericInputCls = `${inputCls} text-right tabular-nums`;
 
@@ -32,18 +43,22 @@ export default function ConsultationFormSections({
   setManualClubInput,
   editingTrade,
   compact = false,
+  clubLocked = true,
+  clubs = [],
+  selectedClubCode = "",
+  onClubChange,
 }: ConsultationFormSectionsProps) {
   // 동일 membershipName 이 여러 건 들어오는 경우(API 데이터 특성) key 충돌이 나지 않도록
   // name 기준 dedup 한 옵션 목록을 만든다. 첫 번째 매칭의 id 를 대표 id 로 사용.
   const membershipOptions = useMemo(() => {
     const seen = new Map<string, { id: string | null; name: string }>();
-    for (const m of clubDetail.memberships ?? []) {
+    for (const m of clubDetail?.memberships ?? []) {
       const name = (m.membershipName || m.membershipType || "").trim();
       if (!name) continue;
       if (!seen.has(name)) seen.set(name, { id: m.id, name });
     }
     return Array.from(seen.values());
-  }, [clubDetail.memberships]);
+  }, [clubDetail?.memberships]);
   const membershipTypes = membershipOptions.map((o) => o.name);
 
   return (
@@ -52,7 +67,7 @@ export default function ConsultationFormSections({
       <Section step="1" title="거래 정보">
         <Field>
           <Label required>거래유형</Label>
-          <div className="flex h-9 gap-0 rounded-md border border-gray-300 bg-gray-50 p-[3px]">
+          <div className="grid h-10 grid-cols-2 overflow-hidden rounded-md border border-[#d4d4d8] bg-white">
             {(["매수", "매도"] as const).map((t) => {
               const active = form.tradeType === t;
               const activeStyle =
@@ -64,10 +79,10 @@ export default function ConsultationFormSections({
                   key={t}
                   type="button"
                   onClick={() => setForm((f) => ({ ...f, tradeType: t }))}
-                  className={`flex-1 rounded text-[13px] transition-colors ${
+                  className={`text-[13px] transition-colors ${
                     active
                       ? activeStyle
-                      : "bg-transparent text-gray-500 hover:text-gray-700"
+                      : "bg-white text-[#52525b] hover:bg-gray-50"
                   }`}
                 >
                   {t}
@@ -77,17 +92,40 @@ export default function ConsultationFormSections({
           </div>
         </Field>
 
-        <Row cols={compact ? "1fr" : "1fr 200px"}>
+        <Row cols={compact ? "1fr" : "1fr 1fr"}>
           <Field>
             <Label required>골프장명</Label>
             <div className="flex gap-1.5">
               {!manualClubInput ? (
-                <input
-                  type="text"
-                  value={form.clubName}
-                  disabled
-                  className={`${inputCls} flex-1`}
-                />
+                clubLocked ? (
+                  <input
+                    type="text"
+                    value={form.clubName}
+                    disabled
+                    className={`${inputCls} flex-1`}
+                  />
+                ) : (
+                  <div className="flex-1">
+                    <ClubSearchSelect
+                      clubs={clubs}
+                      selectedClubCode={selectedClubCode}
+                      onChange={(code) => {
+                        onClubChange?.(code);
+                        if (!code) {
+                          setForm((f) => ({
+                            ...f,
+                            clubId: "",
+                            clubName: "",
+                            membershipId: null,
+                            membershipType: "",
+                          }));
+                          setManualMembershipInput(false);
+                        }
+                      }}
+                      placeholder="골프장 검색"
+                    />
+                  </div>
+                )
               ) : (
                 <input
                   type="text"
@@ -109,17 +147,33 @@ export default function ConsultationFormSections({
                 onClick={() => {
                   if (manualClubInput) {
                     setManualClubInput(false);
-                    setForm((f) => ({
-                      ...f,
-                      clubId: clubDetail.id,
-                      clubName: clubDetail.name,
-                    }));
+                    if (clubLocked) {
+                      setForm((f) => ({
+                        ...f,
+                        clubId: clubDetail?.id ?? "",
+                        clubName: clubDetail?.name ?? "",
+                      }));
+                    } else {
+                      setForm((f) => ({
+                        ...f,
+                        clubId: "",
+                        clubName: "",
+                        membershipId: null,
+                        membershipType: "",
+                      }));
+                      onClubChange?.("");
+                      setManualMembershipInput(false);
+                    }
                   } else {
                     setManualClubInput(true);
                     setForm((f) => ({ ...f, clubId: "", clubName: "" }));
+                    if (!clubLocked) {
+                      onClubChange?.("__manual__");
+                      setManualMembershipInput(true);
+                    }
                   }
                 }}
-                className={`h-9 shrink-0 rounded-md border px-3 text-[12.5px] font-semibold transition-colors ${
+                className={`h-10 shrink-0 rounded-md border px-3 text-[12.5px] font-semibold transition-colors ${
                   manualClubInput
                     ? "border-gray-900 bg-gray-900 text-white"
                     : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
@@ -143,7 +197,7 @@ export default function ConsultationFormSections({
                       membershipType: "",
                     }));
                   } else {
-                    const picked = clubDetail.memberships?.find(
+                    const picked = clubDetail?.memberships?.find(
                       (m) =>
                         (m.membershipName || m.membershipType) ===
                         e.target.value,
@@ -193,7 +247,7 @@ export default function ConsultationFormSections({
                         membershipType: "",
                       }));
                     }}
-                    className="h-9 shrink-0 rounded-md border border-gray-300 bg-white px-2 text-[11.5px] font-medium text-gray-600 hover:bg-gray-50"
+                    className="h-10 shrink-0 rounded-md border border-gray-300 bg-white px-2 text-[11.5px] font-medium text-gray-600 hover:bg-gray-50"
                   >
                     목록선택
                   </button>
@@ -221,11 +275,12 @@ export default function ConsultationFormSections({
             }))
           }
         />
+        <MatchedCustomerCard customerId={form.customerId} />
       </Section>
 
       {/* SECTION 3 — 금액 정보 */}
       <Section step="3" title="금액 정보">
-        <Row cols={compact ? "1fr" : "1fr 1.4fr"}>
+        <Row cols={compact ? "1fr" : "1fr 1fr"}>
           <Field>
             <Label hint="만원">제시가</Label>
             <input
@@ -255,7 +310,7 @@ export default function ConsultationFormSections({
             />
           </Field>
         </Row>
-        <Row cols={compact ? "1fr" : "1fr 1.4fr"}>
+        <Row cols={compact ? "1fr" : "1fr 1fr"}>
           <Field>
             <Label hint="만원">희망가</Label>
             <input
@@ -285,7 +340,7 @@ export default function ConsultationFormSections({
             />
           </Field>
         </Row>
-        <Row cols={compact ? "1fr" : "1fr 1.4fr"}>
+        <Row cols={compact ? "1fr" : "1fr 1fr"}>
           <Field>
             <Label hint="만원">계약금</Label>
             <input
@@ -317,8 +372,37 @@ export default function ConsultationFormSections({
         </Row>
       </Section>
 
-      {/* SECTION 4 — 일정 */}
-      <Section step="4" title="일정">
+      {/* SECTION 4 — 메모 / 특이사항 */}
+      <Section step="4" title="메모 / 특이사항">
+        {!editingTrade && (
+          <Field>
+            <Label>메모</Label>
+            <textarea
+              value={form.notes}
+              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+              placeholder="타회원권 교환 희망 / 매수 의향 등"
+              className="block h-20 w-full resize-y rounded-md border border-[#d4d4d8] bg-white px-3 py-2.5 text-[13px] leading-[1.5] text-[#18181b] outline-none focus:border-[#0a0a0a]"
+            />
+          </Field>
+        )}
+        {editingTrade && (
+          <p className="text-[11px] text-gray-400">
+            메모는 상담일지 카드의 메모 히스토리에서 추가할 수 있습니다.
+          </p>
+        )}
+        <Field>
+          <Label>특이사항</Label>
+          <textarea
+            value={form.remarks}
+            onChange={(e) => setForm((f) => ({ ...f, remarks: e.target.value }))}
+            placeholder="계약금 입금 완료 / 특별 요청사항 등"
+            className="block h-20 w-full resize-y rounded-md border border-[#d4d4d8] bg-white px-3 py-2.5 text-[13px] leading-[1.5] text-[#18181b] outline-none focus:border-[#0a0a0a]"
+          />
+        </Field>
+      </Section>
+
+      {/* SECTION 5 — 일정 */}
+      <Section step="5" title="일정" last>
         <Row cols="1fr 1fr">
           <Field>
             <Label>등록일</Label>
@@ -343,35 +427,6 @@ export default function ConsultationFormSections({
             />
           </Field>
         </Row>
-      </Section>
-
-      {/* SECTION 5 — 메모 / 특이사항 */}
-      <Section step="5" title="메모 / 특이사항" last>
-        {!editingTrade && (
-          <Field>
-            <Label>메모</Label>
-            <textarea
-              value={form.notes}
-              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-              placeholder="타회원권 교환 희망 / 매수 의향 등"
-              className="block h-20 w-full resize-y rounded-md border border-gray-300 bg-white px-3 py-2.5 text-[13px] leading-[1.5] text-gray-800 outline-none focus:border-gray-900"
-            />
-          </Field>
-        )}
-        {editingTrade && (
-          <p className="text-[11px] text-gray-400">
-            메모는 상담일지 카드의 메모 히스토리에서 추가할 수 있습니다.
-          </p>
-        )}
-        <Field>
-          <Label>특이사항</Label>
-          <textarea
-            value={form.remarks}
-            onChange={(e) => setForm((f) => ({ ...f, remarks: e.target.value }))}
-            placeholder="계약금 입금 완료 / 특별 요청사항 등"
-            className="block h-20 w-full resize-y rounded-md border border-gray-300 bg-white px-3 py-2.5 text-[13px] leading-[1.5] text-gray-800 outline-none focus:border-gray-900"
-          />
-        </Field>
       </Section>
     </>
   );
@@ -398,16 +453,16 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <div className={last ? "" : "mb-5 border-b border-gray-100 pb-5"}>
-      <div className="mb-3.5 flex items-center gap-2">
-        <span className="inline-flex h-[22px] w-[22px] items-center justify-center rounded bg-gray-900 font-mono text-[11px] font-bold text-white">
+    <div className={last ? "" : "mb-7"}>
+      <div className="mb-4 flex items-center gap-2">
+        <span className="inline-flex h-[22px] w-[22px] items-center justify-center rounded bg-[#0a0a0a] text-[11.5px] font-bold tabular-nums text-white">
           {step}
         </span>
-        <h4 className="text-[13px] font-bold tracking-[-0.2px] text-gray-900">
+        <h4 className="text-[14px] font-bold tracking-[-0.005em] text-[#0a0a0a]">
           {title}
         </h4>
       </div>
-      <div className="flex flex-col gap-3">{children}</div>
+      <div className="flex flex-col gap-3.5">{children}</div>
     </div>
   );
 }
@@ -434,10 +489,12 @@ function Label({
   hint?: string;
 }) {
   return (
-    <label className="mb-1.5 flex items-center gap-1 text-[11.5px] font-semibold text-gray-700">
+    <label className="mb-1.5 flex items-center gap-1 text-[12.5px] font-semibold text-[#3f3f46]">
       {children}
-      {required && <span className="text-red-600">*</span>}
-      {hint && <span className="ml-1 font-normal text-gray-400">{hint}</span>}
+      {required && <span className="text-[#DC2626]">*</span>}
+      {hint && (
+        <span className="ml-0.5 font-normal text-[#a1a1aa]">{hint}</span>
+      )}
     </label>
   );
 }

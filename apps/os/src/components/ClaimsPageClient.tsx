@@ -98,7 +98,7 @@ export default function ClaimsPageClient() {
   };
 
   return (
-    <div className="mx-auto max-w-[1036px] px-4 py-12 lg:px-8">
+    <div className="mx-auto max-w-[1500px] px-4 py-12 lg:px-8">
       {/* 타이틀 */}
       <div className="flex items-end justify-between border-b-2 border-black pb-4">
         <h1 className="text-[24px] font-extrabold tracking-[-0.02em] text-[#101828]">

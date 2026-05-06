@@ -39,7 +39,9 @@ export interface CustomerInput {
   residenceArea?: string | null;
 }
 
-// 고객 수정 입력 (OpenAPI UpdateCustomerDto) — customerGrade는 제외
+// 고객 수정 입력 (OpenAPI UpdateCustomerDto)
+// customerGrade 는 거래 라이프사이클에 따라 서버가 자동 산정하지만,
+// 운영자가 영업 상황에 따라 수동 조정할 수 있도록 옵션으로 노출한다.
 export interface CustomerUpdateInput {
   name?: string;
   contact?: string;
@@ -50,6 +52,7 @@ export interface CustomerUpdateInput {
   occupation?: string | null;
   ownedMembershipSummary?: string | null;
   residenceArea?: string | null;
+  customerGrade?: string | null;
 }
 
 // 고객 목록 응답 데이터

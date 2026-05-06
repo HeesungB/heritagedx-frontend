@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Home,
   Flag,
   Users,
   BookOpen,
@@ -17,6 +18,7 @@ import {
 import { useFavoriteConsultations, useRecentSearches } from "@heritage-dx/store";
 
 const NAV_ITEMS = [
+  { href: "/", label: "홈", icon: Home },
   { href: "/clubs", label: "골프장 검색", icon: Flag },
   { href: "/customers", label: "고객 관리", icon: Users },
   { href: "/trades", label: "상담일지", icon: BookOpen },
@@ -24,6 +26,7 @@ const NAV_ITEMS = [
 ] as const;
 
 const STORAGE_KEY = "heritage-os.sidebar.collapsed";
+const SIDEBAR_LIST_MAX = 4;
 
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
@@ -169,7 +172,7 @@ export default function Sidebar({
               </p>
             ) : (
               <ul className="space-y-0.5">
-                {favoriteItems.map((item) => (
+                {favoriteItems.slice(0, SIDEBAR_LIST_MAX).map((item) => (
                   <li key={item.id}>
                     <Link
                       href={item.href}
@@ -204,10 +207,10 @@ export default function Sidebar({
               </p>
             ) : (
               <ul className="space-y-0.5">
-                {recentCustomers.map((item) => (
+                {recentCustomers.slice(0, SIDEBAR_LIST_MAX).map((item) => (
                   <li key={item.value}>
                     <Link
-                      href={`/customers?customerId=${encodeURIComponent(item.value)}`}
+                      href={`/customers/${encodeURIComponent(item.value)}`}
                       onClick={onNavigate}
                       title={item.label}
                       className="flex h-9 items-center gap-3 rounded-[10px] px-3 text-[13px] font-medium text-[#99a1af] hover:bg-white/5 hover:text-white"

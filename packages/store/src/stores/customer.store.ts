@@ -2,8 +2,14 @@ import { createStore } from "zustand/vanilla";
 import type { GeneralRepositories, CustomerListParams } from "@heritage-dx/api";
 import type { CustomerInput, CustomerUpdateInput } from "@heritage-dx/types";
 import type { FetchStatus, PaginationState } from "../entities/common";
-import type { CustomerEntity } from "../entities/customer";
-import { mapCustomerDtoToEntity } from "../mappers/customer.mapper";
+import type {
+  CustomerEntity,
+  CustomerHistorySummaryEntity,
+} from "../entities/customer";
+import {
+  mapCustomerDtoToEntity,
+  mapCustomerHistorySummaryDtoToEntity,
+} from "../mappers/customer.mapper";
 import { normalizePagination } from "../mappers/helpers";
 
 export interface CustomerCreateResult {
@@ -24,6 +30,10 @@ export interface CustomerStoreState {
   update: (id: string, data: CustomerUpdateInput) => Promise<CustomerEntity | null>;
   remove: (id: string) => Promise<boolean>;
   searchByQuery: (query: string, limit?: number) => Promise<CustomerEntity[]>;
+  getOne: (id: string) => Promise<CustomerEntity | null>;
+  getHistorySummary: (
+    id: string,
+  ) => Promise<CustomerHistorySummaryEntity | null>;
   hydrate: (items: CustomerEntity[], pagination: PaginationState) => void;
 }
 
@@ -132,6 +142,30 @@ export function createCustomerStore(repos: GeneralRepositories) {
         return [];
       } catch {
         return [];
+      }
+    },
+
+    getOne: async (id: string) => {
+      try {
+        const response = await repos.customers.getOne(id);
+        if (response.success && response.data) {
+          return mapCustomerDtoToEntity(response.data);
+        }
+        return null;
+      } catch {
+        return null;
+      }
+    },
+
+    getHistorySummary: async (id: string) => {
+      try {
+        const response = await repos.customers.getHistorySummary(id);
+        if (response.success && response.data) {
+          return mapCustomerHistorySummaryDtoToEntity(response.data);
+        }
+        return null;
+      } catch {
+        return null;
       }
     },
 

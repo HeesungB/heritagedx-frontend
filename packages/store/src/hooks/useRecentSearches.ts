@@ -54,6 +54,30 @@ function writeList(scope: string, list: RecentSearchItem[]) {
   }
 }
 
+// 같은 탭 내에서 push/remove/clear 가 다른 컴포넌트(예: Sidebar)에 즉시
+// 반영되도록 scope별 listener Set 을 모듈 수준에 둔다. localStorage 의
+// `storage` 이벤트는 cross-tab 만 동작하므로 별도 통지가 필요.
+const listenersByScope = new Map<string, Set<() => void>>();
+
+function notify(scope: string) {
+  const set = listenersByScope.get(scope);
+  if (!set) return;
+  set.forEach((fn) => fn());
+}
+
+function subscribe(scope: string, listener: () => void) {
+  let set = listenersByScope.get(scope);
+  if (!set) {
+    set = new Set();
+    listenersByScope.set(scope, set);
+  }
+  set.add(listener);
+  return () => {
+    set!.delete(listener);
+    if (set!.size === 0) listenersByScope.delete(scope);
+  };
+}
+
 export interface UseRecentSearchesResult {
   recents: RecentSearchItem[];
   push: (item: RecentSearchItem) => void;
@@ -66,6 +90,16 @@ export function useRecentSearches(scope: string, max = DEFAULT_MAX): UseRecentSe
 
   useEffect(() => {
     setRecents(readList(scope));
+    const unsub = subscribe(scope, () => setRecents(readList(scope)));
+    // 다른 탭에서의 변경도 반영
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === storageKey(scope)) setRecents(readList(scope));
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      unsub();
+      window.removeEventListener("storage", onStorage);
+    };
   }, [scope]);
 
   const push = useCallback(
@@ -74,29 +108,27 @@ export function useRecentSearches(scope: string, max = DEFAULT_MAX): UseRecentSe
       const value = item.value.trim();
       if (!label || !value) return;
       const next: RecentSearchItem = { label, value, kind: item.kind };
-      setRecents((prev) => {
-        const merged = [next, ...prev.filter((t) => t.value !== value)].slice(0, max);
-        writeList(scope, merged);
-        return merged;
-      });
+      const prev = readList(scope);
+      const merged = [next, ...prev.filter((t) => t.value !== value)].slice(0, max);
+      writeList(scope, merged);
+      notify(scope);
     },
     [scope, max],
   );
 
   const remove = useCallback(
     (value: string) => {
-      setRecents((prev) => {
-        const next = prev.filter((t) => t.value !== value);
-        writeList(scope, next);
-        return next;
-      });
+      const prev = readList(scope);
+      const next = prev.filter((t) => t.value !== value);
+      writeList(scope, next);
+      notify(scope);
     },
     [scope],
   );
 
   const clear = useCallback(() => {
-    setRecents([]);
     writeList(scope, []);
+    notify(scope);
   }, [scope]);
 
   return { recents, push, remove, clear };

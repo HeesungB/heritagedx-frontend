@@ -4,6 +4,7 @@ import type {
   ApprovalActionInput,
   Consultation,
   ConsultationInput,
+  ConsultationNoteInput,
   ConsultationsResponse,
 } from "@heritage-dx/types";
 import type { TradeListParams } from "../../types";
@@ -19,4 +20,12 @@ export interface IConsultationAdminRepository {
     id: string,
     body: ApprovalActionInput<AdminConsultationAction>,
   ): Promise<ApiResponse<Consultation>>;
+  // 메모 CRUD — 관리자는 모든 메모를 수정/삭제 가능 (작성자 제한 없음).
+  addNote(id: string, input: ConsultationNoteInput): Promise<ApiResponse<Consultation>>;
+  updateNote(
+    id: string,
+    noteId: string,
+    input: ConsultationNoteInput,
+  ): Promise<ApiResponse<Consultation>>;
+  deleteNote(id: string, noteId: string): Promise<ApiResponse<Consultation>>;
 }

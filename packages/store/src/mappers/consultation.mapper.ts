@@ -20,7 +20,9 @@ export function mapConsultationDtoToEntity(dto: Consultation): ConsultationEntit
     depositAmount: dto.depositAmount,
     accountNumber: dto.accountNumber ?? null,
     customFields: dto.customFields ?? {},
-    notes: dto.notes,
+    // notes 는 신규 JSONB 응답 ({entries:[...]}) 에서 entries 만 추출.
+    // 과거 string 응답이 일시적으로 섞여 들어와도 [] 로 흡수해 화면 크래시를 막는다.
+    notes: Array.isArray(dto.notes?.entries) ? dto.notes.entries : [],
     registrationDate: dto.registrationDate,
     tradeDate: dto.tradeDate,
     remarks: dto.remarks,
@@ -54,6 +56,9 @@ export function buildClubMembershipPair(args: {
   return { club: clubName ?? "", membership: membershipType ?? "" };
 }
 
+// PUT /consultations/:id 에서 notes 직접 수정이 금지되어 있어 update 페이로드에는 notes 를
+// 포함하지 않는다. 메모 변경은 별도 엔드포인트(POST/PATCH/DELETE /consultations/:id/notes)로
+// 수행하므로, 본 매퍼는 notes 를 일관되게 omit 한다.
 export function mapConsultationEntityToInput(
   entity: Partial<ConsultationEntity>,
 ): ConsultationInput {
@@ -75,7 +80,6 @@ export function mapConsultationEntityToInput(
     depositAmount: entity.depositAmount,
     accountNumber: entity.accountNumber,
     customFields: entity.customFields,
-    notes: entity.notes,
     registrationDate: entity.registrationDate,
     tradeDate: entity.tradeDate,
     remarks: entity.remarks,

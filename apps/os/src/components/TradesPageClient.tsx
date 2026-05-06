@@ -11,14 +11,11 @@ import {
   useFavoriteConsultations,
   useRecentSearches,
   canDeleteConsultation,
-  collectMissingConsultationApprovalFields,
   type ConsultationNoteEntry,
   type ApprovalStatus,
-  type ConsultationApprovalFillableField,
-  type ConsultationApprovalStructuralField,
   type RecentSearchItem,
 } from "@heritage-dx/store";
-import ApprovalRequirementsModal from "@/components/ApprovalRequirementsModal";
+import ApprovalRequestSheetModal from "@/components/approval/ApprovalRequestSheetModal";
 import Pill from "@/components/trades/Pill";
 import TypeBadge from "@/components/trades/TypeBadge";
 import FavoriteStar from "@/components/trades/FavoriteStar";
@@ -96,11 +93,7 @@ export default function TradesPageClient() {
   const [sortOrder, setSortOrder] = useState<"DESC" | "ASC">("DESC");
   const [filterApproval, setFilterApproval] = useState<ApprovalFilter>("");
   const [approvalPendingId, setApprovalPendingId] = useState<string | null>(null);
-  const [requirementsPrompt, setRequirementsPrompt] = useState<{
-    trade: MembershipTrade;
-    fillable: ConsultationApprovalFillableField[];
-  } | null>(null);
-  const [requirementsSubmitting, setRequirementsSubmitting] = useState(false);
+  const [approvalSheetTrade, setApprovalSheetTrade] = useState<MembershipTrade | null>(null);
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -216,34 +209,9 @@ export default function TradesPageClient() {
     }
   };
 
-  const handleRequestApproval = async (trade: MembershipTrade) => {
-    const { structural, fillable } = collectMissingConsultationApprovalFields(trade);
-    if (structural.length > 0) {
-      const labels: Record<ConsultationApprovalStructuralField, string> = {
-        tradeType: "거래 유형",
-        clubId: "골프장",
-        membershipId: "회원권",
-      };
-      setErrorMessage(`상담을 먼저 편집해서 ${structural.map((f) => labels[f]).join(", ")}를 선택해 주세요.`);
-      return;
-    }
-    if (fillable.length > 0) {
-      setRequirementsPrompt({ trade, fillable });
-      return;
-    }
-    setApprovalPendingId(trade.id);
-    try {
-      const result = await requestApproval(trade.id);
-      if (result.entity) return;
-      if (result.missingFillable && result.missingFillable.length > 0) {
-        const refreshed = rawTrades.find((t) => t.id === trade.id) ?? trade;
-        setRequirementsPrompt({ trade: refreshed as MembershipTrade, fillable: result.missingFillable });
-        return;
-      }
-      setErrorMessage(result.errorMessage || "승인 요청 실패");
-    } finally {
-      setApprovalPendingId(null);
-    }
+  // 승인 요청 pill 클릭 → 승인요청서 양식 모달 진입. 실제 API 호출은 모달 안에서 처리.
+  const handleOpenApprovalSheet = (trade: MembershipTrade) => {
+    setApprovalSheetTrade(trade);
   };
 
   const filters: TradeFilter[] = ["전체", "매수", "매도", "미정"];
@@ -688,7 +656,7 @@ export default function TradesPageClient() {
                                 <ApprovalPillButton
                                   status={trade.approvalStatus}
                                   pending={approvalPendingId === trade.id}
-                                  onRequest={() => handleRequestApproval(trade)}
+                                  onRequest={() => handleOpenApprovalSheet(trade)}
                                 />
                               </td>
                               <td className="px-2 py-2 align-middle">
@@ -802,42 +770,26 @@ export default function TradesPageClient() {
         }}
       />
 
-      <ApprovalRequirementsModal
-        isOpen={!!requirementsPrompt}
-        onClose={() => {
-          if (requirementsSubmitting) return;
-          setRequirementsPrompt(null);
-        }}
-        isSubmitting={requirementsSubmitting}
-        missingFillable={requirementsPrompt?.fillable ?? []}
-        initial={{
-          customerName: requirementsPrompt?.trade.customerName,
-          contact: requirementsPrompt?.trade.contact,
-          offerPrice: requirementsPrompt?.trade.offerPrice ?? null,
-          depositAmount: requirementsPrompt?.trade.depositAmount ?? null,
-        }}
-        onSubmit={async (patch) => {
-          if (!requirementsPrompt) return;
-          setRequirementsSubmitting(true);
-          setApprovalPendingId(requirementsPrompt.trade.id);
+      <ApprovalRequestSheetModal
+        trade={approvalSheetTrade}
+        isOpen={!!approvalSheetTrade}
+        onClose={() => setApprovalSheetTrade(null)}
+        onSubmit={async (trade, patch) => {
+          setApprovalPendingId(trade.id);
           try {
-            const result = await requestApproval(requirementsPrompt.trade.id, patch);
+            const result = await requestApproval(trade.id, patch);
             if (result.entity) {
-              setRequirementsPrompt(null);
-              return;
+              setApprovalSheetTrade(null);
+              return { success: true };
             }
             if (result.missingFillable && result.missingFillable.length > 0) {
-              const refreshed =
-                rawTrades.find((t) => t.id === requirementsPrompt.trade.id) ?? requirementsPrompt.trade;
-              setRequirementsPrompt({
-                trade: refreshed as MembershipTrade,
-                fillable: result.missingFillable,
-              });
-              return;
+              return {
+                success: false,
+                errorMessage: `다음 필드를 양식에 채워주세요: ${result.missingFillable.join(", ")}`,
+              };
             }
-            setErrorMessage(result.errorMessage || "승인 요청 실패");
+            return { success: false, errorMessage: result.errorMessage || "승인 요청 실패" };
           } finally {
-            setRequirementsSubmitting(false);
             setApprovalPendingId(null);
           }
         }}

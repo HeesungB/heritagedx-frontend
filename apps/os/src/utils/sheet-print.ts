@@ -79,6 +79,52 @@ export async function captureSheetAsJpeg(
 }
 
 /**
+ * 시트 element 에서 body 까지 올라가면서 각 ancestor 의 형제(시트 chain 에 속하지 않는 노드)에
+ * 인쇄 동안 inline `display: none !important` 를 부여한다.
+ * 모달처럼 페이지 본문 위에 떠 있는 컨텍스트에서도 시트만 인쇄되도록 한다.
+ *
+ * inline + !important 를 쓰는 이유: globals.css 의 `.flex:not(.print\:hidden)` 같은
+ * specificity 0,2,0 룰이 단순 attribute selector 룰을 이기는 경우가 있어서 우회.
+ * 반환된 스냅샷은 afterprint 에서 그대로 복원에 사용한다.
+ */
+interface PrintHideSnapshot {
+  node: HTMLElement;
+  origDisplay: string;
+  origPriority: string;
+}
+
+function hidePrintSiblings(element: HTMLElement): PrintHideSnapshot[] {
+  const hidden: PrintHideSnapshot[] = [];
+  let cur: HTMLElement | null = element;
+  while (cur && cur !== document.body) {
+    const parentEl: HTMLElement | null = cur.parentElement;
+    if (!parentEl) break;
+    for (const sib of Array.from(parentEl.children)) {
+      if (sib !== cur && sib instanceof HTMLElement) {
+        hidden.push({
+          node: sib,
+          origDisplay: sib.style.getPropertyValue("display"),
+          origPriority: sib.style.getPropertyPriority("display"),
+        });
+        sib.style.setProperty("display", "none", "important");
+      }
+    }
+    cur = parentEl;
+  }
+  return hidden;
+}
+
+function restorePrintSiblings(snapshots: PrintHideSnapshot[]): void {
+  for (const { node, origDisplay, origPriority } of snapshots) {
+    if (origDisplay) {
+      node.style.setProperty("display", origDisplay, origPriority);
+    } else {
+      node.style.removeProperty("display");
+    }
+  }
+}
+
+/**
  * 브라우저 인쇄 시 시트가 A4 한 장에 맞도록 zoom을 적용한다.
  * afterprint 이벤트에서 zoom을 복원한다.
  */
@@ -112,13 +158,17 @@ export function printSheetFitToPage(element: HTMLElement): void {
     element.style.zoom = String(scale);
   }
 
-  // 4. afterprint에서 zoom 복원
+  // 4. 시트 chain 외의 형제 노드 인쇄 동안 inline display:none 으로 숨김
+  const hidden = hidePrintSiblings(element);
+
+  // 5. afterprint에서 zoom + 형제 inline style 복원
   const restore = () => {
     element.style.zoom = "";
+    restorePrintSiblings(hidden);
     window.removeEventListener("afterprint", restore);
   };
   window.addEventListener("afterprint", restore);
 
-  // 5. 인쇄 실행
+  // 6. 인쇄 실행
   window.print();
 }

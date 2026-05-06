@@ -32,3 +32,11 @@ export type {
 } from "./useFavoriteConsultations";
 export { useRecentSearches } from "./useRecentSearches";
 export type { UseRecentSearchesResult, RecentSearchItem } from "./useRecentSearches";
+export { useFavoriteClubs } from "./useFavoriteClubs";
+export type {
+  UseFavoriteClubsResult,
+  FavoriteClubItem,
+  FavoriteClubMeta,
+} from "./useFavoriteClubs";
+export { useTopClubs } from "./useTopClubs";
+export type { UseTopClubsResult, TopClubLookupItem } from "./useTopClubs";

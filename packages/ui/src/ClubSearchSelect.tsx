@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { ChevronDown, X, Search } from "lucide-react";
+import { ChevronDown, X, Search, Star } from "lucide-react";
 
 export interface ClubSearchItem {
   code: string;
@@ -17,6 +17,10 @@ interface ClubSearchSelectProps {
   onChange: (code: string) => void;
   compact?: boolean;
   placeholder?: string;
+  topClubCodes?: string[];
+  isFavorite?: (code: string) => boolean;
+  onToggleFavorite?: (code: string, item: ClubSearchItem) => void;
+  onClubSelect?: (item: ClubSearchItem) => void;
 }
 
 export default function ClubSearchSelect({
@@ -25,6 +29,10 @@ export default function ClubSearchSelect({
   onChange,
   compact = false,
   placeholder = "전체 골프장",
+  topClubCodes,
+  isFavorite,
+  onToggleFavorite,
+  onClubSelect,
 }: ClubSearchSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -46,6 +54,14 @@ export default function ClubSearchSelect({
         (c.region && c.region.toLowerCase().includes(q)),
     );
   }, [clubs, search]);
+
+  const topItems = useMemo(() => {
+    if (search.trim() || !topClubCodes || topClubCodes.length === 0) return [];
+    const byCode = new Map(clubs.map((c) => [c.code, c]));
+    return topClubCodes
+      .map((code) => byCode.get(code))
+      .filter((c): c is ClubSearchItem => Boolean(c));
+  }, [clubs, topClubCodes, search]);
 
   // 외부 클릭 닫기
   useEffect(() => {
@@ -86,6 +102,73 @@ export default function ClubSearchSelect({
   const basePadding = compact ? "h-8 px-2.5" : "h-10 px-3";
   const baseWidth = compact ? "min-w-[140px]" : "min-w-[160px]";
   const iconSize = compact ? "w-3 h-3" : "w-3.5 h-3.5";
+
+  const handleSelect = (c: ClubSearchItem) => {
+    onChange(c.code);
+    onClubSelect?.(c);
+    setIsOpen(false);
+    setSearch("");
+  };
+
+  const renderRow = (c: ClubSearchItem) => {
+    const fav = isFavorite?.(c.code) ?? false;
+    return (
+      <div
+        key={c.code}
+        className={`flex items-center gap-1.5 px-3 py-2 hover:bg-gray-50 transition-colors ${
+          c.code === selectedClubCode
+            ? "bg-gray-100 font-medium text-gray-900"
+            : "text-gray-700"
+        }`}
+      >
+        <button
+          type="button"
+          onClick={() => handleSelect(c)}
+          className="flex-1 text-left min-w-0"
+        >
+          <div className="flex items-center gap-1">
+            <span className="text-sm truncate">{c.name}</span>
+            {c.operationTypes?.map((type) => (
+              <span
+                key={type}
+                className={`inline-flex px-1 py-0.5 text-[10px] font-medium rounded ${
+                  type === "MEMBERSHIP"
+                    ? "bg-blue-100 text-blue-700"
+                    : "bg-green-100 text-green-700"
+                }`}
+              >
+                {type === "MEMBERSHIP" ? "회원제" : type === "PUBLIC" ? "퍼블릭" : type}
+              </span>
+            ))}
+          </div>
+          {c.region && (
+            <div className="text-xs text-gray-400">
+              {c.region}
+              {c.holes ? ` · ${c.holes}` : ""}
+            </div>
+          )}
+        </button>
+        {onToggleFavorite && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFavorite(c.code, c);
+            }}
+            title={fav ? "즐겨찾기 해제" : "즐겨찾기"}
+            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-gray-100"
+          >
+            <Star
+              className={`h-3.5 w-3.5 ${fav ? "fill-amber-400 stroke-amber-500" : "stroke-gray-300"}`}
+              strokeWidth={1.8}
+            />
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  const topCodeSet = useMemo(() => new Set(topItems.map((c) => c.code)), [topItems]);
 
   return (
     <div ref={containerRef} className={`relative ${baseWidth}`}>
@@ -144,44 +227,22 @@ export default function ClubSearchSelect({
             >
               {placeholder}
             </button>
-            {filtered.map((c) => (
-              <button
-                key={c.code}
-                type="button"
-                onClick={() => {
-                  onChange(c.code);
-                  setIsOpen(false);
-                  setSearch("");
-                }}
-                className={`w-full text-left px-3 py-2 hover:bg-gray-50 transition-colors ${
-                  c.code === selectedClubCode
-                    ? "bg-gray-100 font-medium text-gray-900"
-                    : "text-gray-700"
-                }`}
-              >
-                <div className="flex items-center gap-1">
-                  <span className="text-sm">{c.name}</span>
-                  {c.operationTypes?.map((type) => (
-                    <span
-                      key={type}
-                      className={`inline-flex px-1 py-0.5 text-[10px] font-medium rounded ${
-                        type === "MEMBERSHIP"
-                          ? "bg-blue-100 text-blue-700"
-                          : "bg-green-100 text-green-700"
-                      }`}
-                    >
-                      {type === "MEMBERSHIP" ? "회원제" : type === "PUBLIC" ? "퍼블릭" : type}
-                    </span>
-                  ))}
+
+            {topItems.length > 0 && (
+              <>
+                <div className="px-3 pt-2 pb-1 text-[10px] font-medium tracking-[0.2px] text-gray-400">
+                  즐겨찾기 · 최근
                 </div>
-                {c.region && (
-                  <div className="text-xs text-gray-400">
-                    {c.region}{c.holes ? ` · ${c.holes}` : ""}
-                  </div>
-                )}
-              </button>
-            ))}
-            {filtered.length === 0 && (
+                {topItems.map(renderRow)}
+                <div className="my-1 border-t border-gray-100" />
+              </>
+            )}
+
+            {filtered
+              .filter((c) => !topCodeSet.has(c.code))
+              .map(renderRow)}
+
+            {filtered.length === 0 && topItems.length === 0 && (
               <div className="px-3 py-4 text-sm text-gray-400 text-center">
                 검색 결과 없음
               </div>

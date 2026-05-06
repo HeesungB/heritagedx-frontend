@@ -113,6 +113,8 @@ export {
   useCustomers,
   useFavoriteConsultations,
   useRecentSearches,
+  useFavoriteClubs,
+  useTopClubs,
 } from "./hooks";
 export type {
   ScenarioOptionsData,
@@ -123,6 +125,11 @@ export type {
   UseFavoriteConsultationsResult,
   UseRecentSearchesResult,
   RecentSearchItem,
+  UseFavoriteClubsResult,
+  FavoriteClubItem,
+  FavoriteClubMeta,
+  UseTopClubsResult,
+  TopClubLookupItem,
 } from "./hooks";
 
 // Auth domain

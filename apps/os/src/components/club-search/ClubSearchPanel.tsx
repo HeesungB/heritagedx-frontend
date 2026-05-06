@@ -1,8 +1,8 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
-import { Search, MapPin, Phone } from "lucide-react";
-import { useClubs } from "@heritage-dx/store";
+import { Search, MapPin, Phone, Star } from "lucide-react";
+import { useClubs, useTopClubs } from "@heritage-dx/store";
 import type { ClubEntity } from "@heritage-dx/store";
 import { useAppStores } from "@/stores";
 import {
@@ -82,50 +82,74 @@ function Badge({
 function ClubCard({
   club,
   onSelect,
+  isFavorite,
+  onToggleFavorite,
 }: {
   club: ClubEntity;
   onSelect?: (code: string) => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
 }) {
   const group = getRegionGroup(club.region);
   const operationType = club.operationTypes[0];
   const operationLabel = operationType ? getOperationLabel(operationType) : "";
   const addressText = club.address || club.region;
   return (
-    <button
-      type="button"
-      onClick={() => onSelect?.(club.code)}
-      className="group rounded-[10px] border border-[#e2e8f0] bg-white p-3.5 text-left transition duration-150 hover:-translate-y-px hover:shadow-[0_4px_14px_0_rgba(15,23,43,0.06)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#101828]"
-    >
-      <div className="flex flex-wrap items-center gap-1.5">
-        {group.label && <Badge>{group.label}</Badge>}
-        {operationLabel && (
-          <Badge tone={getOperationTone(operationLabel)}>{operationLabel}</Badge>
-        )}
-        {club.holes && <Badge>{club.holes}</Badge>}
-      </div>
-
-      <h3
-        title={club.name}
-        className="mt-2 truncate text-[15px] font-bold leading-[20px] tracking-[-0.01em] text-[#0f172b]"
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => onSelect?.(club.code)}
+        className="group block w-full rounded-[10px] border border-[#e2e8f0] bg-white p-3.5 text-left transition duration-150 hover:-translate-y-px hover:shadow-[0_4px_14px_0_rgba(15,23,43,0.06)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#101828]"
       >
-        {club.name}
-      </h3>
+        <div className="flex flex-wrap items-center gap-1.5 pr-7">
+          {group.label && <Badge>{group.label}</Badge>}
+          {operationLabel && (
+            <Badge tone={getOperationTone(operationLabel)}>{operationLabel}</Badge>
+          )}
+          {club.holes && <Badge>{club.holes}</Badge>}
+        </div>
 
-      <div className="mt-2 flex flex-col gap-1.5 text-[12px] leading-[17px] tracking-[-0.005em] text-[#62748e]">
-        {addressText && (
-          <p className="flex items-center gap-1.5">
-            <MapPin className="h-3.5 w-3.5 shrink-0 text-[#90a1b9]" strokeWidth={1.5} />
-            <span className="truncate">{addressText}</span>
-          </p>
-        )}
-        {club.contact && (
-          <p className="flex items-center gap-1.5">
-            <Phone className="h-3.5 w-3.5 shrink-0 text-[#90a1b9]" strokeWidth={1.5} />
-            <span className="truncate">{club.contact}</span>
-          </p>
-        )}
-      </div>
-    </button>
+        <h3
+          title={club.name}
+          className="mt-2 truncate text-[15px] font-bold leading-[20px] tracking-[-0.01em] text-[#0f172b]"
+        >
+          {club.name}
+        </h3>
+
+        <div className="mt-2 flex flex-col gap-1.5 text-[12px] leading-[17px] tracking-[-0.005em] text-[#62748e]">
+          {addressText && (
+            <p className="flex items-center gap-1.5">
+              <MapPin className="h-3.5 w-3.5 shrink-0 text-[#90a1b9]" strokeWidth={1.5} />
+              <span className="truncate">{addressText}</span>
+            </p>
+          )}
+          {club.contact && (
+            <p className="flex items-center gap-1.5">
+              <Phone className="h-3.5 w-3.5 shrink-0 text-[#90a1b9]" strokeWidth={1.5} />
+              <span className="truncate">{club.contact}</span>
+            </p>
+          )}
+        </div>
+      </button>
+      {onToggleFavorite && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleFavorite();
+          }}
+          title={isFavorite ? "즐겨찾기 해제" : "즐겨찾기"}
+          className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-md bg-white/80 backdrop-blur-sm transition-colors hover:bg-gray-100"
+        >
+          <Star
+            className={`h-4 w-4 ${
+              isFavorite ? "fill-amber-400 stroke-amber-500" : "stroke-gray-300"
+            }`}
+            strokeWidth={1.8}
+          />
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -139,6 +163,25 @@ export default function ClubSearchPanel({
   const [keyword, setKeyword] = useState("");
   const [region, setRegion] = useState<RegionKey>("ALL");
   const [selectedInitial, setSelectedInitial] = useState<string | null>(null);
+
+  const { topClubCodes, isFavorite, toggleFavorite, trackSelection } =
+    useTopClubs(clubs, 5);
+
+  const topClubs = useMemo(() => {
+    const byCode = new Map(clubs.map((c) => [c.code, c]));
+    return topClubCodes
+      .map((code) => byCode.get(code))
+      .filter((c): c is ClubEntity => Boolean(c));
+  }, [clubs, topClubCodes]);
+
+  const hasActiveFilter =
+    Boolean(keyword.trim()) || region !== "ALL" || selectedInitial !== null;
+
+  const handleSelect = (code: string) => {
+    const club = clubs.find((c) => c.code === code);
+    if (club) trackSelection({ code: club.code, name: club.name });
+    onSelect?.(code);
+  };
 
   const initialsWithClubs = useMemo(() => {
     const set = new Set<string>();
@@ -241,6 +284,37 @@ export default function ClubSearchPanel({
         })}
       </div>
 
+      {!hasActiveFilter && topClubs.length > 0 && (
+        <div className="mt-4">
+          <div className="mb-2 flex items-center gap-1.5">
+            <Star className="h-3.5 w-3.5 fill-amber-400 stroke-amber-500" strokeWidth={1.8} />
+            <p className="text-[13px] font-bold leading-[18px] tracking-[-0.012em] text-[#0f172b]">
+              즐겨찾기 · 최근
+            </p>
+            <span className="text-[11px] leading-[16px] text-[#90a1b9]">
+              {topClubs.length}건
+            </span>
+          </div>
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+            {topClubs.map((club) => (
+              <ClubCard
+                key={`top-${club.code}`}
+                club={club}
+                onSelect={handleSelect}
+                isFavorite={isFavorite(club.code)}
+                onToggleFavorite={() =>
+                  toggleFavorite(club.code, {
+                    name: club.name,
+                    region: club.region,
+                    holes: club.holes,
+                  })
+                }
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="mt-3.5 flex items-center justify-between">
         <p className="text-[14px] font-bold leading-[20px] tracking-[-0.012em] text-[#0f172b]">
           전체 목록 {filtered.length}건
@@ -259,10 +333,23 @@ export default function ClubSearchPanel({
       ) : (
         <div className="mt-2.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {filtered.map((club) => (
-            <ClubCard key={club.code} club={club} onSelect={onSelect} />
+            <ClubCard
+              key={club.code}
+              club={club}
+              onSelect={handleSelect}
+              isFavorite={isFavorite(club.code)}
+              onToggleFavorite={() =>
+                toggleFavorite(club.code, {
+                  name: club.name,
+                  region: club.region,
+                  holes: club.holes,
+                })
+              }
+            />
           ))}
         </div>
       )}
     </section>
   );
 }
+

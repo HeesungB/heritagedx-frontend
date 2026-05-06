@@ -39,6 +39,7 @@ import type {
 import {
   buildClubMembershipPair,
   canDeleteConsultation,
+  useTopClubs,
   type ApprovalStatus,
 } from "@heritage-dx/store";
 import { useAuth } from "@/contexts/AuthContext";
@@ -144,6 +145,15 @@ export default function ConsultationsPage() {
     const clubNames = new Set(rawMemos.map((m) => m.clubName).filter(Boolean));
     return clubs.filter((c) => clubNames.has(c.name));
   }, [clubs, rawMemos]);
+
+  // 골프장 즐겨찾기·최근 본 — 필터 / 폼 양쪽 picker 에 동일하게 노출
+  const {
+    topClubCodes: topClubCodesFilter,
+    isFavorite: isClubFavorite,
+    toggleFavorite: toggleClubFavorite,
+    trackSelection: trackClubSelection,
+  } = useTopClubs(availableClubs, 5);
+  const { topClubCodes: topClubCodesForm } = useTopClubs(clubs, 5);
 
   // 골프장 선택 변경 시 회원권 목록 로드
   useEffect(() => {
@@ -703,6 +713,12 @@ export default function ConsultationsPage() {
               clubs={availableClubs}
               selectedClubCode={selectedClubCode}
               onChange={(code) => { setSelectedClubCode(code); setSelectedMembership(""); }}
+              topClubCodes={topClubCodesFilter}
+              isFavorite={isClubFavorite}
+              onToggleFavorite={(code, item) =>
+                toggleClubFavorite(code, { name: item.name, region: item.region, holes: item.holes })
+              }
+              onClubSelect={(item) => trackClubSelection({ code: item.code, name: item.name })}
             />
             <select
               value={selectedMembership}
@@ -932,6 +948,12 @@ export default function ConsultationsPage() {
                       setManualMembershipInput(false);
                     }
                   }}
+                  topClubCodes={topClubCodesForm}
+                  isFavorite={isClubFavorite}
+                  onToggleFavorite={(code, item) =>
+                    toggleClubFavorite(code, { name: item.name, region: item.region, holes: item.holes })
+                  }
+                  onClubSelect={(item) => trackClubSelection({ code: item.code, name: item.name })}
                   placeholder="골프장 선택"
                 />
                 <button

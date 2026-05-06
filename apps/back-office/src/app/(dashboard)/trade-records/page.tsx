@@ -29,7 +29,7 @@ import {
 import { useMembershipTradeAdminRepository, useClubRepository } from "@heritage-dx/api";
 import type { MembershipTrade, Club, Pagination } from "@heritage-dx/types";
 import type { WorkflowStatus } from "@heritage-dx/store";
-import { canDeleteTrade } from "@heritage-dx/store";
+import { canDeleteTrade, useTopClubs } from "@heritage-dx/store";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import { StatusBadge } from "@/components/approval/StatusBadge";
@@ -94,6 +94,15 @@ export default function MembershipTradesPage() {
     const clubNames = new Set(rawRecords.map((r) => r.clubName).filter(Boolean));
     return clubs.filter((c) => clubNames.has(c.name));
   }, [clubs, rawRecords]);
+
+  // 골프장 즐겨찾기·최근 본 — 필터 / 폼 양쪽 picker 에 동일하게 노출
+  const {
+    topClubCodes: topClubCodesFilter,
+    isFavorite: isClubFavorite,
+    toggleFavorite: toggleClubFavorite,
+    trackSelection: trackClubSelection,
+  } = useTopClubs(availableClubs, 5);
+  const { topClubCodes: topClubCodesForm } = useTopClubs(clubs, 5);
 
   // 골프장 선택 변경 시 회원권 목록 로드
   useEffect(() => {
@@ -538,6 +547,12 @@ export default function MembershipTradesPage() {
               clubs={availableClubs}
               selectedClubCode={selectedClubCode}
               onChange={(code) => { setSelectedClubCode(code); setSelectedMembership(""); }}
+              topClubCodes={topClubCodesFilter}
+              isFavorite={isClubFavorite}
+              onToggleFavorite={(code, item) =>
+                toggleClubFavorite(code, { name: item.name, region: item.region, holes: item.holes })
+              }
+              onClubSelect={(item) => trackClubSelection({ code: item.code, name: item.name })}
             />
             <select
               value={selectedMembership}
@@ -746,6 +761,12 @@ export default function MembershipTradesPage() {
                 setFormMemberships([]);
                 setForm((f) => ({ ...f, membershipName: "" }));
               }}
+              topClubCodes={topClubCodesForm}
+              isFavorite={isClubFavorite}
+              onToggleFavorite={(code, item) =>
+                toggleClubFavorite(code, { name: item.name, region: item.region, holes: item.holes })
+              }
+              onClubSelect={(item) => trackClubSelection({ code: item.code, name: item.name })}
               placeholder="골프장 선택"
             />
           </div>

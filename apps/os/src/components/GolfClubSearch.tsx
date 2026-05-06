@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
+import { Star } from "lucide-react";
 import SearchInput from "./SearchInput";
 import GolfClubTable from "./GolfClubTable";
 import GolfClubDetail from "./GolfClubDetail";
 import OperatorNotice from "./OperatorNotice";
 import { Club, ClubDetail } from "@/types";
 import { useAppStores } from "@/stores";
-import { useClubs, useClubDetail } from "@heritage-dx/store";
+import { useClubs, useClubDetail, useTopClubs } from "@heritage-dx/store";
 import { Loading } from "@heritage-dx/ui";
 import { trackEvent } from "@/lib/gtag";
 
@@ -28,6 +29,15 @@ export default function GolfClubSearch({ onClubConfirm, onReset }: GolfClubSearc
 
   const detailRef = useRef<HTMLDivElement>(null);
 
+  const { topClubCodes, isFavorite, toggleFavorite, trackSelection } =
+    useTopClubs(clubs, 5);
+  const topClubs = useMemo(() => {
+    const byCode = new Map(clubs.map((c) => [c.code, c]));
+    return topClubCodes
+      .map((code) => byCode.get(code))
+      .filter((c): c is Club => Boolean(c));
+  }, [clubs, topClubCodes]);
+
   const filteredClubs = clubs.filter((club) => {
     if (!club.name?.trim()) return false;
     const query = searchQuery.toLowerCase();
@@ -41,6 +51,7 @@ export default function GolfClubSearch({ onClubConfirm, onReset }: GolfClubSearc
   const handleSelect = (club: Club) => {
     setSelectedClub(club);
     setSelectedCode(club.code);
+    trackSelection({ code: club.code, name: club.name });
     trackEvent("club_search", { club_name: club.name });
     // 디테일 섹션으로 스크롤 이동
     setTimeout(() => {
@@ -67,6 +78,58 @@ export default function GolfClubSearch({ onClubConfirm, onReset }: GolfClubSearc
       <div className="mb-6">
         <SearchInput value={searchQuery} onChange={setSearchQuery} />
       </div>
+
+      {!searchQuery && topClubs.length > 0 && (
+        <div className="mb-5">
+          <div className="mb-2 flex items-center gap-1.5">
+            <Star className="h-3.5 w-3.5 fill-amber-400 stroke-amber-500" strokeWidth={1.8} />
+            <span className="text-sm font-semibold text-gray-700">즐겨찾기 · 최근</span>
+            <span className="text-xs text-gray-400">{topClubs.length}건</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {topClubs.map((club) => {
+              const fav = isFavorite(club.code);
+              return (
+                <div
+                  key={`top-${club.code}`}
+                  className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 pl-3 pr-1 py-1 text-sm hover:border-gray-300 hover:bg-white"
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleSelect(club)}
+                    className="text-gray-700 hover:text-gray-900"
+                  >
+                    {club.name}
+                    {club.region && (
+                      <span className="ml-1.5 text-xs text-gray-400">{club.region}</span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFavorite(club.code, {
+                        name: club.name,
+                        region: club.region,
+                        holes: club.holes,
+                      });
+                    }}
+                    title={fav ? "즐겨찾기 해제" : "즐겨찾기"}
+                    className="inline-flex h-6 w-6 items-center justify-center rounded-full hover:bg-gray-100"
+                  >
+                    <Star
+                      className={`h-3.5 w-3.5 ${
+                        fav ? "fill-amber-400 stroke-amber-500" : "stroke-gray-300"
+                      }`}
+                      strokeWidth={1.8}
+                    />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="py-8 flex justify-center"><Loading text="로딩 중..." /></div>
@@ -95,3 +158,4 @@ export default function GolfClubSearch({ onClubConfirm, onReset }: GolfClubSearc
     </div>
   );
 }
+

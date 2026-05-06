@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, ChevronDown } from "lucide-react";
+import { Search, ChevronDown, Star } from "lucide-react";
+import { useTopClubs } from "@heritage-dx/store";
 import type { Club } from "@/types";
 import {
   INITIALS,
@@ -113,6 +114,33 @@ export default function ClubSwitcher({
   const hasActiveFilter =
     Boolean(query.trim()) || region !== "ALL" || selectedInitial !== null;
 
+  const { topClubCodes, isFavorite, toggleFavorite, trackSelection } =
+    useTopClubs(clubs, 5);
+  const topClubs = useMemo(() => {
+    const byCode = new Map(clubs.map((c) => [c.code, c]));
+    return topClubCodes
+      .map((code) => byCode.get(code))
+      .filter((c): c is Club => Boolean(c));
+  }, [clubs, topClubCodes]);
+
+  const handleSelect = (c: Club) => {
+    if (c.code === currentClub.code) {
+      setOpen(false);
+      return;
+    }
+    trackSelection({ code: c.code, name: c.name });
+    onSelect(c.code);
+    setOpen(false);
+  };
+
+  const handleToggleFavorite = (c: Club) => {
+    toggleFavorite(c.code, {
+      name: c.name,
+      region: c.region,
+      holes: c.holes,
+    });
+  };
+
   return (
     <div ref={ref} className="relative">
       <button
@@ -201,6 +229,31 @@ export default function ClubSwitcher({
             </div>
           </div>
 
+          {!hasActiveFilter && topClubs.length > 0 && (
+            <div className="border-b border-[#f3f4f6] px-3 py-2.5">
+              <p className="mb-1.5 flex items-center gap-1 text-[10px] font-medium tracking-[0.2px] text-[#99a1af]">
+                <Star className="h-3 w-3 fill-amber-400 stroke-amber-500" strokeWidth={1.8} />
+                즐겨찾기 · 최근
+              </p>
+              <div className="flex flex-col gap-0.5">
+                {topClubs.map((c) => {
+                  const isCurrent = c.code === currentClub.code;
+                  const fav = isFavorite(c.code);
+                  return (
+                    <ClubRow
+                      key={`top-${c.code}`}
+                      club={c}
+                      isCurrent={isCurrent}
+                      isFavorite={fav}
+                      onSelect={() => handleSelect(c)}
+                      onToggleFavorite={() => handleToggleFavorite(c)}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between px-3 py-2 text-[11px] text-[#99a1af]">
             <span>{hasActiveFilter ? "검색 결과" : "전체 골프장"}</span>
             <span>{filtered.length}개</span>
@@ -214,38 +267,76 @@ export default function ClubSwitcher({
             ) : (
               filtered.map((c) => {
                 const isCurrent = c.code === currentClub.code;
+                const fav = isFavorite(c.code);
                 return (
-                  <button
+                  <ClubRow
                     key={c.code}
-                    type="button"
-                    onClick={() => {
-                      if (!isCurrent) onSelect(c.code);
-                      setOpen(false);
-                    }}
-                    className={`flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left transition-colors hover:bg-gray-50 ${
-                      isCurrent ? "bg-gray-50" : ""
-                    }`}
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-[13px] font-semibold text-[#101828]">
-                        {c.name}
-                      </p>
-                      <p className="mt-0.5 truncate text-[11px] text-[#6a7282]">
-                        {[c.region, c.holes].filter(Boolean).join(" · ") || "-"}
-                      </p>
-                    </div>
-                    {isCurrent && (
-                      <span className="ml-2 shrink-0 text-[11px] font-medium text-[#6a7282]">
-                        현재
-                      </span>
-                    )}
-                  </button>
+                    club={c}
+                    isCurrent={isCurrent}
+                    isFavorite={fav}
+                    onSelect={() => handleSelect(c)}
+                    onToggleFavorite={() => handleToggleFavorite(c)}
+                  />
                 );
               })
             )}
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function ClubRow({
+  club,
+  isCurrent,
+  isFavorite,
+  onSelect,
+  onToggleFavorite,
+}: {
+  club: Club;
+  isCurrent: boolean;
+  isFavorite: boolean;
+  onSelect: () => void;
+  onToggleFavorite: () => void;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-1 rounded-md px-2.5 py-2 transition-colors hover:bg-gray-50 ${
+        isCurrent ? "bg-gray-50" : ""
+      }`}
+    >
+      <button
+        type="button"
+        onClick={onSelect}
+        className="flex flex-1 min-w-0 items-center justify-between text-left"
+      >
+        <div className="min-w-0">
+          <p className="truncate text-[13px] font-semibold text-[#101828]">{club.name}</p>
+          <p className="mt-0.5 truncate text-[11px] text-[#6a7282]">
+            {[club.region, club.holes].filter(Boolean).join(" · ") || "-"}
+          </p>
+        </div>
+        {isCurrent && (
+          <span className="ml-2 shrink-0 text-[11px] font-medium text-[#6a7282]">현재</span>
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleFavorite();
+        }}
+        title={isFavorite ? "즐겨찾기 해제" : "즐겨찾기"}
+        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-gray-100"
+      >
+        <Star
+          className={`h-3.5 w-3.5 ${
+            isFavorite ? "fill-amber-400 stroke-amber-500" : "stroke-gray-300"
+          }`}
+          strokeWidth={1.8}
+        />
+      </button>
     </div>
   );
 }

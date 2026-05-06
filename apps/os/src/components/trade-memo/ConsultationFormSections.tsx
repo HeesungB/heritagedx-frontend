@@ -2,6 +2,7 @@
 
 import { useMemo, type ReactNode } from "react";
 import { ClubSearchSelect, type ClubSearchItem } from "@heritage-dx/ui";
+import { useTopClubs } from "@heritage-dx/store";
 import type { ClubDetail, MembershipTradeForm } from "@/types";
 import CustomerAutocomplete from "@/components/CustomerAutocomplete";
 import MatchedCustomerCard from "@/components/trade-memo/MatchedCustomerCard";
@@ -50,6 +51,9 @@ export default function ConsultationFormSections({
 }: ConsultationFormSectionsProps) {
   // 동일 membershipName 이 여러 건 들어오는 경우(API 데이터 특성) key 충돌이 나지 않도록
   // name 기준 dedup 한 옵션 목록을 만든다. 첫 번째 매칭의 id 를 대표 id 로 사용.
+  const { topClubCodes, isFavorite, toggleFavorite, trackSelection } =
+    useTopClubs(clubs, 5);
+
   const membershipOptions = useMemo(() => {
     const seen = new Map<string, { id: string | null; name: string }>();
     for (const m of clubDetail?.memberships ?? []) {
@@ -122,6 +126,18 @@ export default function ConsultationFormSections({
                           setManualMembershipInput(false);
                         }
                       }}
+                      topClubCodes={topClubCodes}
+                      isFavorite={isFavorite}
+                      onToggleFavorite={(code, item) =>
+                        toggleFavorite(code, {
+                          name: item.name,
+                          region: item.region,
+                          holes: item.holes,
+                        })
+                      }
+                      onClubSelect={(item) =>
+                        trackSelection({ code: item.code, name: item.name })
+                      }
                       placeholder="골프장 검색"
                     />
                   </div>

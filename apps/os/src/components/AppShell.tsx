@@ -44,7 +44,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="flex min-w-0 flex-1 flex-col">
           <AppHeader onMenuClick={() => setMobileOpen(true)} />
-          <main className="flex-1">{children}</main>
+          <main className="flex flex-1 flex-col">{children}</main>
         </div>
       </div>
     </HeaderActionsProvider>

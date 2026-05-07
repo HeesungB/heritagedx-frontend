@@ -6,11 +6,12 @@ import { ChevronDown } from "lucide-react";
 import { useAppStores } from "@/stores";
 import {
   getCustomerGradeLabel,
+  mapConsultationDtoToEntity,
   useCustomers,
+  type ConsultationEntity,
   type CustomerEntity,
 } from "@heritage-dx/store";
 import { useConsultationRepository } from "@heritage-dx/api";
-import type { Consultation } from "@heritage-dx/types";
 import { StatusBadge } from "@/components/approval/StatusBadge";
 
 interface Props {
@@ -29,7 +30,7 @@ export default function MatchedCustomerCard({ customerId }: Props) {
   const [open, setOpen] = useState(true);
   const [tab, setTab] = useState<TabKey>("info");
   const [customer, setCustomer] = useState<CustomerEntity | null>(null);
-  const [consultations, setConsultations] = useState<Consultation[]>([]);
+  const [consultations, setConsultations] = useState<ConsultationEntity[]>([]);
   const [historyTotal, setHistoryTotal] = useState(0);
   const [loading, setLoading] = useState(false);
 
@@ -59,7 +60,7 @@ export default function MatchedCustomerCard({ customerId }: Props) {
       if (cancelled) return;
       if (nextCustomer) setCustomer(nextCustomer);
       if (response.success && response.data) {
-        setConsultations(response.data.trades);
+        setConsultations(response.data.trades.map(mapConsultationDtoToEntity));
         setHistoryTotal(
           response.data.pagination?.total ?? response.data.trades.length,
         );
@@ -263,7 +264,7 @@ function HistoryTab({
   total,
 }: {
   customerId: string;
-  items: Consultation[];
+  items: ConsultationEntity[];
   total: number;
 }) {
   if (items.length === 0) {
@@ -300,7 +301,7 @@ function HistoryTab({
                 )}
               </div>
               <div className="mt-0.5 flex items-center gap-1.5 text-[11.5px] leading-[1.55] text-[#52525b]">
-                <span>{h.membershipName}</span>
+                <span>{h.membershipType}</span>
                 <span className="text-[#d4d4d8]">·</span>
                 <StatusBadge status={h.approvalStatus} />
               </div>

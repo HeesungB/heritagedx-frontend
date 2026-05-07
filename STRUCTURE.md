@@ -967,9 +967,13 @@ heritage-dx/
 ├── apps/os/Dockerfile                # OS 앱 Docker 빌드
 ├── apps/back-office/Dockerfile       # Back Office 앱 Docker 빌드
 ├── .dockerignore                     # Docker 빌드 제외 파일
-├── .github/workflows/ci.yml         # PR · 비-main push 시 lint/type-check/build (1-5)
+├── .github/workflows/ci.yml         # 모든 push + main 대상 PR 에서 lint/type-check/build (concurrency 그룹으로 중복 취소)
 └── .github/workflows/deploy.yml     # main 푸시 시 Cloud Run 배포
 ```
+
+### Git Hook (husky)
+
+`.husky/pre-push` 가 `main` 브랜치 직접 push 를 차단한다 — 모든 변경은 PR 을 통해서만 머지. 우회가 꼭 필요한 경우(예: hook 자체 수정) `git push --no-verify` 사용. `pnpm install` 시 root `prepare` 스크립트가 husky 를 자동 활성화하므로 팀원이 별도 설정할 필요 없음.
 
 | 항목 | OS | Back Office |
 |------|-----|-------------|

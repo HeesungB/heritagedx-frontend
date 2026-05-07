@@ -1,6 +1,6 @@
 import { createStore } from "zustand/vanilla";
 import type { GeneralRepositories, TradeListParams } from "@heritage-dx/api";
-import type { ConsultationInput } from "@heritage-dx/types";
+import type { ConsultationInput, ConsultationNoteEntry } from "@heritage-dx/types";
 import { APPROVAL_ACTIONS } from "@heritage-dx/types";
 import type { FetchStatus, PaginationState } from "../entities/common";
 import type {
@@ -58,6 +58,27 @@ export interface ConsultationStoreState {
     },
   ) => Promise<RequestApprovalResult>;
   hydrate: (items: ConsultationEntity[], pagination: PaginationState) => void;
+}
+
+// 메모 CRUD 응답은 `{notes: {entries: [...]}}` 부분 응답이라 entity 를 통째로 재생성하면
+// 다른 필드(거래유형/골프장/고객 등)가 모두 undefined 가 된다. 기존 item 을 보존한 채
+// notes 만 patch 하고, 갱신된 entity 를 반환한다.
+function mergeNotesIntoItem(
+  set: (
+    fn: (state: ConsultationStoreState) => Partial<ConsultationStoreState>,
+  ) => void,
+  get: () => ConsultationStoreState,
+  id: string,
+  entries: ConsultationNoteEntry[] | undefined,
+): ConsultationEntity | null {
+  const next = entries ?? [];
+  const now = new Date().toISOString();
+  set((s) => ({
+    items: s.items.map((item) =>
+      item.id === id ? { ...item, notes: next, updatedAt: now } : item,
+    ),
+  }));
+  return get().items.find((item) => item.id === id) ?? null;
 }
 
 export function createConsultationStore(repos: GeneralRepositories) {
@@ -161,11 +182,7 @@ export function createConsultationStore(repos: GeneralRepositories) {
       try {
         const response = await repos.consultations.addNote(id, { content: trimmed });
         if (!response.success || !response.data) return null;
-        const entity = mapConsultationDtoToEntity(response.data);
-        set((s) => ({
-          items: s.items.map((item) => (item.id === id ? entity : item)),
-        }));
-        return entity;
+        return mergeNotesIntoItem(set, get, id, response.data.notes?.entries);
       } catch {
         return null;
       }
@@ -179,11 +196,7 @@ export function createConsultationStore(repos: GeneralRepositories) {
           content: trimmed,
         });
         if (!response.success || !response.data) return null;
-        const entity = mapConsultationDtoToEntity(response.data);
-        set((s) => ({
-          items: s.items.map((item) => (item.id === id ? entity : item)),
-        }));
-        return entity;
+        return mergeNotesIntoItem(set, get, id, response.data.notes?.entries);
       } catch {
         return null;
       }
@@ -193,11 +206,7 @@ export function createConsultationStore(repos: GeneralRepositories) {
       try {
         const response = await repos.consultations.deleteNote(id, noteId);
         if (!response.success || !response.data) return null;
-        const entity = mapConsultationDtoToEntity(response.data);
-        set((s) => ({
-          items: s.items.map((item) => (item.id === id ? entity : item)),
-        }));
-        return entity;
+        return mergeNotesIntoItem(set, get, id, response.data.notes?.entries);
       } catch {
         return null;
       }

@@ -61,6 +61,7 @@ export type {
   ConsultationNoteEntry,
   ConsultationNotes,
   ConsultationNoteInput,
+  ConsultationNotesData,
   MembershipTrade,
   MembershipTradesResponse,
   MembershipTradeInput,

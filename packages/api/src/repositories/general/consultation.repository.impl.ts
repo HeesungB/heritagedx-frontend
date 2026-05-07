@@ -7,6 +7,7 @@ import type {
   ConsultationAiResponse,
   ConsultationInput,
   ConsultationNoteInput,
+  ConsultationNotesData,
   ConsultationsResponse,
   UserConsultationAction,
 } from "@heritage-dx/types";
@@ -71,16 +72,19 @@ export class ConsultationRepository implements IConsultationRepository {
   async addNote(
     id: string,
     input: ConsultationNoteInput,
-  ): Promise<ApiResponse<Consultation>> {
-    return this.api.post<Consultation>(`/consultations/${id}/notes`, input);
+  ): Promise<ApiResponse<ConsultationNotesData>> {
+    return this.api.post<ConsultationNotesData>(
+      `/consultations/${id}/notes`,
+      input,
+    );
   }
 
   async updateNote(
     id: string,
     noteId: string,
     input: ConsultationNoteInput,
-  ): Promise<ApiResponse<Consultation>> {
-    return this.api.patch<Consultation>(
+  ): Promise<ApiResponse<ConsultationNotesData>> {
+    return this.api.patch<ConsultationNotesData>(
       `/consultations/${id}/notes/${noteId}`,
       input,
     );
@@ -89,7 +93,9 @@ export class ConsultationRepository implements IConsultationRepository {
   async deleteNote(
     id: string,
     noteId: string,
-  ): Promise<ApiResponse<Consultation>> {
-    return this.api.delete<Consultation>(`/consultations/${id}/notes/${noteId}`);
+  ): Promise<ApiResponse<ConsultationNotesData>> {
+    return this.api.delete<ConsultationNotesData>(
+      `/consultations/${id}/notes/${noteId}`,
+    );
   }
 }

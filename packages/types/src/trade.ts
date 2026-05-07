@@ -25,6 +25,13 @@ export interface ConsultationNoteInput {
   content: string;
 }
 
+// POST/PATCH/DELETE /consultations/:id/notes[/:noteId] 응답 — 갱신된 notes 만 반환.
+// 다른 mutation 들과 달리 전체 Consultation 이 아니라 notes 한 필드만 돌아오므로
+// store 는 기존 entity 의 다른 필드를 보존하면서 notes 만 patch 해야 한다.
+export interface ConsultationNotesData {
+  notes: ConsultationNotes;
+}
+
 // 상담 (OpenAPI ConsultationResponseDto)
 export interface Consultation {
   id: string;

@@ -6,6 +6,7 @@ import { ChevronDown } from "lucide-react";
 import { useCustomerRepository } from "@heritage-dx/api";
 import {
   getCustomerGradeLabel,
+  getOwnedMembershipStatusLabel,
   mapCustomerDtoToEntity,
   mapCustomerHistorySummaryDtoToEntity,
   type CustomerEntity,
@@ -227,8 +228,17 @@ function InfoTab({
   );
 }
 
+const OWNED_MEMBERSHIP_STATUS_BADGE: Record<string, string> = {
+  OWNED: "bg-[#dcfce7] text-[#166534]",
+  SELLING: "bg-[#fef3c7] text-[#92400e]",
+  TRANSFER_PENDING: "bg-[#dbeafe] text-[#1e3a8a]",
+  SOLD: "bg-[#e5e7eb] text-[#374151]",
+  UNKNOWN: "bg-[#f3f4f6] text-[#6b7280]",
+};
+
 function MembershipsTab({ customer }: { customer: CustomerEntity }) {
   const summary = customer.ownedMembershipSummary?.trim();
+  const items = customer.ownedMemberships;
   return (
     <div>
       {summary ? (
@@ -236,9 +246,52 @@ function MembershipsTab({ customer }: { customer: CustomerEntity }) {
           {summary}
         </div>
       ) : null}
-      <div className="rounded-md border border-dashed border-[#d4d4d8] bg-white px-3 py-4 text-center text-[11.5px] text-[#9ca3af]">
-        보유 회원권 행 데이터는 추후 백엔드 연동 예정입니다.
-      </div>
+      {items.length === 0 ? (
+        <div className="rounded-md border border-dashed border-[#d4d4d8] bg-white px-3 py-4 text-center text-[11.5px] text-[#9ca3af]">
+          등록된 보유 회원권이 없습니다
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-md border border-[#e5e7eb]">
+          <table className="w-full border-collapse text-[12px]">
+            <thead className="bg-[#fafafa]">
+              <tr className="text-[11px] font-medium text-[#6b7280]">
+                <th className="px-2.5 py-1.5 text-left font-medium">골프장</th>
+                <th className="px-2.5 py-1.5 text-left font-medium">회원 유형</th>
+                <th className="px-2.5 py-1.5 text-left font-medium">상태</th>
+                <th className="px-2.5 py-1.5 text-right font-medium">수량</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it) => (
+                <tr
+                  key={`${it.clubId}-${it.membershipId}`}
+                  className="border-t border-[#f3f4f6]"
+                >
+                  <td className="px-2.5 py-1.5 text-[#0a0a0a]">
+                    {it.clubName ?? "—"}
+                  </td>
+                  <td className="px-2.5 py-1.5 text-[#0a0a0a]">
+                    {it.membershipName ?? "—"}
+                  </td>
+                  <td className="px-2.5 py-1.5">
+                    <span
+                      className={`inline-flex items-center rounded-full px-1.5 py-[1px] text-[10.5px] font-semibold ${
+                        OWNED_MEMBERSHIP_STATUS_BADGE[it.status] ??
+                        "bg-[#f3f4f6] text-[#6b7280]"
+                      }`}
+                    >
+                      {getOwnedMembershipStatusLabel(it.status) ?? it.status}
+                    </span>
+                  </td>
+                  <td className="px-2.5 py-1.5 text-right tabular-nums text-[#0a0a0a]">
+                    {it.quantity}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

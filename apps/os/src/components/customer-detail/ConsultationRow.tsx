@@ -2,11 +2,25 @@
 
 import { useState, type CSSProperties, type KeyboardEvent } from "react";
 import { ChevronDown, Edit3 } from "lucide-react";
-import type {
-  ConsultationEntity,
-  ConsultationNoteEntry,
+import {
+  APPROVAL_STATUS,
+  type ApprovalStatus,
+  type ConsultationEntity,
+  type ConsultationNoteEntry,
 } from "@heritage-dx/store";
+import { StatusBadge } from "@/components/approval/StatusBadge";
 import { tradeSideStyle } from "./styles";
+
+const APPROVED_LOCK_STATUSES: ReadonlyArray<string> = [
+  APPROVAL_STATUS.DEPOSIT_APPROVED,
+  APPROVAL_STATUS.FIRST_APPROVED,
+  "TAX_FILING",
+  "COMPLETED",
+];
+
+function isMemoLocked(status: ApprovalStatus | string): boolean {
+  return APPROVED_LOCK_STATUSES.includes(status);
+}
 
 interface Props {
   item: ConsultationEntity;
@@ -48,8 +62,10 @@ export function ConsultationRow({ item, isLast, defaultOpen, onAddNote }: Props)
 
   const memos = sortNotesDesc(item.notes);
   const latest = memos[0];
+  const memoLocked = isMemoLocked(item.approvalStatus);
 
   const submit = async () => {
+    if (memoLocked) return;
     const content = draft.trim();
     if (!content || submitting) return;
     setSubmitting(true);
@@ -84,7 +100,7 @@ export function ConsultationRow({ item, isLast, defaultOpen, onAddNote }: Props)
         style={{
           width: "100%",
           display: "grid",
-          gridTemplateColumns: "auto minmax(0,1fr) auto auto",
+          gridTemplateColumns: "auto minmax(0,1fr) auto auto auto",
           alignItems: "center",
           gap: 10,
           padding: "12px 14px",
@@ -143,6 +159,10 @@ export function ConsultationRow({ item, isLast, defaultOpen, onAddNote }: Props)
             </>
           )}
         </span>
+        <StatusBadge
+          status={item.approvalStatus}
+          className="text-[10.5px] py-px"
+        />
         <span style={tradeSideStyle(item.tradeType)}>{item.tradeType}</span>
         <span
           style={{
@@ -166,66 +186,82 @@ export function ConsultationRow({ item, isLast, defaultOpen, onAddNote }: Props)
             borderTop: "1px solid var(--line-soft)",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {memoLocked ? (
             <div
               style={{
-                flex: 1,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "8px 12px",
-                border: "1px solid var(--line)",
+                padding: "10px 12px",
                 borderRadius: 8,
+                border: "1px dashed var(--line)",
                 background: "#fff",
-                minWidth: 0,
+                fontSize: 11.5,
+                color: "var(--text-3)",
+                textAlign: "center",
               }}
             >
-              <Edit3
-                size={13}
-                strokeWidth={1.5}
-                style={{ color: "var(--text-3)", flexShrink: 0 }}
-              />
-              <input
-                type="text"
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={onKeyDown}
-                placeholder={`${item.clubName} · ${planLabel(item)} 메모를 추가… (Enter)`}
-                disabled={submitting}
+              승인 완료된 상담에는 메모를 추가할 수 없습니다.
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div
                 style={{
                   flex: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "8px 12px",
+                  border: "1px solid var(--line)",
+                  borderRadius: 8,
+                  background: "#fff",
                   minWidth: 0,
-                  border: "none",
-                  outline: "none",
-                  background: "transparent",
-                  fontSize: 12,
-                  color: "var(--text)",
-                  fontFamily: "inherit",
                 }}
-              />
+              >
+                <Edit3
+                  size={13}
+                  strokeWidth={1.5}
+                  style={{ color: "var(--text-3)", flexShrink: 0 }}
+                />
+                <input
+                  type="text"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  placeholder={`${item.clubName} · ${planLabel(item)} 메모를 추가… (Enter)`}
+                  disabled={submitting}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    border: "none",
+                    outline: "none",
+                    background: "transparent",
+                    fontSize: 12,
+                    color: "var(--text)",
+                    fontFamily: "inherit",
+                  }}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={submit}
+                disabled={submitting || !draft.trim()}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: 8,
+                  border: "none",
+                  background:
+                    submitting || !draft.trim() ? "#94a3b8" : "#10b981",
+                  color: "#fff",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor:
+                    submitting || !draft.trim() ? "not-allowed" : "pointer",
+                  flexShrink: 0,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {submitting ? "추가 중…" : "추가"}
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={submit}
-              disabled={submitting || !draft.trim()}
-              style={{
-                padding: "8px 16px",
-                borderRadius: 8,
-                border: "none",
-                background:
-                  submitting || !draft.trim() ? "#94a3b8" : "#10b981",
-                color: "#fff",
-                fontSize: 12,
-                fontWeight: 600,
-                cursor:
-                  submitting || !draft.trim() ? "not-allowed" : "pointer",
-                flexShrink: 0,
-                whiteSpace: "nowrap",
-              }}
-            >
-              {submitting ? "추가 중…" : "추가"}
-            </button>
-          </div>
+          )}
 
           {memos.length > 0 && (
             <div style={{ paddingLeft: 14 }}>

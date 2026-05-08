@@ -10,7 +10,14 @@ export {
   mapCustomerHistorySummaryDtoToEntity,
   mapCustomerEntityToInput,
   mapCustomerEntityToUpdateInput,
+  mapOwnedMembershipDtoToEntity,
+  mapOwnedMembershipEntityToInput,
 } from "./customer.mapper";
+export {
+  mapSettlementDtoToEntity,
+  mapSettlementEntityToInput,
+  mapSettlementEntityToUpdateInput,
+} from "./settlement.mapper";
 export { mapMembershipTradeDtoToEntity, mapMembershipTradeEntityToInput } from "./membership-trade.mapper";
 export { mapMembershipDtoToEntity } from "./membership.mapper";
 export { mapScenarioWithDocsDtoToEntity } from "./scenario.mapper";

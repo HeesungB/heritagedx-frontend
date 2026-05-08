@@ -17,6 +17,7 @@ import { ConfirmModal, Loading } from "@heritage-dx/ui";
 import { PersonCard } from "./customer-detail/PersonCard";
 import { BasicInfoCard } from "./customer-detail/BasicInfoCard";
 import { MembershipCard } from "./customer-detail/MembershipCard";
+import { ConsultationHistoryCard } from "./customer-detail/ConsultationHistoryCard";
 import { NotesCard } from "./customer-detail/NotesCard";
 import { cd } from "./customer-detail/styles";
 
@@ -158,7 +159,8 @@ export default function CustomerDetailClient({ id }: Props) {
 
       <PersonCard customer={customer} />
       <BasicInfoCard customer={customer} onPatch={handlePatch} />
-      <MembershipCard customer={customer} />
+      <MembershipCard customer={customer} onPatch={handlePatch} />
+      <ConsultationHistoryCard customerId={customer.id} />
       <NotesCard customer={customer} onPatch={handlePatch} />
 
       <ConfirmModal

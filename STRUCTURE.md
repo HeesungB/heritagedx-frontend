@@ -23,13 +23,15 @@ heritage-dx/
 │   ├── os/                          # 공개 사이트 (포트 3000)
 │   │   ├── src/
 │   │   │   ├── app/                 # Next.js App Router (loading/error: clubs, trades, claims, customers)
-│   │   │   ├── components/          # 42개 컴포넌트 (top-level 30 + club-profile/ 12) — Sidebar/AppHeader/AppShell shell + 페이지 컴포넌트들
+│   │   │   ├── components/          # 컴포넌트들 — Sidebar/AppHeader/AppShell shell + 페이지 컴포넌트들
 │   │   │   │   ├── club-profile/        # ClubBasicInfoTable, MembershipInfoSection,
 │   │   │   │   │                        #   EstimateSection, CostCalculatorSection, GreenFeeField, InfoField,
 │   │   │   │   │                        #   BenefitsSheetSection, DocumentsSection, MarketPriceSummary,
 │   │   │   │   │                        #   NearbyClubPrices, PriceChart, SectionCard, ClubSwitcher, SoldPriceBanner
+│   │   │   │   ├── customer-create/     # CustomerCreateModal (4섹션 신규 고객 등록 모달 + 스텝퍼),
+│   │   │   │   │                        #   MembershipRow (보유 회원권 다중 행 — ClubSearchSelect + membership select)
 │   │   │   ├── contexts/            # AuthContext, RepositoryContext
-│   │   │   ├── hooks/               # useOrganization, useTaxSettings (localStorage 세율 오버라이드), useSheetStorage, useApprovalSheetStorage (상담일지 ID 별 승인요청서 draft + 디폴트 매핑), useMarketPriceSummary, useSendTradeNotification, useGeocode, useCustomerEnsureFlow
+│   │   │   ├── hooks/               # useOrganization, useTaxSettings (localStorage 세율 오버라이드), useSheetStorage, useSettlementSheet (승인요청서 양식 ↔ 백엔드 settlement — 내부에 react-hook-form `useForm<SheetOverrides>` 보관. 마운트 시 GET → 없으면 POST /draft baseline + localStorage(`hdx:settlement:<consultationId>`, **양식 셀 키 단위로 모든 셀 보존**) 머지 → form.reset. useWatch + useEffect 로 변경 감지 → 300ms debounce 후 매핑 여부 무관하게 모든 dirty 셀을 sheet key 그대로 localStorage 에 저장(네트워크 0). `commit()` 시 dirty 셀 중 SHEET_TO_ENTITY 매핑된 것만 entity 변환 → POST(첫 persist) 또는 PUT(변경 셀만) 한 번 발사. 응답 검증 에러는 settlement-sheet-adapter 의 `parseValidationField` + `ENTITY_TO_SHEET` inverse 로 양식 셀 키에 매핑하여 form.setError 로 주입(셀에 빨간 ring + 메시지) — 매핑 안 되는 필드는 `unmappedErrors` 로 반환되어 모달 상단 합쳐 표시. `markGenerated()` 는 `PATCH /document-generated` 의 `SETTLEMENT_REQUIRED_FIELDS` 응답 `details.missingFields` 도 같은 패턴으로 form.setError 매핑. 성공 시 localStorage 클리어 + form.reset 으로 dirty 초기화. reset/missingFields/documentGeneratedAt 노출), useMarketPriceSummary, useSendTradeNotification, useGeocode, useCustomerEnsureFlow
 │   │   │   ├── lib/                 # server-repositories.ts, authApi.ts, firebase-admin.ts, gtag.ts
 │   │   │   ├── types/               # 앱 전용 타입 (exchange-price.ts 포함)
 │   │   │   ├── constants/           # golfCourseCoordinates.json
@@ -137,15 +139,16 @@ heritage-dx/
 | `trade.ts` | `Consultation`, `ConsultationInput`, `ConsultationNoteEntry`/`ConsultationNotes`/`ConsultationNoteInput`/`ConsultationNotesData`(notes JSONB 메모 entry — `ConsultationNotesData` 는 `POST/PATCH/DELETE /consultations/:id/notes[/:noteId]` 의 부분 응답 `{notes: {entries:[...]}}` 전용 타입), `MembershipTrade`, `MembershipTradeInput`, `TradeType` (`"매도"` \| `"매수"`), AI 자연어 추출용 `ConsultationAiInput`/`ConsultationAiDraft`/`ConsultationAiCandidate`/`ConsultationAiMatchInfo`/`ConsultationAiMissingField`/`ConsultationAiResponse` — pagination 은 공용 `Pagination` 사용. `Consultation.notes` 는 `{ entries: ConsultationNoteEntry[] }` 구조이며 메모 CRUD 는 별도 엔드포인트(`POST/PATCH/DELETE /consultations/:id/notes[/:noteId]`) 로만 수행한다. `ConsultationInput.notes` 는 **상담 생성 시에만** 첫 entry 텍스트로 사용(서버 자동 변환), `PUT /consultations/:id` 에서는 omit 필수. AI 타입은 `packages/store/src/entities/consultation-ai.ts` 에서 re-export 되어 뷰는 `@heritage-dx/store` 로만 import |
 | `approval.ts` | `APPROVAL_STATUS`, `APPROVAL_ACTIONS`, `ApprovalStatus`/`WorkflowStatus`/`ApprovalAction`/`ApprovalActionInput` |
 | `claim.ts` | `Claim`, `ClaimInput` |
-| `customer.ts` | `Customer`, `CustomerInput`, `CustomerUpdateInput`, `CustomersListData`, `CustomerHistory`, `CustomerHistorySummary` — OpenAPI `CustomerResponseDto` 1:1 |
+| `customer.ts` | `Customer`, `CustomerInput`, `CustomerUpdateInput`, `CustomerOwnedMembership` (clubId/membershipId/status/quantity/note/displayOrder + clubName/membershipName join), `CustomersListData`, `CustomerHistory`, `CustomerHistorySummary` — OpenAPI `CustomerResponseDto` 1:1. UpdateInput.ownedMemberships 동작: 미포함=유지/[]=전체삭제/[...]=전체교체 |
 | `notice.ts` | `Notice` (files 배열 포함), `NoticeFile`, `NoticeInput`, `NoticesData` — pagination 은 공용 `Pagination` |
+| `settlement.ts` | `Settlement`, `SettlementInput`, `SettlementUpdateInput`, `SettlementDraftRequest`, `SettlementDraftResponse` — 입출금표(상담 1:1). 백엔드 응답 기준 평탄 필드: 메타(consultationId/membershipTradeId/documentGeneratedAt 등) + 헤더(membershipName/tradeDate/salesContractAmount/remarks) + 매도(sellName/sellPhone/sellDealerId/sellEntityType/sellMembershipAmount/sellCommissionDeducted) + 매수(buy 계열 동일). draft 응답은 `{ draft, missingFields, warnings }` 한 단계 감싸짐. PUT 동작: 키 명시된 셀만 변경 |
 | `kpi.ts` | `KpiTradesResponse` (userId/managerName 포함 4필드), `KpiConsultationsResponse` (8필드 전체), `KpiTradesParams`, `KpiConsultationsParams`, `Employee` |
 | `user.ts` | `User` (isActive, createdAt 등 포함 full UserDto), `AdminUser` (alias), `UserRole`, `UserCreateInput`, `UserUpdateInput`, `LoginResponse` |
 | `organization.ts` | `Organization` |
 
 ### 4.2. `@heritage-dx/utils`
 
-두 개의 유틸리티 모듈.
+네 개의 유틸리티 모듈.
 
 **`currency.ts`** — 한국 원화 포맷팅:
 - `formatCurrency(amount)` → `"1,000원"`
@@ -164,6 +167,13 @@ heritage-dx/
 - `getProvince(region)` / `getRegionGroup(region)` — 지역 그룹핑
 - `INITIALS` — 14개 초성 + `"0-9"`
 - `REGION_GROUPS` — `수도권`, `강원도`, `충청도`, `전라도`, `경상도`, `제주도`
+
+**`phone.ts`** — 한국 휴대폰 번호:
+- `formatPhoneNumber(value)` — 숫자만 추출해 길이별로 `010-1234-5678` 형태 자동 포맷
+- `isValidKoreanMobile(value)` — `^010-\d{4}-\d{4}$` 매칭
+
+**`email.ts`** — 이메일:
+- `isValidEmail(value)` — `[^\s@]+@[^\s@]+\.[^\s@]+` 매칭
 
 ### 4.3. `@heritage-dx/api-client`
 
@@ -237,6 +247,7 @@ packages/api/
 | `IMarketPriceRepository` | `listByMembership(membershipId, { from, to })` |
 | `INoticeRepository` | `list(params?)`, `create(input)`, `update(id, input)`, `delete(id)` |
 | `ICustomerRepository` | `getAll(params?)`, `getOne(id)`, `create(data)`, `update(id, data)`, `delete(id)`, `getHistory(id)`, `getHistorySummary(id)` |
+| `ISettlementRepository` | `createDraft(consultationId)` (POST /settlements/draft, in-memory 산출), `create(data)`, `getOne(consultationId)`, `update(consultationId, partial)`, `markDocumentGenerated(consultationId)` (PATCH `/document-generated` — 승인 요청 게이트), `delete(consultationId)`. 상담 1건 ↔ 입출금표 1건 |
 
 - `packages/api/src/interfaces/general/notice.repository.ts` — `INoticeRepository` 인터페이스 (`NoticeListParams`, `list`, `create`, `update`, `delete`). 읽기는 `/notices` 공개 엔드포인트, 쓰기는 `/admin/notices` 관리자 엔드포인트(서버측 토큰 검증)로 라우팅.
 - `packages/api/src/repositories/general/notice.repository.impl.ts` — `ApiClient` 기반 구현체
@@ -263,7 +274,8 @@ packages/api/
 
 - **상담일지 = 리드/재작업 장부**, **거래내역 = 계약금 이후 실행 + 월별 매출 집계 장부**. 전환 시점은 계약금 입금 확인 시점.
 - **상담 리스트 기본 필터**: OS/BO 모두 `isConverted=false` 기본. FIRST_APPROVED 건은 "거래 전환 완료 포함" 토글로 노출.
-- **APPROVE_FIRST 가드**: 상담 `depositAmount > 0` 일 때만 BO 승인 버튼 활성화 = "계약금 입금 확인 완료".
+- **APPROVE_FIRST 가드 (2026-05-08 갱신)**: BO "계약금 확인" 버튼이 `depositAmount > 0` AND `settlementDocumentGenerated === true` 둘 다 충족할 때만 활성화. 백엔드가 입출금표 문서 생성 완료를 별도 게이트로 두며 미충족 시 400 거부. APPROVE_FIRST 처리 시 상담을 거래내역으로 전환하고 `settlement.membershipTradeId` 에 거래 ID 를 연결한다. 상담 응답에 `settlementId / settlementDocumentGenerated / settlementDocumentGeneratedAt` 메타가 포함된다.
+- **REQUEST_APPROVAL 게이트 (2026-05)**: OS의 ApprovalRequestSheetModal 이 "승인 요청 보내기" 클릭 시, REQUEST_APPROVAL 액션 직전에 `PATCH /api/settlements/:consultationId/document-generated` 를 호출하여 입출금표 문서 생성 완료를 백엔드에 마킹한다. 백엔드는 이 마킹이 있어야 다음 상태로 전이하도록 검증한다.
 - **REOPEN vs REJECT**: REOPEN은 거래 이관 직전 단계에서 무산(상담 DRAFT 복귀), REJECT는 거래 이관 후 무산(거래 물리 삭제 + 상담 DRAFT 복귀). 둘 다 `ActionReasonModal`로 사유를 받는다.
 - **완료 거래 락**: COMPLETED 거래 자체와 그 거래에 연결된 상담은 수정/삭제가 서버에서 거부된다. UI는 가드 노출.
 - **삭제 권한**: `canDeleteConsultation(user, cons)` — `FIRST_APPROVED`/`linkedTradeId` 있는 상담은 대표/백오피스만 삭제. `canDeleteTrade(user)` — 거래내역은 항상 대표/백오피스만 삭제. OS/BO 삭제 버튼 모두 가드 적용.
@@ -318,14 +330,16 @@ packages/store/
 │   │   ├── organization.ts   # OrganizationEntity
 │   │   ├── user.ts           # UserRole, UserEntity, AdminUserEntity
 │   │   ├── employee.ts       # EmployeeEntity
-│   │   ├── customer.ts       # CustomerEntity (+ ageBracket/occupation/ownedMembershipSummary/customerGrade(read-only)/residenceArea — 2026-04 추가)
+│   │   ├── customer.ts       # CustomerEntity (+ ageBracket/occupation/ownedMembershipSummary/customerGrade(read-only)/residenceArea — 2026-04 추가). OwnedMembershipEntity[] (clubId/membershipId/status/quantity/note/displayOrder + clubName/membershipName join), OWNED_MEMBERSHIP_STATUS_LABEL (OWNED/SELLING/TRANSFER_PENDING/SOLD/UNKNOWN ↔ 보유/매도중/명의이전중/매도완료/알 수 없음 — 백엔드 검증 2026-05-07), getOwnedMembershipStatusLabel — 2026-05 추가
+│   │   ├── settlement.ts     # SettlementEntity (입출금표 — 상담 1:1, 백엔드 응답 기준 평탄 필드: 메타 + 헤더(membershipName/tradeDate/salesContractAmount/remarks) + 매도/매수(sellName/sellPhone/sellDealerId/sellEntityType/sellMembershipAmount/sellCommissionDeducted, buy 계열 동일)), SettlementCellKey, SETTLEMENT_CELL_KEYS const, EMPTY_SETTLEMENT_ENTITY 헬퍼
 │   │   ├── club-document.ts  # ClubDocumentEntity, ClubScenarioDocumentEntity
 │   │   └── memo-history.ts   # `flattenMemoHistoryNotes(notes)` 만 — 백엔드가 notes JSONB 로 정규화되면서 client-side `__MEMO_V1__` 인코딩/디코딩 경로는 폐기. 단일 텍스트 필드(예: customer.memo) 에 과거 마커가 흘러들어왔을 때 `flattenMemoHistoryNotes` 로 entries content 를 시간순 join 한 plain text 로 정규화 (마커 없으면 통과, 파싱 실패 시 데이터 손실 방지로 원본 유지)
 │   ├── mappers/              # DTO ↔ Entity 변환 (순수 함수)
 │   │   ├── index.ts
 │   │   ├── club.mapper.ts
 │   │   ├── consultation.mapper.ts
-│   │   ├── customer.mapper.ts       # mapCustomerDtoToEntity (memo 는 flattenMemoHistoryNotes 로 정규화 — `__MEMO_V1__` 마커가 들어오면 entries.content 시간순 join), mapCustomerEntityToInput, mapCustomerEntityToUpdateInput
+│   │   ├── customer.mapper.ts       # mapCustomerDtoToEntity (memo 는 flattenMemoHistoryNotes 로 정규화 — `__MEMO_V1__` 마커가 들어오면 entries.content 시간순 join, ownedMemberships 는 displayOrder 오름차순 정렬), mapCustomerEntityToInput, mapCustomerEntityToUpdateInput (ownedMemberships 키가 명시 entry 일 때만 페이로드에 포함 — 미포함=유지/[]=전체삭제/[...]=전체교체), mapOwnedMembershipDtoToEntity, mapOwnedMembershipEntityToInput
+│   │   ├── settlement.mapper.ts     # mapSettlementDtoToEntity (SETTLEMENT_CELL_KEYS 로 알려진 셀만 흡수), mapSettlementEntityToInput (POST /api/settlements 전체 페이로드, documentGenerated 계열/createdAt 제외), mapSettlementEntityToUpdateInput (partial entity → PUT 페이로드, dirty 키만)
 │   │   ├── membership-trade.mapper.ts
 │   │   ├── membership.mapper.ts
 │   │   ├── scenario.mapper.ts
@@ -344,7 +358,8 @@ packages/store/
 │   │   ├── membership-trade.store.ts       # general — read-only (mutation 메서드 모두 제거)
 │   │   ├── consultation-admin.store.ts     # admin — approveFirst / reopen 만 (HOLD/REJECT/REQUEST_APPROVAL 제거)
 │   │   ├── membership-trade-admin.store.ts # admin — advanceToTaxFiling / advanceToCompleted / reject (REJECT는 응답 후 로컬 목록에서 제거)
-│   │   └── customer.store.ts               # CRUD + searchByQuery + getOne/getHistorySummary
+│   │   ├── customer.store.ts               # CRUD + searchByQuery + getOne/getHistorySummary
+│   │   └── settlement.store.ts             # 입출금표 store — byConsultation: Record<id, entity> 캐시, actions: createDraft (in-memory, 응답 envelope 한 단계 풀어 `{entity, missingFields}` 반환)/create (첫 persist)/fetchOne/update/markDocumentGenerated/remove. PATCH /document-generated 결과로 entity 캐시 갱신
 │   └── hooks/                # 컴포넌트용 편의 훅
 │       ├── index.ts
 │       ├── useClubs.ts
@@ -560,16 +575,16 @@ ESLint 9 flat config 공유 패키지. `eslint-config-next`의 `core-web-vitals`
 
 **승인 워크플로우 (`approval/`):**
 - `StatusBadge` — 상담·거래 상태 공통 배지
-- `ApprovalRequestSheetModal` — 상담일지 행마다 1대1 매핑되는 [회원권 거래 승인요청서] 풀스크린 모달. `useApprovalSheetStorage(trade, user.name, organization)` 로 디폴트 매핑 + draft 로드. 액션: 인쇄(`printSheetFitToPage`) / JPEG(`captureSheetAsJpeg`) / 초기화(localStorage 키 삭제 + 디폴트 복귀) / 닫기 / **승인 요청 보내기**(부모가 주입한 `onSubmit(trade, patch)` 호출 — 양식 자기쪽 핵심 필드를 ConsultationEntity patch 로 묶어 store `requestApproval` 으로 전달). 양식 본체는 top-level `ApprovalRequestSheet` 컴포넌트가 렌더하며 `forwardRef<HTMLDivElement>` 로 캡처용 ref 노출. TradesPageClient 의 `ApprovalPillButton` `onRequest` 가 이 모달을 여는 유일한 진입점.
+- `ApprovalRequestSheetModal` — 상담일지 행마다 1대1 매핑되는 [회원권 거래 승인요청서] 풀스크린 모달. **2026-05 격상 + 명시적 commit 모델 (재조정)**: 데이터 소스가 클라이언트 localStorage(`useApprovalSheetStorage`) → 자동 persist Settlement API → **localStorage(`hdx:settlement:<consultationId>`) draft + 명시적 commit Settlement API** 로 두 차례 변경됐다. `useSettlementSheet(trade)` 가 마운트 시 `GET /api/settlements/:id` → 없으면 `POST /api/settlements/draft` baseline + localStorage 미commit 변경분 머지. 셀 변경은 entity state + localStorage debounced 저장만 — 네트워크 호출 0. 액션: 인쇄(`printSheetFitToPage`) / JPEG(`captureSheetAsJpeg`) / 초기화(`DELETE /api/settlements/:id` 후 draft 재산출 + localStorage 클리어) / 닫기 / **승인 요청 보내기** (1) `commit()` — pending localStorage flush + isDraft=true 면 `POST /api/settlements`, 아니면 `PUT /api/settlements/:id` 한 번 발사. 성공 시 localStorage 클리어 + isDraft=false 전환. (2) `PATCH /api/settlements/:id/document-generated` — 백엔드 게이트. (3) 부모가 주입한 `onSubmit(trade, patch)` — 양식 자기쪽 핵심 필드를 ConsultationEntity patch 로 묶어 store `requestApproval` 으로 전달. 단계 중 어느 하나라도 실패하면 흐름 중단(localStorage 보존하여 사용자가 재시도 가능). `documentGeneratedAt` 표시 배너 유지. 양식 본체는 top-level `ApprovalRequestSheet` 컴포넌트가 렌더하며 `forwardRef<HTMLDivElement>` 로 캡처용 ref 노출. TradesPageClient 의 `ApprovalPillButton` `onRequest` 가 이 모달을 여는 유일한 진입점.
 
 **건의사항:**
 `ClaimsPageClient`
 
 **고객:**
-`CustomersPageClient`, `CustomerDetailClient`, `CustomerAutocomplete` — `/customers` 목록 (`CustomersPageClient` — CRUD, 행 클릭 시 `/customers/<id>` 라우트 push) / `/customers/[id]` 상세 (`CustomerDetailClient` — `useCustomerRepository().getOne(id)` 단일 조회 + `update(id, partial)` 인라인 편집, 단일 컬럼 풀폭 시안 1:1 적용. 상단 PersonCard(이름 + 등급/거래 의사 dot 태그 + 연락처/이메일/등록일 메타) → BasicInfoCard(8행: 고객명·연락처·이메일·직장/직업·연령대·거주지·고객 등급·거래 의사. 고객 등급/거래 의사는 칩 그룹 read-only — 백엔드 enum 미정. 나머지는 InlineField 클릭 편집. 우측 상단 "편집" 토글) → MembershipCard(시안 표 헤더만 — 데이터 없을 때 "등록된 보유 회원권이 없습니다", "+ 회원권 추가" 버튼은 disabled) → NotesCard(textarea + 검정 "기록 저장" 버튼 → memo 텍스트 누적, 하단 이력 표시). 우측 보조 컬럼·탭은 시안에 없음). 시안 카드 컴포넌트는 `apps/os/src/components/customer-detail/` 에 분리 — `PersonCard`, `BasicInfoCard`, `MembershipCard`, `NotesCard`, `EmptyCard`, `InlineField` (hover→연필→input→체크/X 저장 primitive), `styles.ts` (시안 cdStyles + tagStyle 헬퍼). CSS 변수(`--bg`/`--text`/`--text-2`/`--text-3`/`--line`/`--line-soft`/`--green-soft`/`--green-text`/`--slate-soft`)는 `apps/os/src/app/globals.css` 에 정의. `CustomerAutocomplete` — 상담/거래 폼에서 재사용되는 이름/연락처 자동완성. 미등록 고객 저장 시에는 `useCustomerEnsureFlow` 훅이 `ConfirmModal`을 띄워 `POST /customers` → `POST /consultations` 를 순차 실행한다.
+`CustomersPageClient`, `CustomerDetailClient`, `CustomerAutocomplete` — `/customers` 목록 (`CustomersPageClient` — 검색/페이지네이션 + 행 클릭 시 `/customers/<id>` 라우트 push. "신규 고객 등록" 버튼 → `customer-create/CustomerCreateModal` open. `CustomerCreateModal` — 4섹션 모달(기본정보/추가정보/보유회원권/메모), 연락처 자동 포맷·형식 검증, 이메일 형식 검증, 연령대 칩, 메모 글자수 카운터(500자). 보유 회원권은 `customer-create/MembershipRow` 다중 행(`ClubSearchSelect usePortal` + 클럽 detail 의 membership dedup — modal-body `overflow-y-auto` 클리핑 회피), (clubId, membershipId) 행 내 중복 차단, 빈 배열 허용. 제출은 `useCustomers().create` 사용 — 서버 conflict 시 "이미 등록된 연락처입니다" 표시) / `/customers/[id]` 상세 (`CustomerDetailClient` — `useCustomerRepository().getOne(id)` 단일 조회 + `update(id, partial)` 인라인 편집, 단일 컬럼 풀폭 시안 1:1 적용. 상단 PersonCard(이름 + 등급/거래 의사 dot 태그 + 연락처/이메일/등록일 메타) → BasicInfoCard(8행: 고객명·연락처·이메일·직장/직업·연령대·거주지·고객 등급·거래 의사. 고객 등급/거래 의사는 칩 그룹 read-only — 백엔드 enum 미정. 나머지는 InlineField 클릭 편집. 우측 상단 "편집" 토글) → MembershipCard(`customer.ownedMemberships` 행 표시 — 골프장/회원유형/상태(태그)/수량/메모/액션. "+ 회원권 추가" 버튼 → `OwnedMembershipFormModal` open. 행 [수정](모달 edit 모드)/[삭제](`ConfirmModal`) 액션. 추가/수정/삭제 모두 `onPatch({ ownedMemberships: [...] })` 로 PUT 전송 → 백엔드 전체 교체 의미) → ConsultationHistoryCard(`useConsultations(tradeMemo).fetch({ customerId, limit:50 })` 로 해당 고객 상담 전체 조회 → `ConsultationRow` 다중 행. 카드 헤더 "상담 이력" + 우측 건수만, stat 블록/서브 헤더는 의도적으로 제외. 행 헤더는 chevron + 골프장 · 회원권 · 최신메모 truncate + 매수/매도 뱃지(`tradeSideStyle`) + 날짜. 펼침 본문은 `addNote(id, content)` 입력(Enter/녹색 추가 버튼) + 메모 타임라인(점-라인, 최신순 정렬, 첫 항목 "최신" 검정 뱃지). 첫 행 default open) → NotesCard(textarea + 검정 "기록 저장" 버튼 → memo 텍스트 누적, 하단 이력 표시). 우측 보조 컬럼·탭은 시안에 없음). 시안 카드 컴포넌트는 `apps/os/src/components/customer-detail/` 에 분리 — `PersonCard`, `BasicInfoCard`, `MembershipCard`, `OwnedMembershipFormModal` (골프장+회원권 picker — `ClubSearchSelect`/`useClubs`/`useClubDetail`/`useTopClubs` 재사용, 상태/수량/메모/정렬 입력, (clubId,membershipId) 중복 차단), `ConsultationHistoryCard`, `ConsultationRow`, `NotesCard`, `EmptyCard`, `InlineField` (hover→연필→input→체크/X 저장 primitive), `styles.ts` (시안 cdStyles + tagStyle 헬퍼 + `getCustomerGradeColor`/`getOwnedMembershipStatusColor`/`tradeSideStyle`). CSS 변수(`--bg`/`--text`/`--text-2`/`--text-3`/`--line`/`--line-soft`/`--green-soft`/`--green-text`/`--slate-soft`)는 `apps/os/src/app/globals.css` 에 정의. `CustomerAutocomplete` — 상담/거래 폼에서 재사용되는 이름/연락처 자동완성. 미등록 고객 저장 시에는 `useCustomerEnsureFlow` 훅이 `ConfirmModal`을 띄워 `POST /customers` → `POST /consultations` 를 순차 실행한다.
 
 **모달/시트:**
-`PasswordChangeModal`, `TaxGuideModal`, `TaxSettingsModal`, `EstimateSheet`, `ApprovalRequestSheet` — **`ApprovalRequestSheet`**: 첨부 양식 그대로의 인라인 편집형 시트(헤더/회원권 출금/입금/매매계약서/세금계산서/거래경로/수익금/세무신고/특이사항). props=(overrides, onChange) 단일 디스패치, 체크박스류는 ■/□ 토글로 단일 선택값을 같은 키에 저장. `forwardRef<HTMLDivElement>` 로 캡처용 ref 를 노출하며 폭은 `1050px` (sheet-print 의 JPEG_PAGE_WIDTH 와 일치). 컨테이너는 `approval/ApprovalRequestSheetModal` 이 담당하며, 양식 자기쪽 핵심 필드를 patch 로 묶어 store 의 `requestApproval(id, patch)` 를 호출(update+approvalAction 순차 수행) — 누락 필드용 별도 모달은 더 이상 두지 않는다.
+`PasswordChangeModal`, `TaxGuideModal`, `TaxSettingsModal`, `EstimateSheet`, `ApprovalRequestSheet` — **`ApprovalRequestSheet`** (2026-05 RHF 도입): 첨부 양식 그대로의 인라인 편집형 시트(헤더/회원권 출금/입금/매매계약서/세금계산서/거래경로/수익금/세무신고/특이사항). props=`forwardRef<HTMLDivElement>` (값 props 제거됨) — `react-hook-form` 의 `FormProvider` 안에서 사용되며, 셀 컴포넌트(`TextCell`/`NumCell`/`Check`/`RegisteredInput`)는 module scope 로 정의되어 `useFormContext` 로 register/Controller/setValue 사용. inner 컴포넌트가 module scope 라 부모 리렌더로 input 이 unmount/remount 되지 않아 입력 끊김이 없음. 셀별 검증 에러는 `useCellError(name)` 헬퍼가 `formState.errors[name]` 을 읽어 빨간 ring + 작은 메시지로 표시(group toggle Check 는 outline 만). 폭은 `1050px` (sheet-print 의 JPEG_PAGE_WIDTH 와 일치). 데이터는 `useSettlementSheet`(2026-05 신설; localStorage draft + 명시적 commit, 내부에 useForm 통합) 가 관리; 컨테이너는 `approval/ApprovalRequestSheetModal` 이 담당하며 양식을 `FormProvider {...form}` 로 감싸고 "승인 요청 보내기" 시 `commit()` → `PATCH /document-generated` → store `requestApproval(id, patch)` 순차 수행 — commit 결과 `{ ok: false, unmappedErrors }` 면 단계 중단 + 모달 상단에 unmapped 표시(셀 빨간 표시는 form.setError 가 자동). 어댑터(`apps/os/src/hooks/settlement-sheet-adapter.ts`)의 `SHEET_TO_ENTITY` 매핑 테이블이 양식 셀 키(예: sellCompany/outAmount/outFeeIncluded)를 백엔드 entity 필드(sellName/sellMembershipAmount/sellCommissionDeducted)로 양방향 변환하며, `ENTITY_TO_SHEET` inverse + `parseValidationField` 로 NestJS class-validator 메시지(`"property X should not exist"`, `"X must be ..."`)에서 셀 키 추출. 매핑 미확정 셀(outDeposit, inBank, taxIssue 그룹, transferReport, sellerRoute 그룹, expense 등)은 양식에 빈 셀로 노출되며 백엔드에 안 실린다.
 
 **유틸리티:**
 `HomeClient`, `DashboardClient`, `SearchInput`, `OperatorNotice`, `SystemNotice`

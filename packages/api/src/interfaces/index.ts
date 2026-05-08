@@ -9,6 +9,7 @@ export type {
   NoticeListParams,
   ICustomerRepository,
   CustomerListParams,
+  ISettlementRepository,
 } from "./general";
 
 export type {
@@ -38,6 +39,7 @@ import type {
   IMarketPriceRepository,
   INoticeRepository,
   ICustomerRepository,
+  ISettlementRepository,
 } from "./general";
 
 import type {
@@ -67,6 +69,7 @@ export interface GeneralRepositories {
   marketPrices: IMarketPriceRepository;
   notices: INoticeRepository;
   customers: ICustomerRepository;
+  settlements: ISettlementRepository;
 }
 
 export interface AdminRepositories {

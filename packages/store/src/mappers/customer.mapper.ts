@@ -2,19 +2,53 @@ import type {
   Customer,
   CustomerHistorySummary,
   CustomerInput,
+  CustomerOwnedMembership,
   CustomerUpdateInput,
 } from "@heritage-dx/types";
 import type {
   CustomerEntity,
   CustomerHistorySummaryEntity,
+  OwnedMembershipEntity,
 } from "../entities/customer";
 import {
   decodeMemoEntries,
   flattenMemoHistoryNotes,
 } from "../entities/memo-history";
 
+export function mapOwnedMembershipDtoToEntity(
+  dto: CustomerOwnedMembership,
+): OwnedMembershipEntity {
+  return {
+    clubId: dto.clubId,
+    membershipId: dto.membershipId,
+    status: dto.status,
+    quantity: dto.quantity,
+    note: dto.note ?? null,
+    displayOrder: dto.displayOrder,
+    clubName: dto.clubName ?? null,
+    membershipName: dto.membershipName ?? null,
+  };
+}
+
+export function mapOwnedMembershipEntityToInput(
+  entity: OwnedMembershipEntity,
+): CustomerOwnedMembership {
+  // 요청 페이로드에는 join 필드(clubName/membershipName)는 보내지 않는다 — 응답 전용.
+  return {
+    clubId: entity.clubId,
+    membershipId: entity.membershipId,
+    status: entity.status,
+    quantity: entity.quantity,
+    note: entity.note ?? undefined,
+    displayOrder: entity.displayOrder,
+  };
+}
+
 export function mapCustomerDtoToEntity(dto: Customer): CustomerEntity {
   const rawMemo = dto.memo ?? null;
+  const ownedMemberships = (dto.ownedMemberships ?? [])
+    .map(mapOwnedMembershipDtoToEntity)
+    .sort((a, b) => a.displayOrder - b.displayOrder);
   return {
     id: dto.id,
     organizationId: dto.organizationId,
@@ -32,6 +66,7 @@ export function mapCustomerDtoToEntity(dto: Customer): CustomerEntity {
     ageBracket: dto.ageBracket ?? null,
     occupation: dto.occupation ?? null,
     ownedMembershipSummary: dto.ownedMembershipSummary ?? null,
+    ownedMemberships,
     customerGrade: dto.customerGrade ?? null,
     residenceArea: dto.residenceArea ?? null,
     createdAt: dto.createdAt,
@@ -51,6 +86,7 @@ export function mapCustomerEntityToInput(
     ageBracket: entity.ageBracket ?? undefined,
     occupation: entity.occupation ?? undefined,
     ownedMembershipSummary: entity.ownedMembershipSummary ?? undefined,
+    ownedMemberships: entity.ownedMemberships?.map(mapOwnedMembershipEntityToInput),
     residenceArea: entity.residenceArea ?? undefined,
   };
 }
@@ -97,6 +133,10 @@ export function mapCustomerEntityToUpdateInput(
   if (entity.occupation !== undefined) input.occupation = entity.occupation ?? undefined;
   if (entity.ownedMembershipSummary !== undefined)
     input.ownedMembershipSummary = entity.ownedMembershipSummary ?? undefined;
+  // ownedMemberships: 키가 명시적으로 들어왔을 때만 페이로드에 포함.
+  // 미포함 → 백엔드 "유지", [] → 전체 삭제, [...] → 전체 교체.
+  if (entity.ownedMemberships !== undefined)
+    input.ownedMemberships = entity.ownedMemberships.map(mapOwnedMembershipEntityToInput);
   if (entity.residenceArea !== undefined) input.residenceArea = entity.residenceArea ?? undefined;
   return input;
 }

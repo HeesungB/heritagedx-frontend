@@ -42,6 +42,10 @@ export type {
   CustomerHistoryRecentConsultationEntity,
   CustomerHistoryRecentMembershipTradeEntity,
   CustomerGradeKey,
+  OwnedMembershipEntity,
+  OwnedMembershipStatusKey,
+  SettlementEntity,
+  SettlementCellKey,
 } from "./entities/index";
 export {
   scenarioMatchesFilters,
@@ -58,6 +62,10 @@ export {
   appendCustomerMemoEntry,
   CUSTOMER_GRADE_LABEL,
   getCustomerGradeLabel,
+  OWNED_MEMBERSHIP_STATUS_LABEL,
+  getOwnedMembershipStatusLabel,
+  EMPTY_SETTLEMENT_ENTITY,
+  SETTLEMENT_CELL_KEYS,
 } from "./entities/index";
 export type { CustomerMemoEntry } from "./entities/index";
 
@@ -69,6 +77,7 @@ export {
   createConsultationAdminStore,
   createMembershipTradeAdminStore,
   createCustomerStore,
+  createSettlementStore,
 } from "./stores";
 export type {
   ClubStore,
@@ -85,6 +94,8 @@ export type {
   CustomerStoreState,
   CustomerCreateResult,
   RequestApprovalResult,
+  SettlementStore,
+  SettlementStoreState,
 } from "./stores";
 
 // Hooks
@@ -115,6 +126,7 @@ export {
   useRecentSearches,
   useFavoriteClubs,
   useTopClubs,
+  useSettlements,
 } from "./hooks";
 export type {
   ScenarioOptionsData,
@@ -208,6 +220,11 @@ export {
   mapCustomerHistorySummaryDtoToEntity,
   mapCustomerEntityToInput,
   mapCustomerEntityToUpdateInput,
+  mapOwnedMembershipDtoToEntity,
+  mapOwnedMembershipEntityToInput,
+  mapSettlementDtoToEntity,
+  mapSettlementEntityToInput,
+  mapSettlementEntityToUpdateInput,
   normalizePagination,
 } from "./mappers/index";
 
@@ -227,6 +244,14 @@ export type {
 
 // 고객 update 입력 타입 — 뷰의 인라인 편집(`InlineField`) 콜백에서 사용
 export type { CustomerUpdateInput } from "@heritage-dx/types";
+
+// Settlement DTO/Input — 뷰가 @heritage-dx/store 만 import 하도록 재노출
+export type {
+  Settlement,
+  SettlementInput,
+  SettlementUpdateInput,
+  SettlementDraftResponse,
+} from "@heritage-dx/types";
 
 // 상담 메모 (notes JSONB) 타입 — 뷰는 @heritage-dx/store 경유로만 import
 export type {

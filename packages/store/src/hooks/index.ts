@@ -40,3 +40,4 @@ export type {
 } from "./useFavoriteClubs";
 export { useTopClubs } from "./useTopClubs";
 export type { UseTopClubsResult, TopClubLookupItem } from "./useTopClubs";
+export { useSettlements } from "./useSettlements";

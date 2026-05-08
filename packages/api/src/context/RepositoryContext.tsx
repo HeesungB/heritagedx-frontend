@@ -87,6 +87,10 @@ export function useCustomerRepository() {
   return useGeneralRepositories().customers;
 }
 
+export function useSettlementRepository() {
+  return useGeneralRepositories().settlements;
+}
+
 export function useConsultationAdminRepository() {
   return useAdminRepositories().consultations;
 }

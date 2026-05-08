@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, X, Search, Star } from "lucide-react";
 
 export interface ClubSearchItem {
@@ -21,7 +22,14 @@ interface ClubSearchSelectProps {
   isFavorite?: (code: string) => boolean;
   onToggleFavorite?: (code: string, item: ClubSearchItem) => void;
   onClubSelect?: (item: ClubSearchItem) => void;
+  /**
+   * 드롭다운을 `document.body` 로 portal 렌더 + `position: fixed` 로 띄운다.
+   * 부모가 `overflow:hidden|auto` 인 컨테이너일 때 잘림 방지용. 기본은 false (기존 동작).
+   */
+  usePortal?: boolean;
 }
+
+const DROPDOWN_HEIGHT_HINT = 290;
 
 export default function ClubSearchSelect({
   clubs,
@@ -33,10 +41,17 @@ export default function ClubSearchSelect({
   isFavorite,
   onToggleFavorite,
   onClubSelect,
+  usePortal = false,
 }: ClubSearchSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [pos, setPos] = useState<{ top: number; left: number; width: number }>({
+    top: 0,
+    left: 0,
+    width: 288,
+  });
   const containerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const selectedClub = useMemo(
@@ -63,13 +78,13 @@ export default function ClubSearchSelect({
       .filter((c): c is ClubSearchItem => Boolean(c));
   }, [clubs, topClubCodes, search]);
 
-  // 외부 클릭 닫기
+  // 외부 클릭 닫기 — portal 모드에서는 dropdown 도 trigger 외부이므로 둘 다 체크
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
+      const target = e.target as Node;
+      const inTrigger = containerRef.current?.contains(target);
+      const inDropdown = dropdownRef.current?.contains(target);
+      if (!inTrigger && !inDropdown) {
         setIsOpen(false);
         setSearch("");
       }
@@ -77,6 +92,31 @@ export default function ClubSearchSelect({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  // portal 모드: trigger 위치에 맞춰 dropdown fixed 좌표 계산
+  useEffect(() => {
+    if (!isOpen || !usePortal) return;
+    const place = () => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const overflow =
+        rect.bottom + DROPDOWN_HEIGHT_HINT > window.innerHeight - 12;
+      setPos({
+        top: overflow
+          ? Math.max(12, rect.top - DROPDOWN_HEIGHT_HINT - 6)
+          : rect.bottom + 4,
+        left: rect.left,
+        width: Math.max(rect.width, 288),
+      });
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [isOpen, usePortal]);
 
   // Escape 닫기
   useEffect(() => {
@@ -197,59 +237,82 @@ export default function ClubSearchSelect({
         </div>
       </button>
 
-      {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-72 max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-72 flex flex-col">
-          <div className="p-2 border-b border-gray-200">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-              <input
-                ref={inputRef}
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="골프장 검색..."
-                className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400"
-              />
-            </div>
-          </div>
-
-          <div className="overflow-y-auto flex-1">
-            <button
-              type="button"
-              onClick={() => {
-                onChange("");
-                setIsOpen(false);
-                setSearch("");
-              }}
-              className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${
-                !selectedClubCode ? "bg-gray-100 font-medium text-gray-900" : "text-gray-600"
-              }`}
+      {isOpen &&
+        (() => {
+          const dropdown = (
+            <div
+              ref={dropdownRef}
+              className={
+                usePortal
+                  ? "bg-white border border-gray-200 rounded-lg shadow-lg z-[60] max-h-72 flex flex-col"
+                  : "absolute top-full left-0 mt-1 w-72 max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-72 flex flex-col"
+              }
+              style={
+                usePortal
+                  ? {
+                      position: "fixed",
+                      top: pos.top,
+                      left: pos.left,
+                      width: pos.width,
+                    }
+                  : undefined
+              }
             >
-              {placeholder}
-            </button>
-
-            {topItems.length > 0 && (
-              <>
-                <div className="px-3 pt-2 pb-1 text-[10px] font-medium tracking-[0.2px] text-gray-400">
-                  즐겨찾기 · 최근
+              <div className="p-2 border-b border-gray-200">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="골프장 검색..."
+                    className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400"
+                  />
                 </div>
-                {topItems.map(renderRow)}
-                <div className="my-1 border-t border-gray-100" />
-              </>
-            )}
-
-            {filtered
-              .filter((c) => !topCodeSet.has(c.code))
-              .map(renderRow)}
-
-            {filtered.length === 0 && topItems.length === 0 && (
-              <div className="px-3 py-4 text-sm text-gray-400 text-center">
-                검색 결과 없음
               </div>
-            )}
-          </div>
-        </div>
-      )}
+
+              <div className="overflow-y-auto flex-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange("");
+                    setIsOpen(false);
+                    setSearch("");
+                  }}
+                  className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${
+                    !selectedClubCode ? "bg-gray-100 font-medium text-gray-900" : "text-gray-600"
+                  }`}
+                >
+                  {placeholder}
+                </button>
+
+                {topItems.length > 0 && (
+                  <>
+                    <div className="px-3 pt-2 pb-1 text-[10px] font-medium tracking-[0.2px] text-gray-400">
+                      즐겨찾기 · 최근
+                    </div>
+                    {topItems.map(renderRow)}
+                    <div className="my-1 border-t border-gray-100" />
+                  </>
+                )}
+
+                {filtered
+                  .filter((c) => !topCodeSet.has(c.code))
+                  .map(renderRow)}
+
+                {filtered.length === 0 && topItems.length === 0 && (
+                  <div className="px-3 py-4 text-sm text-gray-400 text-center">
+                    검색 결과 없음
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+          return usePortal && typeof document !== "undefined"
+            ? createPortal(dropdown, document.body)
+            : dropdown;
+        })()}
     </div>
   );
 }

@@ -30,6 +30,15 @@ export interface ConsultationEntity {
   holdReason: string | null;
   rejectionReason: string | null;
   linkedTradeId: string | null;
+  /** 연결된 입출금표 ID (백엔드 2026-05-08 추가). */
+  settlementId: string | null;
+  /**
+   * 입출금표 문서 생성 완료 여부. REQUEST_APPROVAL / APPROVE_FIRST 게이트.
+   * undefined 회피를 위해 boolean 으로 정규화 — null 응답은 false 로.
+   */
+  settlementDocumentGenerated: boolean;
+  /** 문서 생성 완료 시각 (ISO). */
+  settlementDocumentGeneratedAt: string | null;
   createdByName: string | null;
   createdAt: string;
   updatedAt: string;

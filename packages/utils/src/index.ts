@@ -21,3 +21,6 @@ export {
   extractRegionFromAddress,
   getEffectiveRegion,
 } from "./korean";
+
+export { formatPhoneNumber, isValidKoreanMobile } from "./phone";
+export { isValidEmail } from "./email";

@@ -62,6 +62,15 @@ export type {
   CustomerHistoryRecentConsultationEntity,
   CustomerHistoryRecentMembershipTradeEntity,
   CustomerGradeKey,
+  OwnedMembershipEntity,
+  OwnedMembershipStatusKey,
 } from "./customer";
-export { CUSTOMER_GRADE_LABEL, getCustomerGradeLabel } from "./customer";
+export {
+  CUSTOMER_GRADE_LABEL,
+  getCustomerGradeLabel,
+  OWNED_MEMBERSHIP_STATUS_LABEL,
+  getOwnedMembershipStatusLabel,
+} from "./customer";
 export type { ClubDocumentEntity, ClubScenarioDocumentEntity } from "./club-document";
+export type { SettlementEntity, SettlementCellKey } from "./settlement";
+export { EMPTY_SETTLEMENT_ENTITY, SETTLEMENT_CELL_KEYS } from "./settlement";

@@ -808,13 +808,21 @@ export default function ConsultationsPage() {
                           {(trade.approvalStatus === "PENDING_DEPOSIT" ||
                             trade.approvalStatus === "PENDING_APPROVAL") && (() => {
                             const hasDeposit = !!trade.depositAmount && trade.depositAmount > 0;
+                            const docReady = !!trade.settlementDocumentGenerated;
+                            const blockedReason = !hasDeposit
+                              ? "계약금 입력 후 확인 가능"
+                              : !docReady
+                                ? "입출금표 문서 생성 완료가 필요합니다 (OS 의 승인 요청 단계)"
+                                : "계약금 확인 후 거래 자동 생성";
                             return (
                               <button
                                 type="button"
-                                disabled={approvalBusyId === trade.id || !hasDeposit}
+                                disabled={
+                                  approvalBusyId === trade.id || !hasDeposit || !docReady
+                                }
                                 onClick={() => runApprovalAction(trade, "APPROVE_FIRST")}
                                 className="px-2 py-0.5 text-xs font-medium rounded border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-30 disabled:cursor-not-allowed"
-                                title={hasDeposit ? "계약금 확인 후 거래 자동 생성" : "계약금 입력 후 확인 가능"}
+                                title={blockedReason}
                               >
                                 계약금 확인
                               </button>

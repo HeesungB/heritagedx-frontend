@@ -5,41 +5,10 @@ import { useRouter } from "next/navigation";
 import { Search, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAppStores } from "@/stores";
 import { useCustomers } from "@heritage-dx/store";
-import {
-  Button,
-  Input,
-  Textarea,
-  Modal,
-  Loading,
-} from "@heritage-dx/ui";
+import { Loading } from "@heritage-dx/ui";
+import { CustomerCreateModal } from "./customer-create/CustomerCreateModal";
 
 const DEFAULT_LIMIT = 20;
-
-interface CustomerFormState {
-  name: string;
-  contact: string;
-  email: string;
-  address: string;
-  memo: string;
-  ageBracket: string;
-  occupation: string;
-  ownedMembershipSummary: string;
-  residenceArea: string;
-}
-
-const emptyForm: CustomerFormState = {
-  name: "",
-  contact: "",
-  email: "",
-  address: "",
-  memo: "",
-  ageBracket: "",
-  occupation: "",
-  ownedMembershipSummary: "",
-  residenceArea: "",
-};
-
-const AGE_BRACKET_OPTIONS = ["20대", "30대", "40대", "50대", "60대", "70대 이상"] as const;
 
 export default function CustomersPageClient() {
   const router = useRouter();
@@ -50,7 +19,6 @@ export default function CustomersPageClient() {
     isLoading,
     isRefreshing,
     fetch,
-    create,
   } = useCustomers(customerStore);
 
   const [searchInput, setSearchInput] = useState("");
@@ -58,9 +26,6 @@ export default function CustomersPageClient() {
   const [page, setPage] = useState(1);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createForm, setCreateForm] = useState<CustomerFormState>(emptyForm);
-  const [createSubmitting, setCreateSubmitting] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setSearchQuery(searchInput.trim()), 300);
@@ -76,37 +41,6 @@ export default function CustomersPageClient() {
       order: "DESC",
     });
   }, [page, searchQuery, fetch]);
-
-  const handleCreate = async () => {
-    if (!createForm.name.trim() || !createForm.contact.trim()) {
-      setCreateError("고객명과 연락처를 입력해주세요.");
-      return;
-    }
-    setCreateSubmitting(true);
-    setCreateError(null);
-    const result = await create({
-      name: createForm.name.trim(),
-      contact: createForm.contact.trim(),
-      email: createForm.email.trim() || null,
-      address: createForm.address.trim() || null,
-      memo: createForm.memo.trim() || undefined,
-      ageBracket: createForm.ageBracket.trim() || null,
-      occupation: createForm.occupation.trim() || null,
-      ownedMembershipSummary: createForm.ownedMembershipSummary.trim() || null,
-      residenceArea: createForm.residenceArea.trim() || null,
-    });
-    setCreateSubmitting(false);
-    if (result.success) {
-      setShowCreateModal(false);
-      setCreateForm(emptyForm);
-    } else {
-      setCreateError(
-        result.conflict
-          ? "이미 등록된 연락처입니다."
-          : result.errorMessage ?? "고객 등록에 실패했습니다.",
-      );
-    }
-  };
 
   const totalPages = pagination?.totalPages ?? 1;
   const total = pagination?.total ?? 0;
@@ -265,149 +199,12 @@ export default function CustomersPageClient() {
         )}
       </main>
 
-      <Modal
-        isOpen={showCreateModal}
-        onClose={() => {
-          setShowCreateModal(false);
-          setCreateForm(emptyForm);
-          setCreateError(null);
-        }}
-        title="신규 고객 등록"
-        footer={
-          <>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowCreateModal(false);
-                setCreateForm(emptyForm);
-                setCreateError(null);
-              }}
-              disabled={createSubmitting}
-            >
-              취소
-            </Button>
-            <Button onClick={handleCreate} isLoading={createSubmitting}>
-              등록
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              고객명 *
-            </label>
-            <Input
-              value={createForm.name}
-              onChange={(e) =>
-                setCreateForm({ ...createForm, name: e.target.value })
-              }
-              placeholder="홍길동"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              연락처 *
-            </label>
-            <Input
-              value={createForm.contact}
-              onChange={(e) =>
-                setCreateForm({ ...createForm, contact: e.target.value })
-              }
-              placeholder="010-1234-5678"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              이메일
-            </label>
-            <Input
-              type="email"
-              value={createForm.email}
-              onChange={(e) =>
-                setCreateForm({ ...createForm, email: e.target.value })
-              }
-              placeholder="hong@example.com"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              주소
-            </label>
-            <Input
-              value={createForm.address}
-              onChange={(e) =>
-                setCreateForm({ ...createForm, address: e.target.value })
-              }
-              placeholder="서울특별시 강남구 테헤란로 123"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                연령대
-              </label>
-              <select
-                value={createForm.ageBracket}
-                onChange={(e) => setCreateForm({ ...createForm, ageBracket: e.target.value })}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
-              >
-                <option value="">선택</option>
-                {AGE_BRACKET_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                직업
-              </label>
-              <Input
-                value={createForm.occupation}
-                onChange={(e) => setCreateForm({ ...createForm, occupation: e.target.value })}
-                placeholder="회사원, 자영업 등"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              거주 지역
-            </label>
-            <Input
-              value={createForm.residenceArea}
-              onChange={(e) => setCreateForm({ ...createForm, residenceArea: e.target.value })}
-              placeholder="서울 강남구, 경기 성남 등"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              보유 회원권 요약
-            </label>
-            <Textarea
-              value={createForm.ownedMembershipSummary}
-              onChange={(e) => setCreateForm({ ...createForm, ownedMembershipSummary: e.target.value })}
-              rows={2}
-              placeholder="현재 보유 중인 회원권"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              메모
-            </label>
-            <Textarea
-              value={createForm.memo}
-              onChange={(e) =>
-                setCreateForm({ ...createForm, memo: e.target.value })
-              }
-              rows={3}
-              placeholder="선호 시간, 관심 회원권 등"
-            />
-          </div>
-          {createError && (
-            <p className="text-sm text-red-600">{createError}</p>
-          )}
-        </div>
-      </Modal>
+      {showCreateModal && (
+        <CustomerCreateModal
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={() => setShowCreateModal(false)}
+        />
+      )}
     </div>
   );
 }

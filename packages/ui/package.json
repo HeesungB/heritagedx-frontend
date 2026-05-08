@@ -19,7 +19,9 @@
   "devDependencies": {
     "@heritage-dx/typescript-config": "workspace:*",
     "@types/react": "^19.0.1",
+    "@types/react-dom": "^19.0.0",
     "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "typescript": "^5.7.2"
   }
 }

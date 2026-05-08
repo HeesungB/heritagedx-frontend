@@ -1,6 +1,8 @@
 "use client";
 
 import { forwardRef } from "react";
+import { Controller, useFormContext } from "react-hook-form";
+import type { SheetOverrides } from "@/hooks/settlement-sheet-adapter";
 
 const inlineInputCls =
   "bg-transparent border-none outline-none w-full hover:bg-emerald-50 focus:bg-white focus:ring-1 focus:ring-emerald-400 rounded px-1 -mx-1 transition-colors";
@@ -12,28 +14,150 @@ const autoResize = (el: HTMLTextAreaElement) => {
   el.style.height = `${el.scrollHeight}px`;
 };
 
-interface ApprovalRequestSheetProps {
-  overrides: Record<string, string>;
-  onChange: (key: string, value: string) => void;
-}
-
 const fmtNum = (raw: string) => {
   const n = parseInt((raw || "").replace(/[^0-9]/g, ""), 10);
   if (!n) return "";
   return n.toLocaleString("ko-KR");
 };
 
-const onNumInput = (
-  raw: string,
-  key: string,
-  onChange: (key: string, value: string) => void,
-) => {
-  onChange(key, raw.replace(/[^0-9]/g, ""));
-};
+/** 양식 셀의 에러 메시지를 RHF formState 에서 단일 string 으로 추출. */
+function useCellError(name: string): string | undefined {
+  const {
+    formState: { errors },
+  } = useFormContext<SheetOverrides>();
+  const entry = errors[name];
+  if (!entry) return undefined;
+  const msg = (entry as { message?: unknown }).message;
+  return typeof msg === "string" ? msg : undefined;
+}
 
-const ApprovalRequestSheet = forwardRef<HTMLDivElement, ApprovalRequestSheetProps>(
-  function ApprovalRequestSheet({ overrides, onChange }, ref) {
-    const v = (key: string) => overrides[key] ?? "";
+const errorRing = "ring-1 ring-red-400 bg-red-50";
+const errorText = "mt-0.5 text-[10px] text-red-600 leading-tight whitespace-pre-line";
+
+// 모듈 스코프 셀 컴포넌트들 — reference 가 안정적이라 부모 리렌더에 입력이 끊기지 않는다.
+function TextCell({
+  keyName,
+  placeholder,
+  className = "",
+}: {
+  keyName: string;
+  placeholder?: string;
+  className?: string;
+}) {
+  const { register } = useFormContext<SheetOverrides>();
+  const error = useCellError(keyName);
+  return (
+    <>
+      <input
+        type="text"
+        {...register(keyName)}
+        placeholder={placeholder}
+        className={`${inlineInputCls} ${className} ${error ? errorRing : ""}`}
+      />
+      {error && <div className={errorText}>{error}</div>}
+    </>
+  );
+}
+
+function NumCell({
+  keyName,
+  placeholder,
+  prefix,
+}: {
+  keyName: string;
+  placeholder?: string;
+  prefix?: string;
+}) {
+  const { control } = useFormContext<SheetOverrides>();
+  const error = useCellError(keyName);
+  return (
+    <div>
+      <div className="flex items-center gap-1">
+        {prefix && <span className="text-gray-500 flex-shrink-0">{prefix}</span>}
+        <Controller
+          control={control}
+          name={keyName}
+          render={({ field }) => (
+            <input
+              type="text"
+              value={fmtNum(field.value ?? "")}
+              onChange={(e) =>
+                field.onChange(e.target.value.replace(/[^0-9]/g, ""))
+              }
+              onBlur={field.onBlur}
+              ref={field.ref}
+              placeholder={placeholder ?? "0"}
+              className={`${inlineNumberCls} ${error ? errorRing : ""}`}
+            />
+          )}
+        />
+      </div>
+      {error && <div className={errorText}>{error}</div>}
+    </div>
+  );
+}
+
+function Check({
+  groupKey,
+  option,
+  label,
+}: {
+  groupKey: string;
+  option: string;
+  label: string;
+}) {
+  const { watch, setValue } = useFormContext<SheetOverrides>();
+  const error = useCellError(groupKey);
+  const selected = watch(groupKey) === option;
+  return (
+    <button
+      type="button"
+      onClick={() =>
+        setValue(groupKey, selected ? "" : option, { shouldDirty: true })
+      }
+      className={`inline-flex items-center gap-1 px-1 py-0.5 text-[12px] hover:bg-emerald-50 rounded transition-colors ${selected ? "font-semibold text-gray-900" : "text-gray-600"} ${error ? "ring-1 ring-red-400" : ""}`}
+    >
+      <span className="font-mono">{selected ? "■" : "□"}</span>
+      <span>{label}</span>
+    </button>
+  );
+}
+
+/**
+ * inline `<input {...register("...")}/>` 들을 한 곳에서 관리하기 위한 wrapper.
+ * 에러 표시(빨간 ring + 메시지) 일관 적용.
+ */
+function RegisteredInput({
+  name,
+  placeholder,
+  className = "",
+  showMessage = true,
+}: {
+  name: string;
+  placeholder?: string;
+  className?: string;
+  showMessage?: boolean;
+}) {
+  const { register } = useFormContext<SheetOverrides>();
+  const error = useCellError(name);
+  return (
+    <>
+      <input
+        type="text"
+        {...register(name)}
+        placeholder={placeholder}
+        className={`${className} ${error ? errorRing : ""}`}
+      />
+      {error && showMessage && <div className={errorText}>{error}</div>}
+    </>
+  );
+}
+
+const ApprovalRequestSheet = forwardRef<HTMLDivElement>(
+  function ApprovalRequestSheet(_props, ref) {
+    const { register } = useFormContext<SheetOverrides>();
+    const remarksRegister = register("remarks");
+    const remarksError = useCellError("remarks");
 
     const thLabelCls =
       "bg-gray-50 border border-gray-300 px-2 py-1.5 text-[12px] font-semibold text-gray-700 whitespace-nowrap text-center align-middle";
@@ -42,72 +166,16 @@ const ApprovalRequestSheet = forwardRef<HTMLDivElement, ApprovalRequestSheetProp
     const sectionTitleCls =
       "border border-gray-300 px-2 py-2 text-[13px] font-bold text-gray-800 text-center bg-emerald-50";
 
-    // 체크박스 토글: groupKey 의 값이 option 과 같으면 ■, 아니면 □.
-    const Check = ({ groupKey, option, label }: { groupKey: string; option: string; label: string }) => {
-      const selected = v(groupKey) === option;
-      return (
-        <button
-          type="button"
-          onClick={() => onChange(groupKey, selected ? "" : option)}
-          className={`inline-flex items-center gap-1 px-1 py-0.5 text-[12px] hover:bg-emerald-50 rounded transition-colors ${selected ? "font-semibold text-gray-900" : "text-gray-600"}`}
-        >
-          <span className="font-mono">{selected ? "■" : "□"}</span>
-          <span>{label}</span>
-        </button>
-      );
-    };
-
-    const TextCell = ({
-      keyName,
-      placeholder,
-      className = "",
-    }: {
-      keyName: string;
-      placeholder?: string;
-      className?: string;
-    }) => (
-      <input
-        type="text"
-        value={v(keyName)}
-        onChange={(e) => onChange(keyName, e.target.value)}
-        placeholder={placeholder}
-        className={`${inlineInputCls} ${className}`}
-      />
-    );
-
-    const NumCell = ({
-      keyName,
-      placeholder,
-      prefix,
-    }: {
-      keyName: string;
-      placeholder?: string;
-      prefix?: string;
-    }) => (
-      <div className="flex items-center gap-1">
-        {prefix && <span className="text-gray-500 flex-shrink-0">{prefix}</span>}
-        <input
-          type="text"
-          value={fmtNum(v(keyName))}
-          onChange={(e) => onNumInput(e.target.value, keyName, onChange)}
-          placeholder={placeholder ?? "0"}
-          className={inlineNumberCls}
-        />
-      </div>
-    );
-
     return (
       <div
         ref={ref}
         className="bg-white px-6 py-5 mx-auto font-sans text-[12px] text-gray-800 print:p-3 print:m-0"
         style={{ width: "1050px", maxWidth: "100%" }}
       >
-        {/* 제목 */}
         <h1 className="text-center text-lg font-bold mb-2 tracking-wide text-gray-900">
           회원권 거래 승인요청서
         </h1>
 
-        {/* 헤더 — 회사/일자/회원권명/매도·매수 담당·성명·연락처 */}
         <table className="w-full border-collapse">
           <colgroup>
             <col style={{ width: "12%" }} />
@@ -149,10 +217,8 @@ const ApprovalRequestSheet = forwardRef<HTMLDivElement, ApprovalRequestSheetProp
               </td>
               <td className={tdCls}>
                 <TextCell keyName="sellCompany" />
-                <input
-                  type="text"
-                  value={v("sellContact")}
-                  onChange={(e) => onChange("sellContact", e.target.value)}
+                <RegisteredInput
+                  name="sellContact"
                   placeholder="연락처"
                   className={`${inlineInputCls} mt-0.5 text-[11px] text-gray-400 placeholder:text-gray-300`}
                 />
@@ -163,10 +229,8 @@ const ApprovalRequestSheet = forwardRef<HTMLDivElement, ApprovalRequestSheetProp
               </td>
               <td className={tdCls} colSpan={2}>
                 <TextCell keyName="buyCompany" />
-                <input
-                  type="text"
-                  value={v("buyContact")}
-                  onChange={(e) => onChange("buyContact", e.target.value)}
+                <RegisteredInput
+                  name="buyContact"
                   placeholder="연락처"
                   className={`${inlineInputCls} mt-0.5 text-[11px] text-gray-400 placeholder:text-gray-300`}
                 />
@@ -393,7 +457,7 @@ const ApprovalRequestSheet = forwardRef<HTMLDivElement, ApprovalRequestSheetProp
           </tbody>
         </table>
 
-        {/* 매매계약서 / 세금계산서 */}
+        {/* 매매계약서 / 세금계산서 / 거래경로 / 수익금 / 세무신고 / 특이사항 */}
         <table className="w-full border-collapse mt-2">
           <colgroup>
             <col style={{ width: "12%" }} />
@@ -415,21 +479,21 @@ const ApprovalRequestSheet = forwardRef<HTMLDivElement, ApprovalRequestSheetProp
               <td className={thLabelCls}>매출(발행)</td>
               <td className={tdCls} colSpan={4}>
                 <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={v("taxIssueAmount")}
-                    onChange={(e) => onChange("taxIssueAmount", e.target.value)}
-                    placeholder="발행금액"
-                    className={`${inlineInputCls} flex-1`}
-                  />
+                  <div className="flex-1">
+                    <RegisteredInput
+                      name="taxIssueAmount"
+                      placeholder="발행금액"
+                      className={`${inlineInputCls} w-full`}
+                    />
+                  </div>
                   <span className="text-gray-500 flex-shrink-0">--&gt;</span>
-                  <input
-                    type="text"
-                    value={v("taxIssueRecipient")}
-                    onChange={(e) => onChange("taxIssueRecipient", e.target.value)}
-                    placeholder="수령인"
-                    className={`${inlineInputCls} flex-1`}
-                  />
+                  <div className="flex-1">
+                    <RegisteredInput
+                      name="taxIssueRecipient"
+                      placeholder="수령인"
+                      className={`${inlineInputCls} w-full`}
+                    />
+                  </div>
                 </div>
               </td>
             </tr>
@@ -437,21 +501,21 @@ const ApprovalRequestSheet = forwardRef<HTMLDivElement, ApprovalRequestSheetProp
               <td className={thLabelCls}>매입(수령)</td>
               <td className={tdCls} colSpan={4}>
                 <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={v("taxReceiveAmount")}
-                    onChange={(e) => onChange("taxReceiveAmount", e.target.value)}
-                    placeholder="수령금액"
-                    className={`${inlineInputCls} flex-1`}
-                  />
+                  <div className="flex-1">
+                    <RegisteredInput
+                      name="taxReceiveAmount"
+                      placeholder="수령금액"
+                      className={`${inlineInputCls} w-full`}
+                    />
+                  </div>
                   <span className="text-gray-500 flex-shrink-0">&lt;--</span>
-                  <input
-                    type="text"
-                    value={v("taxReceiveIssuer")}
-                    onChange={(e) => onChange("taxReceiveIssuer", e.target.value)}
-                    placeholder="발행인"
-                    className={`${inlineInputCls} flex-1`}
-                  />
+                  <div className="flex-1">
+                    <RegisteredInput
+                      name="taxReceiveIssuer"
+                      placeholder="발행인"
+                      className={`${inlineInputCls} w-full`}
+                    />
+                  </div>
                 </div>
               </td>
             </tr>
@@ -464,11 +528,10 @@ const ApprovalRequestSheet = forwardRef<HTMLDivElement, ApprovalRequestSheetProp
                   <div className="flex items-center gap-1">
                     <Check groupKey="sellerRoute" option="소개" label="소개" />
                     <span className="text-gray-400">(</span>
-                    <input
-                      type="text"
-                      value={v("sellerRouteIntro")}
-                      onChange={(e) => onChange("sellerRouteIntro", e.target.value)}
+                    <RegisteredInput
+                      name="sellerRouteIntro"
                       className="w-20 bg-transparent border-b border-gray-300 outline-none text-[11px] focus:border-emerald-500"
+                      showMessage={false}
                     />
                     <span className="text-gray-400">)</span>
                   </div>
@@ -486,11 +549,10 @@ const ApprovalRequestSheet = forwardRef<HTMLDivElement, ApprovalRequestSheetProp
                   <div className="flex items-center gap-1">
                     <Check groupKey="buyerRoute" option="소개" label="소개" />
                     <span className="text-gray-400">(</span>
-                    <input
-                      type="text"
-                      value={v("buyerRouteIntro")}
-                      onChange={(e) => onChange("buyerRouteIntro", e.target.value)}
+                    <RegisteredInput
+                      name="buyerRouteIntro"
                       className="w-20 bg-transparent border-b border-gray-300 outline-none text-[11px] focus:border-emerald-500"
+                      showMessage={false}
                     />
                     <span className="text-gray-400">)</span>
                   </div>
@@ -542,29 +604,26 @@ const ApprovalRequestSheet = forwardRef<HTMLDivElement, ApprovalRequestSheetProp
                   <Check groupKey="transferReport" option="불필요" label="불필요" />
                   <div className="flex items-center gap-1">
                     <span className="text-[11px] text-gray-500">신고금액</span>
-                    <input
-                      type="text"
-                      value={v("transferAmount")}
-                      onChange={(e) => onChange("transferAmount", e.target.value)}
+                    <RegisteredInput
+                      name="transferAmount"
                       className="w-24 bg-transparent border-b border-gray-300 outline-none focus:border-emerald-500"
+                      showMessage={false}
                     />
                   </div>
                   <div className="flex items-center gap-1">
                     <span className="text-[11px] text-gray-500">마감일</span>
-                    <input
-                      type="text"
-                      value={v("transferDeadline")}
-                      onChange={(e) => onChange("transferDeadline", e.target.value)}
+                    <RegisteredInput
+                      name="transferDeadline"
                       className="w-20 bg-transparent border-b border-gray-300 outline-none focus:border-emerald-500"
+                      showMessage={false}
                     />
                   </div>
                   <div className="flex items-center gap-1">
                     <span className="text-[11px] text-gray-500">완료 일자</span>
-                    <input
-                      type="text"
-                      value={v("transferDoneAt")}
-                      onChange={(e) => onChange("transferDoneAt", e.target.value)}
+                    <RegisteredInput
+                      name="transferDoneAt"
                       className="w-20 bg-transparent border-b border-gray-300 outline-none focus:border-emerald-500"
+                      showMessage={false}
                     />
                   </div>
                 </div>
@@ -578,29 +637,26 @@ const ApprovalRequestSheet = forwardRef<HTMLDivElement, ApprovalRequestSheetProp
                   <Check groupKey="acquireReport" option="불필요" label="불필요" />
                   <div className="flex items-center gap-1">
                     <span className="text-[11px] text-gray-500">신고금액</span>
-                    <input
-                      type="text"
-                      value={v("acquireAmount")}
-                      onChange={(e) => onChange("acquireAmount", e.target.value)}
+                    <RegisteredInput
+                      name="acquireAmount"
                       className="w-24 bg-transparent border-b border-gray-300 outline-none focus:border-emerald-500"
+                      showMessage={false}
                     />
                   </div>
                   <div className="flex items-center gap-1">
                     <span className="text-[11px] text-gray-500">마감일</span>
-                    <input
-                      type="text"
-                      value={v("acquireDeadline")}
-                      onChange={(e) => onChange("acquireDeadline", e.target.value)}
+                    <RegisteredInput
+                      name="acquireDeadline"
                       className="w-20 bg-transparent border-b border-gray-300 outline-none focus:border-emerald-500"
+                      showMessage={false}
                     />
                   </div>
                   <div className="flex items-center gap-1">
                     <span className="text-[11px] text-gray-500">완료 일자</span>
-                    <input
-                      type="text"
-                      value={v("acquireDoneAt")}
-                      onChange={(e) => onChange("acquireDoneAt", e.target.value)}
+                    <RegisteredInput
+                      name="acquireDoneAt"
                       className="w-20 bg-transparent border-b border-gray-300 outline-none focus:border-emerald-500"
+                      showMessage={false}
                     />
                   </div>
                 </div>
@@ -610,17 +666,19 @@ const ApprovalRequestSheet = forwardRef<HTMLDivElement, ApprovalRequestSheetProp
               <td className={thLabelCls}>특이사항</td>
               <td className={tdCls} colSpan={5}>
                 <textarea
-                  value={v("remarks")}
+                  {...remarksRegister}
                   onChange={(e) => {
-                    onChange("remarks", e.target.value);
+                    void remarksRegister.onChange(e);
                     autoResize(e.target);
                   }}
                   ref={(el) => {
+                    remarksRegister.ref(el);
                     if (el) autoResize(el);
                   }}
                   rows={2}
-                  className="w-full bg-transparent border-none outline-none resize-none hover:bg-emerald-50 focus:bg-white focus:ring-1 focus:ring-emerald-400 rounded px-1 -mx-1 transition-colors"
+                  className={`w-full bg-transparent border-none outline-none resize-none hover:bg-emerald-50 focus:bg-white focus:ring-1 focus:ring-emerald-400 rounded px-1 -mx-1 transition-colors ${remarksError ? errorRing : ""}`}
                 />
+                {remarksError && <div className={errorText}>{remarksError}</div>}
               </td>
             </tr>
           </tbody>

@@ -104,12 +104,40 @@ export class ApiClient {
       const json = await response.json();
 
       if (!response.ok) {
-        const errorBody = json?.error ?? json;
+        // 응답 형태:
+        //   1) NestJS class-validator: { message: string[], error: "Bad Request", statusCode }
+        //   2) 커스텀 nested:           { error: { message, code, details }, ... }
+        //   3) 커스텀 평탄:             { code, message, details, statusCode } (예: SETTLEMENT_REQUIRED_FIELDS)
+        const customError =
+          typeof json?.error === "object" && json.error !== null
+            ? (json.error as { message?: unknown; code?: string; details?: unknown })
+            : null;
+        const messages = Array.isArray(json?.message)
+          ? (json.message as string[])
+          : Array.isArray(customError?.message)
+            ? (customError.message as string[])
+            : null;
+        const singleError = messages
+          ? messages.join("\n")
+          : typeof customError?.message === "string"
+            ? customError.message
+            : typeof json?.message === "string"
+              ? json.message
+              : "요청 처리 중 오류가 발생했습니다.";
+        const errorCode =
+          customError?.code ??
+          (typeof json?.code === "string" ? (json.code as string) : undefined);
+        const errorDetails =
+          (customError?.details as Record<string, unknown> | undefined) ??
+          (typeof json?.details === "object" && json.details !== null
+            ? (json.details as Record<string, unknown>)
+            : null);
         return {
           success: false,
-          error: errorBody?.message || json?.message || "요청 처리 중 오류가 발생했습니다.",
-          errorCode: errorBody?.code,
-          errorDetails: errorBody?.details ?? null,
+          error: singleError,
+          errors: messages ?? undefined,
+          errorCode,
+          errorDetails,
         };
       }
 
@@ -223,9 +251,25 @@ export class ApiClient {
       const json = await response.json();
 
       if (!response.ok) {
+        const messages = Array.isArray(json?.message)
+          ? (json.message as string[])
+          : null;
+        const errorCode =
+          typeof json?.code === "string" ? (json.code as string) : undefined;
+        const errorDetails =
+          typeof json?.details === "object" && json.details !== null
+            ? (json.details as Record<string, unknown>)
+            : null;
         return {
           success: false,
-          error: json.message || "요청 처리 중 오류가 발생했습니다.",
+          error: messages
+            ? messages.join("\n")
+            : (typeof json?.message === "string"
+                ? json.message
+                : "요청 처리 중 오류가 발생했습니다."),
+          errors: messages ?? undefined,
+          errorCode,
+          errorDetails,
         };
       }
 

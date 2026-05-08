@@ -29,3 +29,6 @@ export type {
   CustomerStoreState,
   CustomerCreateResult,
 } from "./customer.store";
+
+export { createSettlementStore } from "./settlement.store";
+export type { SettlementStore, SettlementStoreState } from "./settlement.store";

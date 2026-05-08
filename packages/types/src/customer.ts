@@ -1,5 +1,24 @@
 import type { Pagination } from "./api";
 
+/**
+ * 고객 보유 회원권 항목.
+ * PUT/POST /api/customers* 의 ownedMemberships 배열 요소이자, 응답에 함께 내려오는 join 결과.
+ * - 같은 요청 안에서 (clubId, membershipId) 중복 등록 불가
+ * - status enum (백엔드 검증 2026-05-07): OWNED / SELLING / TRANSFER_PENDING / SOLD / UNKNOWN
+ *   한글 라벨은 `@heritage-dx/store` 의 OWNED_MEMBERSHIP_STATUS_LABEL 참고.
+ */
+export interface CustomerOwnedMembership {
+  clubId: string;
+  membershipId: string;
+  status: string;
+  quantity: number;
+  note?: string | null;
+  displayOrder: number;
+  // 응답 join 필드 (요청에는 보내지 않아도 됨)
+  clubName?: string | null;
+  membershipName?: string | null;
+}
+
 // 고객 (OpenAPI CustomerResponseDto)
 export interface Customer {
   id: string;
@@ -15,6 +34,7 @@ export interface Customer {
   ageBracket?: string | null;
   occupation?: string | null;
   ownedMembershipSummary?: string | null;
+  ownedMemberships?: CustomerOwnedMembership[];
   /**
    * 고객 영업 등급. 거래 라이프사이클에 따라 서버가 자동 산정한다 (예: ACTIVE_DEAL, HIGH_INTENT).
    * 클라이언트에서는 읽기 전용이며, 폼 입력으로 변경하지 않는다.
@@ -36,12 +56,14 @@ export interface CustomerInput {
   ageBracket?: string | null;
   occupation?: string | null;
   ownedMembershipSummary?: string | null;
+  ownedMemberships?: CustomerOwnedMembership[];
   residenceArea?: string | null;
 }
 
 // 고객 수정 입력 (OpenAPI UpdateCustomerDto)
 // customerGrade 는 거래 라이프사이클에 따라 서버가 자동 산정하지만,
 // 운영자가 영업 상황에 따라 수동 조정할 수 있도록 옵션으로 노출한다.
+// ownedMemberships 동작: 미포함 → 유지 / [] → 전체 삭제 / [...] → 전체 교체
 export interface CustomerUpdateInput {
   name?: string;
   contact?: string;
@@ -51,6 +73,7 @@ export interface CustomerUpdateInput {
   ageBracket?: string | null;
   occupation?: string | null;
   ownedMembershipSummary?: string | null;
+  ownedMemberships?: CustomerOwnedMembership[];
   residenceArea?: string | null;
   customerGrade?: string | null;
 }

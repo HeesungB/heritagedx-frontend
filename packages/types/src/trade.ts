@@ -62,6 +62,11 @@ export interface Consultation {
   holdReason: string | null;
   rejectionReason: string | null;
   linkedTradeId: string | null;
+  // 연결된 입출금표 메타 (백엔드 2026-05-08 추가).
+  // REQUEST_APPROVAL / APPROVE_FIRST 게이트는 settlementDocumentGenerated 가 true 일 때만 통과.
+  settlementId?: string | null;
+  settlementDocumentGenerated?: boolean | null;
+  settlementDocumentGeneratedAt?: string | null;
   createdByName?: string;
   createdAt: string;
   updatedAt: string;

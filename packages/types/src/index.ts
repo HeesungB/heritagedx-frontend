@@ -106,6 +106,7 @@ export type {
   Customer,
   CustomerInput,
   CustomerUpdateInput,
+  CustomerOwnedMembership,
   CustomersListData,
   CustomerHistory,
   CustomerHistorySummary,
@@ -114,6 +115,14 @@ export type {
 } from "./customer";
 
 export type { Notice, NoticeFile, NoticeInput, NoticesData } from "./notice";
+
+export type {
+  Settlement,
+  SettlementInput,
+  SettlementUpdateInput,
+  SettlementDraftRequest,
+  SettlementDraftResponse,
+} from "./settlement";
 
 export type {
   KpiTradesResponse,

@@ -2,14 +2,17 @@ import type { CustomerMemoEntry } from "./memo-history";
 
 /**
  * 백엔드 customerGrade enum → 사용자 노출 한글 라벨.
- * 현재 명시된 값은 2개 (`docs/api/README.md`):
+ * 4단계 (강함 → 약함):
  *   - ACTIVE_DEAL: 거래 생성 시 자동 부여
  *   - HIGH_INTENT: 거래 REJECT/삭제 후 다른 거래가 없을 때 자동 하향
- * 추가 단계는 백엔드 스펙 확정(Phase B) 후 enum 강화 예정.
+ *   - INTERESTED:  관심 표명 단계
+ *   - PROSPECT:    잠재 고객(가장 약한 단계)
  */
 export const CUSTOMER_GRADE_LABEL = {
   ACTIVE_DEAL: "거래 중인 고객",
   HIGH_INTENT: "거래 의사가 높은 고객",
+  INTERESTED: "관심 고객",
+  PROSPECT: "잠재 고객",
 } as const;
 
 export type CustomerGradeKey = keyof typeof CUSTOMER_GRADE_LABEL;
@@ -23,6 +26,44 @@ export function getCustomerGradeLabel(grade: string | null | undefined): string 
   }
   // 매핑되지 않은 값은 raw 그대로 표시 (백엔드가 enum 추가했을 때 코드 미반영 상태 대비)
   return trimmed;
+}
+
+/**
+ * 보유 회원권 status enum → 한글 라벨 (백엔드 검증 2026-05-07).
+ * 미매핑 값은 raw 그대로 표시.
+ */
+export const OWNED_MEMBERSHIP_STATUS_LABEL = {
+  OWNED: "보유",
+  SELLING: "매도중",
+  TRANSFER_PENDING: "명의이전중",
+  SOLD: "매도완료",
+  UNKNOWN: "알 수 없음",
+} as const;
+
+export type OwnedMembershipStatusKey = keyof typeof OWNED_MEMBERSHIP_STATUS_LABEL;
+
+export function getOwnedMembershipStatusLabel(
+  status: string | null | undefined,
+): string | null {
+  if (!status) return null;
+  const trimmed = status.trim();
+  if (!trimmed) return null;
+  if (trimmed in OWNED_MEMBERSHIP_STATUS_LABEL) {
+    return OWNED_MEMBERSHIP_STATUS_LABEL[trimmed as OwnedMembershipStatusKey];
+  }
+  return trimmed;
+}
+
+export interface OwnedMembershipEntity {
+  clubId: string;
+  membershipId: string;
+  status: string;
+  quantity: number;
+  note: string | null;
+  displayOrder: number;
+  // 응답 join 필드 (서버가 함께 내려줄 때 채워짐)
+  clubName: string | null;
+  membershipName: string | null;
 }
 
 export interface CustomerEntity {
@@ -44,6 +85,8 @@ export interface CustomerEntity {
   ageBracket: string | null;
   occupation: string | null;
   ownedMembershipSummary: string | null;
+  /** 보유 회원권 목록 — displayOrder 오름차순 정렬됨. 빈 배열이 기본. */
+  ownedMemberships: OwnedMembershipEntity[];
   // 서버가 거래 라이프사이클에 맞춰 자동 산정. 클라이언트는 읽기 전용.
   customerGrade: string | null;
   residenceArea: string | null;

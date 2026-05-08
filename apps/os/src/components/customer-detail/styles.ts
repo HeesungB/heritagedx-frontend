@@ -308,13 +308,50 @@ export type { TagColor };
 
 // 백엔드 customerGrade enum → 태그 색상.
 // PersonCard / BasicInfoCard 의 거래 의사 칩에서 동일 색을 쓰도록 한곳에 정의.
-// ACTIVE_DEAL: 거래 진행 중 의미 → amber.  HIGH_INTENT: 의사 강함 → green.
+// 단계 강도 순서대로 시각적으로 구분되게: amber → green → blue → yellow.
 const CUSTOMER_GRADE_COLOR: Record<string, TagColor> = {
   ACTIVE_DEAL: "amber",
   HIGH_INTENT: "green",
+  INTERESTED: "blue",
+  PROSPECT: "yellow",
 };
 
 export function getCustomerGradeColor(grade: string | null | undefined): TagColor {
   if (!grade) return "slate";
   return CUSTOMER_GRADE_COLOR[grade.trim()] ?? "slate";
+}
+
+// 보유 회원권 status 태그 색 (백엔드 enum 2026-05-07 기준).
+// OWNED 보유 → green(안정), SELLING 매도중 → amber(진행), TRANSFER_PENDING 명의이전중 → blue(작업 중),
+// SOLD 매도완료 → slate(종료), UNKNOWN 알 수 없음 → slate.
+const OWNED_MEMBERSHIP_STATUS_COLOR: Record<string, TagColor> = {
+  OWNED: "green",
+  SELLING: "amber",
+  TRANSFER_PENDING: "blue",
+  SOLD: "slate",
+  UNKNOWN: "slate",
+};
+
+export function getOwnedMembershipStatusColor(
+  status: string | null | undefined,
+): TagColor {
+  if (!status) return "slate";
+  return OWNED_MEMBERSHIP_STATUS_COLOR[status.trim()] ?? "slate";
+}
+
+// 매수/매도 뱃지 (상담 이력 행). mockup V3 의 sideStyle 과 동일 색감.
+export function tradeSideStyle(side: "매수" | "매도"): CSSProperties {
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    height: 18,
+    padding: "0 6px",
+    borderRadius: 4,
+    fontSize: 10.5,
+    fontWeight: 600,
+    letterSpacing: "0.02em",
+    background: side === "매수" ? "#dbeafe" : "#fee2e2",
+    color: side === "매수" ? "#1e3a8a" : "#991b1b",
+    flexShrink: 0,
+  };
 }

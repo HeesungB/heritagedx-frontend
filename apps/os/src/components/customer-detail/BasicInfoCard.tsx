@@ -18,11 +18,12 @@ const AGE_BRACKET_OPTIONS = [
   "70대 이상",
 ] as const;
 
-// 거래 의사 칩 — 백엔드 customerGrade enum 과 매핑.
-// (백엔드 스펙 문서상 ACTIVE_DEAL, HIGH_INTENT 만 명시. 추후 확정 시 enum 보강)
+// 거래 의사 칩 — 백엔드 customerGrade enum 과 매핑 (강함 → 약함 순서).
 const INTENT_CHIPS: ReadonlyArray<{ value: string; label: string }> = [
   { value: "ACTIVE_DEAL", label: "거래 중인 고객" },
   { value: "HIGH_INTENT", label: "거래 의사가 높은 고객" },
+  { value: "INTERESTED", label: "관심 고객" },
+  { value: "PROSPECT", label: "잠재 고객" },
 ];
 
 interface BasicInfoCardProps {

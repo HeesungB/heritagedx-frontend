@@ -6,7 +6,10 @@
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
+  /** 단일 메시지 — 메시지 배열이 오면 join 결과. UI 토스트 등 단일 표시용. */
   error?: string;
+  /** class-validator 배열 메시지 보존 — 필드별 매핑이 필요한 폼 검증에서 활용. */
+  errors?: string[];
   errorCode?: string;
   errorDetails?: Record<string, unknown> | null;
 }

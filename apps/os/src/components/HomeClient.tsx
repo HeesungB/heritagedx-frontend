@@ -11,8 +11,8 @@ import {
   getRegionGroup,
   REGION_GROUPS,
   extractRegionFromAddress,
-} from "@/components/ClubDirectory";
-import { getEffectiveRegion } from "@heritage-dx/utils";
+  getEffectiveRegion,
+} from "@heritage-dx/utils";
 import MobileNavigation from "@/components/MobileNavigation";
 import { Club, ClubDetail } from "@/types";
 import { useAppStores } from "@/stores";

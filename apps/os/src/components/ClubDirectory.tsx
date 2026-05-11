@@ -1,84 +1,21 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import {
+  INITIALS,
+  getKoreanInitial,
+  normalizeInitial,
+  REGION_GROUPS,
+  getRegionGroup,
+  getEffectiveRegion,
+  extractRegionFromAddress,
+} from "@heritage-dx/utils";
 import { Club } from "@/types";
 
 interface ClubDirectoryProps {
   clubs: Club[];
   totalCount: number;
   onClubSelect: (club: Club) => void;
-}
-
-export const INITIALS = [
-  "ㄱ", "ㄴ", "ㄷ", "ㄹ", "ㅁ", "ㅂ",
-  "ㅅ", "ㅇ", "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ",
-  "0-9",
-];
-
-const ALL_INITIALS = [
-  "ㄱ", "ㄲ", "ㄴ", "ㄷ", "ㄸ", "ㄹ", "ㅁ", "ㅂ", "ㅃ",
-  "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅉ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ",
-];
-
-export function getKoreanInitial(str: string): string {
-  const ch = str.charAt(0);
-  if (ch >= "0" && ch <= "9") return "0-9";
-  const code = ch.charCodeAt(0) - 0xac00;
-  if (code < 0 || code > 11171) return "#";
-  return ALL_INITIALS[Math.floor(code / 588)];
-}
-
-export function normalizeInitial(initial: string): string {
-  const map: Record<string, string> = { "ㄲ": "ㄱ", "ㄸ": "ㄷ", "ㅃ": "ㅂ", "ㅆ": "ㅅ", "ㅉ": "ㅈ" };
-  return map[initial] || initial;
-}
-
-// 정식명 → 약칭 매핑
-const PROVINCE_NORMALIZE: Record<string, string> = {
-  경기도: "경기", 강원도: "강원", 충청북도: "충북", 충청남도: "충남",
-  전라북도: "전북", 전라남도: "전남", 경상북도: "경북", 경상남도: "경남",
-  제주도: "제주", 제주특별자치도: "제주",
-  서울특별시: "서울", 부산광역시: "부산", 대구광역시: "대구",
-  인천광역시: "인천", 광주광역시: "광주", 대전광역시: "대전",
-  울산광역시: "울산", 세종특별자치시: "세종",
-};
-
-// "경기도 용인시" → "경기"
-export function getProvince(region: string): string {
-  const first = region.split(" ")[0] || region;
-  return PROVINCE_NORMALIZE[first] ?? first;
-}
-
-// 권역 그룹 정의 (표시 순서대로)
-export const REGION_GROUPS = ["수도권", "강원도", "충청도", "전라도", "경상도", "제주도"] as const;
-
-// 시/도 → 권역 매핑
-const PROVINCE_TO_GROUP: Record<string, string> = {
-  서울: "수도권", 경기: "수도권", 인천: "수도권",
-  강원: "강원도",
-  충북: "충청도", 충남: "충청도", 대전: "충청도", 세종: "충청도",
-  전북: "전라도", 전남: "전라도", 광주: "전라도",
-  경북: "경상도", 경남: "경상도", 부산: "경상도", 대구: "경상도", 울산: "경상도",
-  제주: "제주도",
-};
-
-export function getRegionGroup(region: string): string | undefined {
-  const province = getProvince(region);
-  return PROVINCE_TO_GROUP[province];
-}
-
-/** address에서 "도 시" 부분 추출 (예: "경기도 용인시 처인구 ..." → "경기도 용인시") */
-export function extractRegionFromAddress(address: string): string {
-  const parts = address.trim().split(/\s+/);
-  if (parts.length >= 2) return `${parts[0]} ${parts[1]}`;
-  return parts[0] || "";
-}
-
-/** club의 region이 비어있으면 address에서 추출 */
-function getEffectiveRegion(region: string, address: string): string {
-  if (region) return region;
-  if (address) return extractRegionFromAddress(address);
-  return "";
 }
 
 export default function ClubDirectory({ clubs, totalCount, onClubSelect }: ClubDirectoryProps) {

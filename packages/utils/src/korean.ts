@@ -58,12 +58,33 @@ const REGION_GROUP_MAP: Record<string, string> = {
   제주: "제주도",
 };
 
-export const REGION_GROUPS = ["수도권", "강원도", "충청도", "전라도", "경상도", "제주도"] as const;
+// 첫 단어 정규화에서 누락된 경우(예: "제주시", "용인시" 처럼 도 prefix 없는 시 단독)
+// 를 위한 부분 문자열 매칭 키워드. 정렬은 의미 없고, 어느 하나만 region 안에 포함되면 매칭.
+const REGION_KEYWORDS: Record<string, string> = {
+  ...REGION_GROUP_MAP,
+  // 도/광역 풀네임을 contains 매칭 보강
+  충청: "충청도", 전라: "전라도", 경상: "경상도",
+};
 
-/** 지역 문자열 → 광역 그룹 반환. 매핑 없으면 null */
+export const REGION_GROUPS = ["수도권", "강원도", "충청도", "전라도", "경상도", "제주도", "해외"] as const;
+
+/**
+ * 지역 문자열 → 광역 그룹 반환.
+ * - region 이 비어있으면 null
+ * - 1차: 첫 단어를 약칭 정규화 후 REGION_GROUP_MAP 매칭 (예: "경기도 용인시" → "경기" → "수도권")
+ * - 2차: 첫 단어가 미매칭이면 region 전체 문자열에서 한국 키워드 부분 매칭 (예: "제주시" → "제주" 포함 → "제주도")
+ * - 그 외 → "해외"
+ */
 export function getRegionGroup(region: string): string | null {
-  const province = getProvince(region);
-  return REGION_GROUP_MAP[province] ?? null;
+  const trimmed = region.trim();
+  if (!trimmed) return null;
+  const province = getProvince(trimmed);
+  const exact = REGION_GROUP_MAP[province];
+  if (exact) return exact;
+  for (const [keyword, group] of Object.entries(REGION_KEYWORDS)) {
+    if (trimmed.includes(keyword)) return group;
+  }
+  return "해외";
 }
 
 /** address에서 "도 시" 부분 추출 (예: "경기도 용인시 처인구 ..." → "경기도 용인시") */

@@ -9,39 +9,16 @@ import {
   INITIALS,
   getKoreanInitial,
   normalizeInitial,
-} from "@/components/ClubDirectory";
+  REGION_GROUPS,
+  getRegionGroup,
+} from "@heritage-dx/utils";
 
-type RegionKey =
-  | "ALL"
-  | "SUDOGWON"
-  | "GANGWON"
-  | "CHUNGCHEONG"
-  | "JEOLLA"
-  | "GYEONGSANG"
-  | "JEJU";
+type RegionKey = "ALL" | (typeof REGION_GROUPS)[number];
 
 const REGION_TABS: { key: RegionKey; label: string }[] = [
   { key: "ALL", label: "전체보기" },
-  { key: "SUDOGWON", label: "수도권" },
-  { key: "GANGWON", label: "강원도" },
-  { key: "CHUNGCHEONG", label: "충청도" },
-  { key: "JEOLLA", label: "전라도" },
-  { key: "GYEONGSANG", label: "경상도" },
-  { key: "JEJU", label: "제주도" },
+  ...REGION_GROUPS.map((g) => ({ key: g, label: g })),
 ];
-
-function getRegionGroup(region: string): { key: RegionKey; label: string } {
-  if (/서울|경기|인천/.test(region)) return { key: "SUDOGWON", label: "경기권" };
-  if (region.includes("강원")) return { key: "GANGWON", label: "강원권" };
-  if (/충청|충[남북]|대전|세종/.test(region))
-    return { key: "CHUNGCHEONG", label: "충청권" };
-  if (/전라|전[남북]|광주/.test(region))
-    return { key: "JEOLLA", label: "전라권" };
-  if (/경상|경[남북]|대구|부산|울산/.test(region))
-    return { key: "GYEONGSANG", label: "경상권" };
-  if (region.includes("제주")) return { key: "JEJU", label: "제주권" };
-  return { key: "ALL", label: region.trim() };
-}
 
 function getOperationLabel(type: string): string {
   if (type === "MEMBERSHIP") return "회원제";
@@ -102,7 +79,7 @@ function ClubCard({
         className="group block w-full rounded-[10px] border border-[#e2e8f0] bg-white p-3.5 text-left transition duration-150 hover:-translate-y-px hover:shadow-[0_4px_14px_0_rgba(15,23,43,0.06)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#101828]"
       >
         <div className="flex flex-wrap items-center gap-1.5 pr-7">
-          {group.label && <Badge>{group.label}</Badge>}
+          {group && <Badge>{group}</Badge>}
           {operationLabel && (
             <Badge tone={getOperationTone(operationLabel)}>{operationLabel}</Badge>
           )}
@@ -194,7 +171,7 @@ export default function ClubSearchPanel({
   const filtered = useMemo(() => {
     const k = keyword.trim().toLowerCase();
     return clubs.filter((c) => {
-      if (region !== "ALL" && getRegionGroup(c.region).key !== region) return false;
+      if (region !== "ALL" && getRegionGroup(c.region) !== region) return false;
       if (
         selectedInitial &&
         normalizeInitial(getKoreanInitial(c.name)) !== selectedInitial

@@ -8,7 +8,7 @@ import {
   INITIALS,
   getKoreanInitial,
   normalizeInitial,
-} from "@/components/ClubDirectory";
+} from "@heritage-dx/utils";
 
 type RegionKey =
   | "ALL"

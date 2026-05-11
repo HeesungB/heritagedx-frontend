@@ -1,19 +1,10 @@
 "use client";
 
-import { forwardRef } from "react";
+import { forwardRef, type CSSProperties } from "react";
 import { ClubDetail } from "@/types";
 import { OrganizationEntity } from "@/types/organization";
 import { parseTransferFee } from "@heritage-dx/utils";
-
-const inlineInputCls =
-  "bg-transparent border-none outline-none w-full hover:bg-emerald-50 focus:bg-white focus:ring-1 focus:ring-emerald-400 rounded px-1 -mx-1 transition-colors";
-const inlineNumberCls =
-  "bg-transparent border-none outline-none w-full text-right hover:bg-emerald-50 focus:bg-white focus:ring-1 focus:ring-emerald-400 rounded px-1 -mx-1 tabular-nums transition-colors";
-
-const autoResize = (el: HTMLTextAreaElement) => {
-  el.style.height = "auto";
-  el.style.height = `${el.scrollHeight}px`;
-};
+import styles from "./sheet-common/sheet.module.css";
 
 interface EstimateSheetProps {
   detail: ClubDetail;
@@ -21,7 +12,6 @@ interface EstimateSheetProps {
   recipient?: string;
   price: number;
   commission: number;
-
   stampDuty: number;
   otherCosts: number;
   deposit: number;
@@ -29,24 +19,26 @@ interface EstimateSheetProps {
   userName?: string;
   managerTitle?: string;
   tradeType?: "매수" | "매도";
-  // Inline editing callbacks (all optional)
   onRecipientChange?: (value: string) => void;
   onManagerTitleChange?: (value: string) => void;
   onTradeTypeChange?: (value: "매수" | "매도") => void;
   onPriceChange?: (raw: string) => void;
   onCommissionChange?: (raw: string) => void;
-
   onStampDutyChange?: (raw: string) => void;
   onOtherCostsChange?: (raw: string) => void;
   onDepositChange?: (raw: string) => void;
-
   depositAuto?: boolean;
-
   onDepositAutoReset?: () => void;
-  // Data field overrides
   fieldOverrides?: Record<string, string>;
   onFieldOverrideChange?: (key: string, value: string) => void;
 }
+
+const autoResize = (el: HTMLTextAreaElement) => {
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight}px`;
+};
+
+const cellStyleRight: CSSProperties = { textAlign: "right", fontVariantNumeric: "tabular-nums" };
 
 const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
   function EstimateSheet(
@@ -56,7 +48,6 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
       recipient,
       price,
       commission,
-
       stampDuty,
       otherCosts,
       deposit,
@@ -69,13 +60,10 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
       onTradeTypeChange,
       onPriceChange,
       onCommissionChange,
-
       onStampDutyChange,
       onOtherCostsChange,
       onDepositChange,
-
       depositAuto,
-
       onDepositAutoReset,
       fieldOverrides,
       onFieldOverrideChange,
@@ -84,16 +72,16 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
   ) {
     const isSell = tradeType === "매도";
     const membership = detail.memberships?.[selectedMembershipIndex];
-    const membershipNameOriginal =
-      membership?.membershipName || membership?.membershipType || "";
-    const clubNameOriginal = detail.name || "";
 
-    // Resolve overridden data fields
     const resolveField = (key: string, original: string) =>
       fieldOverrides && key in fieldOverrides ? fieldOverrides[key] : original;
 
-    const clubName = resolveField("clubName", clubNameOriginal);
-    const membershipName = resolveField("membershipName", membershipNameOriginal);
+    const isEditable = !!onFieldOverrideChange;
+    const clubName = resolveField("clubName", detail.name || "");
+    const membershipName = resolveField(
+      "membershipName",
+      membership?.membershipName || membership?.membershipType || "",
+    );
 
     const transferFeeWon = parseTransferFee(detail.costs.registrationFee) * 10000;
     const totalExtra = transferFeeWon + commission + stampDuty + otherCosts;
@@ -103,511 +91,396 @@ const EstimateSheet = forwardRef<HTMLDivElement, EstimateSheetProps>(
     const today = new Date();
     const formattedDate = `${today.getFullYear()}. ${today.getMonth() + 1}. ${today.getDate()}`;
 
-    const fmt = (n: number) => {
-      if (!n) return "";
-      return `${n.toLocaleString("ko-KR")}원`;
-    };
-
-    const fmtNum = (n: number) => {
-      if (!n) return "";
-      return n.toLocaleString("ko-KR");
-    };
+    const fmt = (n: number) => (n ? n.toLocaleString("ko-KR") : "0");
 
     const handleNumInput = (value: string, onChange: (raw: string) => void) => {
       onChange(value.replace(/[^0-9]/g, ""));
     };
 
-    const thCls =
-      "bg-gray-100 border border-gray-300 px-2 py-1.5 text-xs font-medium text-gray-600 whitespace-nowrap text-center";
-    const tdCls = "border border-gray-300 px-2 py-1.5 text-xs";
-    const thAccent =
-      "bg-gray-100 border border-gray-300 px-2 py-1.5 text-xs font-semibold text-gray-700 whitespace-nowrap text-center";
+    const renderText = (
+      key: string,
+      original: string,
+      opts: { placeholder?: string; style?: CSSProperties; className?: string } = {},
+    ) => {
+      const val = resolveField(key, original);
+      if (isEditable) {
+        return (
+          <input
+            type="text"
+            value={val}
+            onChange={(e) => onFieldOverrideChange!(key, e.target.value)}
+            placeholder={opts.placeholder}
+            className={`${styles.editCell} ${opts.className ?? ""}`}
+            style={{ width: "100%", ...opts.style }}
+          />
+        );
+      }
+      return <span style={opts.style}>{val || opts.placeholder || ""}</span>;
+    };
 
-    const isDataEditable = !!onFieldOverrideChange;
-
-    const sectionTitleCls = "font-semibold text-gray-800 text-sm ml-1.5";
-    const renderSectionTitle = (key: string, defaultLabel: string) =>
-      isDataEditable ? (
-        <input
-          type="text"
-          value={resolveField(key, defaultLabel)}
-          onChange={(e) => onFieldOverrideChange!(key, e.target.value)}
-          className={`${sectionTitleCls} bg-transparent border-none outline-none hover:bg-emerald-50 focus:bg-white focus:ring-1 focus:ring-emerald-400 rounded px-1 -mx-1 transition-colors`}
-        />
-      ) : (
-        <span className={sectionTitleCls}>{resolveField(key, defaultLabel)}</span>
-      );
-
-    // 테이블 th 라벨 편집
-    const editableLabel = (key: string, defaultLabel: string) =>
-      isDataEditable ? (
-        <input
-          type="text"
-          value={resolveField(`label_${key}`, defaultLabel)}
-          onChange={(e) => onFieldOverrideChange!(`label_${key}`, e.target.value)}
-          className="bg-transparent border-none outline-none w-full hover:bg-emerald-50 focus:bg-white focus:ring-1 focus:ring-emerald-400 rounded px-1 -mx-1 transition-colors text-inherit font-inherit text-xs text-center"
-        />
-      ) : defaultLabel;
-
-    const renderNumCell = (
+    const renderNumWithAuto = (
       value: number,
       onChange?: (raw: string) => void,
       extra?: { auto?: boolean; onAutoReset?: () => void; autoLabel?: string },
-    ) => (
-      <td className={`${tdCls} text-right tabular-nums whitespace-nowrap`}>
-        {onChange ? (
-          <div>
-            <div className="flex items-center gap-0.5">
-              <input
-                type="text"
-                value={fmtNum(value)}
-                onChange={(e) => handleNumInput(e.target.value, onChange)}
-                className={inlineNumberCls}
-                placeholder="0"
-              />
-              <span className="flex-shrink-0">원</span>
-            </div>
-            {extra?.auto === false && extra.onAutoReset && (
-              <button
-                type="button"
-                onClick={extra.onAutoReset}
-                className="text-[10px] text-gray-400 hover:text-gray-600 underline mt-0.5 print:hidden"
-              >
-                {extra.autoLabel || "자동계산"}
-              </button>
-            )}
-          </div>
-        ) : (
-          fmt(value)
-        )}
-      </td>
+    ) => {
+      if (!onChange) {
+        return (
+          <span style={cellStyleRight}>
+            {fmt(value)}
+            <span style={{ marginLeft: 2 }}>원</span>
+          </span>
+        );
+      }
+      return (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+            <input
+              type="text"
+              value={fmt(value)}
+              onChange={(e) => handleNumInput(e.target.value, onChange)}
+              className={`${styles.editCell} ${styles.editCellRight}`}
+              style={{ minWidth: 70, textAlign: "right" }}
+              placeholder="0"
+            />
+            <span style={{ flexShrink: 0 }}>원</span>
+          </span>
+          {extra?.auto === false && extra.onAutoReset ? (
+            <button
+              type="button"
+              onClick={extra.onAutoReset}
+              className="print:hidden"
+              style={{
+                fontSize: 9,
+                color: "#8a8f99",
+                background: "transparent",
+                border: 0,
+                cursor: "pointer",
+                padding: 0,
+                textDecoration: "underline",
+              }}
+            >
+              {extra.autoLabel ?? "자동계산"}
+            </button>
+          ) : null}
+        </div>
+      );
+    };
+
+    // 구비서류 텍스트 - membership에서 기본값 가져오되 override 가능
+    const docsKey = isSell ? "sellerDocuments" : "buyerDocuments";
+    const docsOriginal = (isSell ? membership?.sellerDocuments : membership?.buyerDocuments) || "";
+    const docsValue = resolveField(docsKey, docsOriginal);
+
+    const notesValue = resolveField(
+      "disclaimerNotes",
+      [
+        "* 상기 견적 금액은 시장 상황에 따라 변동될 수 있습니다.",
+        "* 계약금 입금 후 잔금은 명의개서일 전일까지 입금 부탁드립니다.",
+      ].join("\n"),
     );
 
-    // Number of "부대비용" sub-columns
-    const extraCols = 4;
-
     return (
-      <div
-        ref={ref}
-        className="bg-white p-6 max-w-4xl mx-auto font-sans text-sm print:p-4 print:max-w-none print:m-0"
-      >
-        {/* 제목 영역 */}
-        <div className="border-t-4 border-emerald-600 mb-3">
-          <h1 className="text-center text-xl font-bold py-2 text-gray-800">
-            {isDataEditable ? (
-              <input
-                type="text"
-                value={clubName}
-                onChange={(e) => onFieldOverrideChange!("clubName", e.target.value)}
-                className={`${inlineInputCls} inline-block text-center text-xl font-bold w-auto max-w-xs`}
-                style={{ width: `${Math.max(clubName.length, 4)}em` }}
-              />
-            ) : (
-              clubName
-            )}{" "}
-            회원권{" "}
-            {onTradeTypeChange ? (
-              <button
-                type="button"
-                onClick={() =>
-                  onTradeTypeChange(tradeType === "매수" ? "매도" : "매수")
-                }
-                className="text-emerald-600 underline decoration-emerald-300 cursor-pointer hover:text-emerald-700 print:no-underline print:text-gray-800 transition-colors"
-              >
-                {tradeType}
-              </button>
-            ) : (
-              tradeType
-            )}{" "}
-            견적서
-          </h1>
-        </div>
+      <div ref={ref} className={styles.paper}>
+        {/* Title */}
+        <h1 className={styles.docTitle}>
+          {isEditable ? (
+            <input
+              type="text"
+              value={clubName}
+              onChange={(e) => onFieldOverrideChange!("clubName", e.target.value)}
+              className={`${styles.editCell} ${styles.editCellCenter}`}
+              style={{ width: `${Math.max(clubName.length, 4)}em`, display: "inline-block" }}
+            />
+          ) : (
+            clubName
+          )}
+          {" 회원권 "}
+          {onTradeTypeChange ? (
+            <button
+              type="button"
+              className="tradeToggle"
+              onClick={() => onTradeTypeChange(isSell ? "매수" : "매도")}
+            >
+              {tradeType}
+            </button>
+          ) : (
+            tradeType
+          )}
+          {" 견적서"}
+        </h1>
 
-        {/* 수신 / 공급자 정보 (단일 테이블) */}
-        <div className="mb-3">
-          <table className="w-full border-collapse border border-gray-300">
-            <colgroup>
-              <col style={{ width: "11%" }} />
-              <col style={{ width: "22%" }} />
-              <col style={{ width: "3%" }} />
-              <col style={{ width: "11%" }} />
-              <col style={{ width: "22%" }} />
-              <col style={{ width: "9%" }} />
-              <col style={{ width: "22%" }} />
-            </colgroup>
-            <tbody>
-              {/* 1행: 수신 / 등록번호 + 대표이사 */}
-              <tr>
-                <td className={thCls}>{editableLabel("recipient", "수  신")}</td>
-                <td className={tdCls}>
-                  {onRecipientChange ? (
+        {/* 수신자 정보 */}
+        <section className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <div className={styles.sectionTitle}>수신자 정보</div>
+            <div className={styles.sectionUnit}>{formattedDate}</div>
+          </div>
+          <div className={styles.kvGrid}>
+            <div className={styles.kvRow}>
+              <div className={styles.kvKey}>수신</div>
+              <div className={styles.kvVal}>
+                {onRecipientChange ? (
+                  <input
+                    type="text"
+                    value={recipient || ""}
+                    onChange={(e) => onRecipientChange(e.target.value)}
+                    className={styles.editCell}
+                    placeholder="수신자"
+                  />
+                ) : (
+                  recipient || ""
+                )}
+              </div>
+            </div>
+            <div className={styles.kvRow}>
+              <div className={styles.kvKey}>견적일자</div>
+              <div className={styles.kvVal}>{renderText("estimateDate", formattedDate)}</div>
+            </div>
+            <div className={styles.kvRow}>
+              <div className={styles.kvKey}>연락처</div>
+              <div className={styles.kvVal}>
+                {renderText("recipientPhone", "", { placeholder: "연락처" })}
+              </div>
+            </div>
+            <div className={styles.kvRow}>
+              <div className={styles.kvKey}>담당자</div>
+              <div className={styles.kvVal}>
+                <span style={{ display: "inline-flex", gap: 6 }}>
+                  {isEditable ? (
                     <input
                       type="text"
-                      value={recipient || ""}
-                      onChange={(e) => onRecipientChange(e.target.value)}
-                      placeholder="수신자"
-                      className={inlineInputCls}
+                      value={resolveField("managerName", userName || "")}
+                      onChange={(e) => onFieldOverrideChange!("managerName", e.target.value)}
+                      className={styles.editCell}
+                      style={{ width: 80 }}
+                      placeholder="이름"
                     />
                   ) : (
-                    recipient || ""
+                    <span>{userName || ""}</span>
                   )}
-                </td>
-                <td
-                  rowSpan={5}
-                  className="bg-emerald-700 border border-gray-300 text-white text-sm font-bold text-center align-middle"
-                  style={{ writingMode: "vertical-rl", letterSpacing: "0.2em" }}
-                >
-                  {isDataEditable ? (
-                    <input type="text" value={resolveField("label_supplier", "공급자")} onChange={(e) => onFieldOverrideChange!("label_supplier", e.target.value)} className="bg-transparent border-none outline-none w-full text-center text-white hover:bg-emerald-600 focus:bg-emerald-600 focus:ring-1 focus:ring-white rounded transition-colors" style={{ writingMode: "vertical-rl" }} />
-                  ) : "공급자"}
-                </td>
-                <td className={thCls}>{editableLabel("orgRegistrationNumber", "등 록 번 호")}</td>
-                <td className={tdCls}>
-                  {isDataEditable ? (
-                    <input type="text" value={resolveField("orgRegistrationNumber", organization?.registrationNumber || "")} onChange={(e) => onFieldOverrideChange!("orgRegistrationNumber", e.target.value)} className={inlineInputCls} placeholder="등록번호" />
-                  ) : (organization?.registrationNumber || "")}
-                </td>
-                <td className={thCls}>{editableLabel("orgRepresentativeName", "대 표 이 사")}</td>
-                <td className={tdCls}>
-                  {isDataEditable ? (
-                    <input type="text" value={resolveField("orgRepresentativeName", organization?.representativeName || "")} onChange={(e) => onFieldOverrideChange!("orgRepresentativeName", e.target.value)} className={inlineInputCls} placeholder="대표이사" />
-                  ) : (
-                    <>
-                      {organization?.representativeName || ""}
-                      {organization?.logoUrl && (
-                        <img src={organization.logoUrl} alt="직인" className="inline-block h-14 ml-2 align-middle opacity-80" />
-                      )}
-                    </>
-                  )}
-                </td>
-              </tr>
-              {/* 2행: 견적일자 / 상호 */}
-              <tr>
-                <td className={thCls}>{editableLabel("estimateDate", "견 적 일 자")}</td>
-                <td className={tdCls}>
-                  {isDataEditable ? (
-                    <input type="text" value={resolveField("estimateDate", formattedDate)} onChange={(e) => onFieldOverrideChange!("estimateDate", e.target.value)} className={inlineInputCls} />
-                  ) : formattedDate}
-                </td>
-                <td className={thCls}>{editableLabel("orgBusinessName", "상  호")}</td>
-                <td colSpan={3} className={tdCls}>
-                  {isDataEditable ? (
-                    <input type="text" value={resolveField("orgBusinessName", organization?.businessName || organization?.name || "")} onChange={(e) => onFieldOverrideChange!("orgBusinessName", e.target.value)} className={inlineInputCls} placeholder="상호" />
-                  ) : (organization?.businessName || organization?.name || "")}
-                </td>
-              </tr>
-              {/* 3행: 담당자 / 주소 */}
-              <tr>
-                <td className={thCls}>{editableLabel("manager", "담 당 자")}</td>
-                <td className={tdCls}>
-                  <span className="inline-flex items-center gap-1">
-                    {isDataEditable ? (
-                      <input type="text" value={resolveField("managerName", userName || "")} onChange={(e) => onFieldOverrideChange!("managerName", e.target.value)} placeholder="이름" className="bg-transparent border-none outline-none hover:bg-emerald-50 focus:bg-white focus:ring-1 focus:ring-emerald-400 rounded px-1 -mx-1 transition-colors w-20" />
-                    ) : (
-                      <span>{userName || ""}</span>
-                    )}
-                    {onManagerTitleChange ? (
-                      <input
-                        type="text"
-                        value={managerTitle || ""}
-                        onChange={(e) => onManagerTitleChange(e.target.value)}
-                        placeholder="직책"
-                        className="bg-transparent border-none outline-none hover:bg-emerald-50 focus:bg-white focus:ring-1 focus:ring-emerald-400 rounded px-1 -mx-1 transition-colors w-16"
-                      />
-                    ) : (
-                      managerTitle ? <span>{managerTitle}</span> : null
-                    )}
-                  </span>
-                </td>
-                <td className={thCls}>{editableLabel("orgAddress", "주  소")}</td>
-                <td colSpan={3} className={tdCls}>
-                  {isDataEditable ? (
-                    <input type="text" value={resolveField("orgAddress", organization?.address || "")} onChange={(e) => onFieldOverrideChange!("orgAddress", e.target.value)} className={inlineInputCls} placeholder="주소" />
-                  ) : (organization?.address || "")}
-                </td>
-              </tr>
-              {/* 4행: 연락처 / 종목 */}
-              <tr>
-                <td className={thCls}>{editableLabel("orgPhone", "연 락 처")}</td>
-                <td className={tdCls}>
-                  {isDataEditable ? (
-                    <input type="text" value={resolveField("orgPhone", organization?.phoneNumber || "")} onChange={(e) => onFieldOverrideChange!("orgPhone", e.target.value)} className={inlineInputCls} placeholder="연락처" />
-                  ) : (organization?.phoneNumber || "")}
-                </td>
-                <td className={thCls}>{editableLabel("orgBusinessType", "종  목")}</td>
-                <td colSpan={3} className={tdCls}>
-                  {isDataEditable ? (
-                    <input type="text" value={resolveField("orgBusinessType", organization?.businessType || "")} onChange={(e) => onFieldOverrideChange!("orgBusinessType", e.target.value)} className={inlineInputCls} placeholder="종목" />
-                  ) : (organization?.businessType || "")}
-                </td>
-              </tr>
-              {/* 5행: FAX / TEL */}
-              <tr>
-                <td className={thCls}>{editableLabel("orgFax", "F A X")}</td>
-                <td className={tdCls}>
-                  {isDataEditable ? (
-                    <input type="text" value={resolveField("orgFax", organization?.faxNumber || "")} onChange={(e) => onFieldOverrideChange!("orgFax", e.target.value)} className={inlineInputCls} placeholder="FAX" />
-                  ) : (organization?.faxNumber || "")}
-                </td>
-                <td className={thCls}>{editableLabel("orgTel", "T E L")}</td>
-                <td colSpan={3} className={tdCls}>
-                  {isDataEditable ? (
-                    <input type="text" value={resolveField("orgTel", organization?.phoneNumber || "")} onChange={(e) => onFieldOverrideChange!("orgTel", e.target.value)} className={inlineInputCls} placeholder="TEL" />
-                  ) : (organization?.phoneNumber || "")}
-                </td>
-              </tr>
-              {/* 6행: 입금계좌 (전체 너비) */}
-              <tr>
-                <td className={thCls}>{editableLabel("orgDepositAccount", "입 금 계 좌")}</td>
-                <td colSpan={6} className={`${tdCls} text-center font-semibold`}>
-                  {isDataEditable ? (
-                    <input type="text" value={resolveField("orgDepositAccount", organization?.depositAccount || "")} onChange={(e) => onFieldOverrideChange!("orgDepositAccount", e.target.value)} className={`${inlineInputCls} text-center font-semibold`} placeholder="입금계좌" />
-                  ) : (organization?.depositAccount || "")}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+                  {onManagerTitleChange ? (
+                    <input
+                      type="text"
+                      value={managerTitle || ""}
+                      onChange={(e) => onManagerTitleChange(e.target.value)}
+                      className={styles.editCell}
+                      style={{ width: 60, color: "#8a8f99" }}
+                      placeholder="직책"
+                    />
+                  ) : managerTitle ? (
+                    <span style={{ color: "#8a8f99" }}>{managerTitle}</span>
+                  ) : null}
+                </span>
+              </div>
+            </div>
+            <div className={`${styles.kvRow} ${styles.kvRowFull}`}>
+              <div className={styles.kvKey}>FAX</div>
+              <div className={styles.kvVal}>
+                {renderText("recipientFax", "", { placeholder: "FAX" })}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 공급자 정보 */}
+        <section className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <div className={styles.sectionTitle}>공급자 정보</div>
+          </div>
+          <div className={styles.kvGrid}>
+            <div className={styles.kvRow}>
+              <div className={styles.kvKey}>상호</div>
+              <div className={styles.kvVal}>
+                {renderText("orgBusinessName", organization?.businessName || organization?.name || "")}
+              </div>
+            </div>
+            <div className={styles.kvRow}>
+              <div className={styles.kvKey}>등록번호</div>
+              <div className={styles.kvVal}>
+                {renderText("orgRegistrationNumber", organization?.registrationNumber || "")}
+              </div>
+            </div>
+            <div className={styles.kvRow}>
+              <div className={styles.kvKey}>대표이사</div>
+              <div className={styles.kvVal}>
+                {renderText("orgRepresentativeName", organization?.representativeName || "")}
+              </div>
+            </div>
+            <div className={styles.kvRow}>
+              <div className={styles.kvKey}>종목</div>
+              <div className={styles.kvVal}>
+                {renderText("orgBusinessType", organization?.businessType || "")}
+              </div>
+            </div>
+            <div className={styles.kvRow}>
+              <div className={styles.kvKey}>TEL</div>
+              <div className={styles.kvVal}>
+                {renderText("orgTel", organization?.phoneNumber || "")}
+              </div>
+            </div>
+            <div className={styles.kvRow}>
+              <div className={styles.kvKey}>FAX</div>
+              <div className={styles.kvVal}>{renderText("orgFax", organization?.faxNumber || "")}</div>
+            </div>
+            <div className={`${styles.kvRow} ${styles.kvRowFull}`}>
+              <div className={styles.kvKey}>주소</div>
+              <div className={styles.kvVal}>{renderText("orgAddress", organization?.address || "")}</div>
+            </div>
+            <div className={`${styles.kvRow} ${styles.kvRowFull}`}>
+              <div className={styles.kvKey}>입금계좌</div>
+              <div className={styles.kvVal}>
+                {renderText("orgDepositAccount", organization?.depositAccount || "")}
+              </div>
+            </div>
+          </div>
+        </section>
 
         {/* 견적 내역 */}
-        <div className="mb-3">
-          <div className="mb-1.5">
-            <span className="text-emerald-600 text-base align-middle">🔑</span>
-            {renderSectionTitle("sectionEstimate", "견적 내역")}
+        <section className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <div className={styles.sectionTitle}>견적 내역</div>
+            <div className={styles.sectionUnit}>단위: 원</div>
           </div>
-          <table className="w-full border-collapse border border-gray-300">
-            <colgroup>
-              <col />
-              <col />
-              <col />
-              <col />
-              <col />
-              <col />
-            </colgroup>
+          <table className={styles.tbl}>
             <thead>
               <tr>
-                <th className={thAccent} rowSpan={2}>
-                  {editableLabel("membershipCol", "회원권명")}
-                </th>
-                <th className={thAccent} rowSpan={2}>
-                  {editableLabel("priceCol", `${tradeType}금액`)}
-                </th>
-                <th className={thAccent} colSpan={extraCols}>
-                  {editableLabel("extraCostsCol", "부대비용")}
-                </th>
-              </tr>
-              <tr>
-                <th className={thAccent}>{editableLabel("transferFeeCol", "명의개서료")}</th>
-                <th className={thAccent}>{editableLabel("commissionCol", "중개수수료")}</th>
-
-                <th className={thAccent}>{editableLabel("stampDutyCol", "인지세")}</th>
-                <th className={thAccent}>{editableLabel("otherCostsCol", "기타비용")}</th>
+                <th style={{ width: "22%" }}>회원권명</th>
+                <th style={{ width: "14%" }}>{tradeType}금액</th>
+                <th>명의개서료</th>
+                <th>중개수수료</th>
+                <th>인지세</th>
+                <th>기타비용</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td className={`${tdCls} text-center font-medium`}>
-                  {isDataEditable ? (
-                    <div className="flex flex-col items-center gap-0.5">
-                      <input
-                        type="text"
-                        value={clubName}
-                        onChange={(e) => onFieldOverrideChange!("clubName", e.target.value)}
-                        className="bg-transparent border-none outline-none text-center font-medium hover:bg-emerald-50 focus:bg-white focus:ring-1 focus:ring-emerald-400 rounded px-1 -mx-1 transition-colors w-full"
-                      />
-                      {membershipName !== undefined && (
-                        <input
-                          type="text"
-                          value={membershipName}
-                          onChange={(e) => onFieldOverrideChange!("membershipName", e.target.value)}
-                          placeholder="회원권 종류"
-                          className="bg-transparent border-none outline-none text-center text-xs text-gray-500 hover:bg-emerald-50 focus:bg-white focus:ring-1 focus:ring-emerald-400 rounded px-1 -mx-1 transition-colors w-full"
-                        />
-                      )}
-                    </div>
-                  ) : (
-                    <>
-                      {clubName}
-                      {membershipName && (
-                        <>
-                          <br />
-                          <span className="text-xs text-gray-500">
-                            ({membershipName})
-                          </span>
-                        </>
-                      )}
-                    </>
-                  )}
+                <td className={styles.tdCenter}>
+                  <span className={styles.tdNameMain}>{clubName}</span>
+                  {membershipName ? (
+                    <span className={styles.tdNameSub}>{membershipName}</span>
+                  ) : null}
                 </td>
-                {renderNumCell(price, onPriceChange)}
-                <td className={`${tdCls} text-right tabular-nums whitespace-nowrap`}>{fmt(transferFeeWon)}</td>
-                {renderNumCell(commission, onCommissionChange)}
-
-                {renderNumCell(stampDuty, onStampDutyChange)}
-                {renderNumCell(otherCosts, onOtherCostsChange)}
+                <td className={styles.tdNum}>{renderNumWithAuto(price, onPriceChange)}</td>
+                <td className={styles.tdNum}>{fmt(transferFeeWon)} 원</td>
+                <td className={styles.tdNum}>{renderNumWithAuto(commission, onCommissionChange)}</td>
+                <td className={styles.tdNum}>{renderNumWithAuto(stampDuty, onStampDutyChange)}</td>
+                <td className={styles.tdNum}>{renderNumWithAuto(otherCosts, onOtherCostsChange)}</td>
               </tr>
-              {/* 합계 / 계약금 / 잔금 요약 행 (가로) */}
-              <tr>
-                <th colSpan={2} className={thAccent}>{editableLabel("totalCol", "합계")}</th>
-                <th colSpan={2} className={thAccent}>{editableLabel("depositCol", "계약금")}</th>
-                <th colSpan={2} className={thAccent}>{editableLabel("balanceCol", "잔금")}</th>
+              <tr className={styles.sumHead}>
+                <td colSpan={2}>합계</td>
+                <td colSpan={2}>계약금</td>
+                <td colSpan={2}>잔금</td>
               </tr>
-              <tr>
-                <td colSpan={2} className={`${tdCls} text-right tabular-nums font-semibold`}>{fmt(grandTotal)}</td>
-                <td colSpan={2} className={`${tdCls} text-right tabular-nums font-medium`}>
-                  {onDepositChange ? (
-                    <div>
-                      <div className="flex items-center gap-0.5">
-                        <input
-                          type="text"
-                          value={fmtNum(deposit)}
-                          onChange={(e) => handleNumInput(e.target.value, onDepositChange)}
-                          className={inlineNumberCls}
-                          placeholder="0"
-                        />
-                        <span className="flex-shrink-0">원</span>
-                      </div>
-                      {depositAuto === false && onDepositAutoReset && (
-                        <button
-                          type="button"
-                          onClick={onDepositAutoReset}
-                          className="text-[10px] text-gray-400 hover:text-gray-600 underline mt-0.5 print:hidden"
-                        >
-                          자동(10%)
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    fmt(deposit)
-                  )}
+              <tr className={styles.sumRow}>
+                <td colSpan={2}>{fmt(grandTotal)} 원</td>
+                <td colSpan={2}>
+                  {renderNumWithAuto(deposit, onDepositChange, {
+                    auto: depositAuto,
+                    onAutoReset: onDepositAutoReset,
+                    autoLabel: "자동(10%)",
+                  })}
                 </td>
-                <td colSpan={2} className={`${tdCls} text-right tabular-nums font-semibold`}>{fmt(balance)}</td>
+                <td colSpan={2}>{fmt(balance)} 원</td>
               </tr>
             </tbody>
           </table>
-        </div>
+        </section>
 
         {/* 구비서류 */}
-        <div className="mb-3">
-          <div className="mb-1.5">
-            <span className="text-emerald-600 text-base align-middle">🔑</span>
-            {renderSectionTitle("sectionDocuments", isSell ? "매도시 구비서류" : "매수시 구비서류")}
+        <section className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <div className={styles.sectionTitle}>{isSell ? "매도시 구비서류" : "매수시 구비서류"}</div>
           </div>
-          <table className="w-full border-collapse border border-gray-300">
-            <tbody>
-              <tr>
-                <td className={`${tdCls} whitespace-pre-wrap`} style={{ minHeight: 80 }}>
-                  {isDataEditable ? (
-                    <textarea
-                      ref={(el) => { if (el) autoResize(el); }}
-                      value={resolveField(
-                        isSell ? "sellerDocuments" : "buyerDocuments",
-                        (isSell ? membership?.sellerDocuments : membership?.buyerDocuments) || "",
-                      )}
-                      onChange={(e) =>
-                        onFieldOverrideChange!(
-                          isSell ? "sellerDocuments" : "buyerDocuments",
-                          e.target.value,
-                        )
-                      }
-                      onInput={(e) => autoResize(e.currentTarget)}
-                      className={`${inlineInputCls} resize-none overflow-hidden min-h-[4em]`}
-                      rows={4}
-                    />
-                  ) : (
-                    (isSell
-                      ? (membership?.sellerDocuments || "\u00A0")
-                      : (membership?.buyerDocuments || "\u00A0"))
-                  )}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+          <div style={{ marginTop: 8 }}>
+            {isEditable ? (
+              <textarea
+                ref={(el) => {
+                  if (el) autoResize(el);
+                }}
+                value={docsValue}
+                onChange={(e) => onFieldOverrideChange!(docsKey, e.target.value)}
+                onInput={(e) => autoResize(e.currentTarget)}
+                rows={4}
+                className={styles.editCell}
+                style={{ minHeight: "4em", whiteSpace: "pre-wrap", fontSize: 10.5, lineHeight: 1.55 }}
+                placeholder={isSell ? "매도시 구비서류" : "매수시 구비서류"}
+              />
+            ) : (
+              <div
+                style={{
+                  whiteSpace: "pre-wrap",
+                  fontSize: 10.5,
+                  lineHeight: 1.55,
+                  color: "var(--sheet-ink-3)",
+                }}
+              >
+                {docsValue || " "}
+              </div>
+            )}
+          </div>
+        </section>
 
-        {/* 안내 문구 */}
-        <div className="text-xs text-gray-500 space-y-1 mb-3 pl-1">
-          {isDataEditable ? (
+        {/* Notes */}
+        <div className={styles.notesBlock}>
+          {isEditable ? (
             <textarea
-              ref={(el) => { if (el) autoResize(el); }}
-              value={resolveField(
-                "disclaimerNotes",
-                [
-                  "* 상기 견적 금액은 시장 상황에 따라 변동될 수 있습니다.",
-                  "* 계약금 입금 후 잔금은 명의개서일 전일까지 입금 부탁드립니다.",
-                ].join("\n"),
-              )}
+              ref={(el) => {
+                if (el) autoResize(el);
+              }}
+              value={notesValue}
               onChange={(e) => onFieldOverrideChange!("disclaimerNotes", e.target.value)}
               onInput={(e) => autoResize(e.currentTarget)}
-              className={`${inlineInputCls} resize-none overflow-hidden text-xs text-gray-500`}
-              rows={3}
+              rows={2}
+              className={styles.editCell}
+              style={{ width: "100%", fontSize: 10.5 }}
             />
           ) : (
-            <>
-              <p>* 상기 견적 금액은 시장 상황에 따라 변동될 수 있습니다.</p>
-              <p>* 계약금 입금 후 잔금은 명의개서일 전일까지 입금 부탁드립니다.</p>
-            </>
+            notesValue.split("\n").map((line, idx) => <div key={idx}>{line}</div>)
           )}
         </div>
 
-        {/* 하단 로고 및 연락처 */}
-        <div className="pt-2 border-t border-gray-200">
-          <table className="w-full text-xs text-gray-500">
-            <tbody>
-              <tr>
-                <td className="align-middle" style={{ width: 120 }}>
-                  {organization?.logoUrl ? (
-                    <img
-                      src={organization.logoUrl}
-                      alt="logo"
-                      className="h-8 object-contain"
-                    />
-                  ) : (
-                    <>
-                      <span className="inline-block w-8 h-8 bg-emerald-700 rounded-full text-white font-bold text-xs text-center leading-8 align-middle">
-                        참존
-                      </span>
-                    </>
+        {/* Footer */}
+        <div className={styles.docFoot}>
+          <div className={styles.footInfo}>
+            <div className={styles.footName}>
+              {renderText(
+                "footerCompanyName",
+                organization?.businessName || organization?.name || "참존회원권",
+                { style: { width: "auto", display: "inline-block", minWidth: 100 } },
+              )}
+            </div>
+            <div className={styles.footLines}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "nowrap" }}>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  {renderText(
+                    "footerLine1",
+                    organization?.address || "서울특별시 강남구 삼성로 531, 4층",
+                    { style: { width: "100%" } },
                   )}
-                  {isDataEditable ? (
-                    <input
-                      type="text"
-                      value={resolveField("footerCompanyName", organization?.businessName || organization?.name || "참존회원권")}
-                      onChange={(e) => onFieldOverrideChange!("footerCompanyName", e.target.value)}
-                      className="bg-transparent border-none outline-none hover:bg-emerald-50 focus:bg-white focus:ring-1 focus:ring-emerald-400 rounded px-1 transition-colors font-semibold text-emerald-700 w-20 ml-1"
-                    />
-                  ) : (
-                    <span className="font-semibold text-emerald-700 ml-2">
-                      {organization?.businessName || organization?.name || "참존회원권"}
-                    </span>
-                  )}
-                </td>
-                <td className="text-right align-top">
-                  {isDataEditable ? (
-                    <>
-                      <input
-                        type="text"
-                        value={resolveField("footerLine1", `${organization?.address || "서울특별시 강남구 삼성로 531, 4층"}   T. ${organization?.phoneNumber || "02) 6426 - 2000"}`)}
-                        onChange={(e) => onFieldOverrideChange!("footerLine1", e.target.value)}
-                        className="bg-transparent border-none outline-none w-full text-right hover:bg-emerald-50 focus:bg-white focus:ring-1 focus:ring-emerald-400 rounded px-1 -mx-1 transition-colors"
-                      />
-                      <input
-                        type="text"
-                        value={resolveField("footerLine2", `${organization?.faxNumber ? `FAX. ${organization.faxNumber}` : "제주 : 제주특별자치도 제주시 다호5길 16, 4층   T. 064) 900 - 2244"}`)}
-                        onChange={(e) => onFieldOverrideChange!("footerLine2", e.target.value)}
-                        className="bg-transparent border-none outline-none w-full text-right hover:bg-emerald-50 focus:bg-white focus:ring-1 focus:ring-emerald-400 rounded px-1 -mx-1 transition-colors"
-                      />
-                    </>
-                  ) : (
-                    <>
-                      <p>서울 : 서울특별시 강남구 삼성로 531, 4층 &nbsp;&nbsp; T. 02) 6426 - 2000</p>
-                      <p>제주 : 제주특별자치도 제주시 다호5길 16, 4층 &nbsp;&nbsp; T. 064) 900 - 2244</p>
-                    </>
-                  )}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                </span>
+                <span className={styles.footSep}>|</span>
+                <b>T.</b>
+                <span style={{ flex: "0 0 auto", width: 130 }}>
+                  {renderText("footerTel1", organization?.phoneNumber || "02) 6426-2000", {
+                    style: { width: "100%" },
+                  })}
+                </span>
+              </div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "nowrap" }}>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  {renderText("footerLine2", "제주특별자치도 제주시 다호5길 16, 4층", {
+                    style: { width: "100%" },
+                  })}
+                </span>
+                <span className={styles.footSep}>|</span>
+                <b>T.</b>
+                <span style={{ flex: "0 0 auto", width: 130 }}>
+                  {renderText("footerTel2", "064) 900-2244", { style: { width: "100%" } })}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className={styles.footBadge}>C</div>
         </div>
       </div>
     );

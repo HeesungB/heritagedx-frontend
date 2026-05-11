@@ -6,6 +6,8 @@ import { ClubDetail } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/hooks/useOrganization";
 import EstimateSheet from "../EstimateSheet";
+import SheetToolbar from "../sheet-common/SheetToolbar";
+import sheetStyles from "../sheet-common/sheet.module.css";
 import { trackEvent } from "@/lib/gtag";
 import { parseTransferFeeToWon } from "@heritage-dx/utils";
 
@@ -26,8 +28,6 @@ export default function EstimateSection({
   const { organization } = useOrganization();
   const sheetRef = useRef<HTMLDivElement>(null);
   const [jpegDownloading, setJpegDownloading] = useState(false);
-
-  // 계약금 자동계산 여부 추적
   const [depositAuto, setDepositAuto] = useState(true);
 
   const recipient = fieldOverrides.recipient || "";
@@ -45,7 +45,6 @@ export default function EstimateSection({
   const otherCostsNum = parseInt(otherCosts.replace(/[^0-9]/g, ""), 10) || 0;
   const depositNum = parseInt(deposit.replace(/[^0-9]/g, ""), 10) || 0;
 
-  // 계약금 자동계산: 합계 변경 시
   useEffect(() => {
     if (depositAuto) {
       const tfWon = parseTransferFeeToWon(detail.costs.registrationFee);
@@ -65,7 +64,6 @@ export default function EstimateSection({
   const handleJpegDownload = async () => {
     if (!sheetRef.current || !detail) return;
     setJpegDownloading(true);
-
     try {
       const blob = await captureSheetAsJpeg(sheetRef.current);
       const url = URL.createObjectURL(blob);
@@ -86,8 +84,13 @@ export default function EstimateSection({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Sheet (inline editing) */}
+    <div className={sheetStyles.sheetStage}>
+      <SheetToolbar
+        title="견적서"
+        onPrint={() => sheetRef.current && printSheetFitToPage(sheetRef.current)}
+        onJpeg={handleJpegDownload}
+        jpegLoading={jpegDownloading}
+      />
       <EstimateSheet
         ref={sheetRef}
         detail={detail}
@@ -115,54 +118,6 @@ export default function EstimateSection({
         fieldOverrides={fieldOverrides}
         onFieldOverrideChange={onFieldOverrideChange}
       />
-
-      {/* Actions */}
-      <div className="flex justify-center gap-4 print:hidden">
-        <button
-          onClick={() => printSheetFitToPage(sheetRef.current!)}
-          className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-        >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-            />
-          </svg>
-          인쇄하기
-        </button>
-        <button
-          onClick={handleJpegDownload}
-          disabled={jpegDownloading}
-          className={`flex items-center gap-2 px-6 py-2.5 border border-gray-300 rounded-lg transition-colors ${
-            jpegDownloading
-              ? "opacity-50 cursor-not-allowed"
-              : "hover:bg-gray-50"
-          }`}
-        >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-            />
-          </svg>
-          {jpegDownloading ? "다운로드 중..." : "JPEG 다운로드"}
-        </button>
-      </div>
     </div>
   );
 }
-

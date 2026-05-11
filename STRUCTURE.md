@@ -28,6 +28,8 @@ heritage-dx/
 │   │   │   │   │                        #   EstimateSection, CostCalculatorSection, GreenFeeField, InfoField,
 │   │   │   │   │                        #   BenefitsSheetSection, DocumentsSection, MarketPriceSummary,
 │   │   │   │   │                        #   NearbyClubPrices, PriceChart, SectionCard, ClubSwitcher, SoldPriceBanner
+│   │   │   │   ├── sheet-common/        # 혜택지/견적서 A4 시트 공용 (2026-05 리디자인) —
+│   │   │   │   │                        #   sheet.module.css, SheetToolbar, PrintItemSelector
 │   │   │   │   ├── customer-create/     # CustomerCreateModal (4섹션 신규 고객 등록 모달 + 스텝퍼),
 │   │   │   │   │                        #   MembershipRow (보유 회원권 다중 행 — ClubSearchSelect + membership select)
 │   │   │   ├── contexts/            # AuthContext, RepositoryContext
@@ -538,7 +540,7 @@ ESLint 9 flat config 공유 패키지. `eslint-config-next`의 `core-web-vitals`
 └── claims/page.tsx               # 건의사항
 ```
 
-#### 컴포넌트 (42개 — top-level 30, `club-profile/` 12)
+#### 컴포넌트 (51개 — top-level 34, `club-profile/` 14, `sheet-common/` 3 [.tsx 2 + .module.css 1])
 
 **코어:**
 `AuthGuard`, `ClientLayout`, `AppShell`, `Sidebar`, `AppHeader`, `MobileNavigation`, `GoogleAnalytics`
@@ -553,6 +555,8 @@ ESLint 9 flat config 공유 패키지. `eslint-config-next`의 `core-web-vitals`
 
 **골프장 프로필 섹션** (`club-profile/`):
 `ClubBasicInfoTable`, `MembershipInfoSection`, `EstimateSection`, `CostCalculatorSection`, `GreenFeeField`, `InfoField`, `BenefitsSheetSection`, `DocumentsSection`, `MarketPriceSummary`, `NearbyClubPrices`, `PriceChart`, `SectionCard`, `ClubSwitcher`, `SoldPriceBanner`
+
+**시트 공용 디자인 (`sheet-common/` — 2026-05 혜택지/견적서 리디자인)**: 골프장 프로필의 `혜택지` / `견적서` 두 탭이 공유하는 A4 1페이지 컴팩트 레이아웃. 새 시각 시스템은 모노크롬 + Pretendard + 섹션 헤더 underline + KV 2컬럼 그리드 + sharp border, hover/focus highlight 는 emerald → neutral/yellow (`#f7f8fa` hover / `#fffbe6` focus). `apps/os/src/components/sheet-common/` 에 분리: `sheet.module.css` (CSS Modules — 디자인 토큰 + `.sheetStage`/`.paper`/`.kvGrid`/`.kvRow`/`.editCell`/`.tbl`/`.docFoot`/`.psChip` 등), `SheetToolbar` (좌 `혜택지|견적서` 라벨 + vertical separator + 옵션 `클릭 편집` 뱃지 / 우 인쇄·JPEG pill 버튼), `PrintItemSelector` (혜택지 전용 chip 그리드 셀렉터 — `groups: { title, items: { key, label, hasData? }[] }` props, `hidden:Set<string>`/`onChange` 로 외부 상태 연결, 헤더 토글로 접힘). 시트 본문은 `.paper`(794×1123 min-height, padding `28px 40px 80px`, position:relative) 안에 섹션이 자연 배치되고 `.docFoot` 는 position:absolute로 항상 A4 바닥에 고정. 데이터가 길어지면 페이퍼는 자연스럽게 늘어나고, 인쇄/JPEG 경로는 기존 `sheet-print.ts` 의 fit-to-page zoom 로직이 그대로 처리 (변경 없음). `MembershipInfoSheet`(혜택지 본문)과 `EstimateSheet`(견적서 본문)는 둘 다 이 시스템 사용. `MembershipInfoSheet` 섹션 = 골프장 정보 (KV 그리드) / 회원권 정보 (KV + multiline med/tall) / 그린피 정보 (`.gfWrap` — 평일/주말 × 회원유형 테이블 + 카트비/캐디비 카드) / 기타 비용 + 기타 사항 (`.etcRow` 좌우 분할: 비용 4컬럼 테이블 + 메모 영역). `EstimateSheet` 섹션 = 수신자 정보 / 공급자 정보 / 견적 내역 (회원권명/{tradeType}금액/명의개서료/중개수수료/인지세/기타비용 + 합계/계약금/잔금 sumHead/sumRow) / `{매수|매도}시 구비서류` / disclaimer notes. 매수·매도 토글은 시안의 별도 카드 대신 제목 안 inline 버튼(`.tradeToggle` global selector) 유지 — 클릭하면 `onTradeTypeChange("매수"↔"매도")` 호출 + 구비서류·라벨 자동 전환. 컨테이너는 `BenefitsSheetSection`(툴바 + PrintItemSelector + `MembershipInfoSheet`)과 `EstimateSection`(툴바 + `EstimateSheet`)이며 `useSheetStorage`(localStorage `hdx:sheet:{clubCode}:{benefits|estimate}`) 의 `fieldOverrides`/`hiddenItems`/`customItems` 모델은 그대로 — 인라인 편집/항목 hide-show/커스텀 항목 추가 기능 유지.
 
 **ClubProfile 화면 구조 (2026-05 detail.html V3 기반 재설계)**: 글로벌 `AppHeader` 의 actions 슬롯은 비우고(`setActions(null)`) `ClubSwitcher` 는 본문 sticky 툴바로 이동. ClubProfile 본문 최상단은 단일 sticky 툴바 한 줄로 `ClubSwitcher (88CC + 다른 골프장으로 이동)` · `36홀` · `[개인|법인]` 사각 토글 · `[membershipName ...]` pill 토글(필터된 `memberships[]` 을 회색 트랙 안 흰색 active pill 로 노출 — 데이터에 정/준회원 외 다양한 종류가 있어도 모두 동적 렌더) · 우측 `매물 시세 · 갱신일` · `[지도]` · `[상담일지]` 버튼. 그 아래 `SoldPriceBanner` (선택 회원권 `dealerPriceRange` + `{개인|법인}-{membershipName} 기준` 컨텍스트), 탭 바 `회원권 정보 / 혜택지 / 견적서`, 회원권 정보 탭은 6개 `SectionCard` 2열 그리드(`01 골프장 정보` / `02 회원권 정보` / `03 그린피 정보` / `04 시세 추이` / `05 기타 비용` / `06 구비서류`). 회원권 선택은 `selectedMembershipIndex` (filtered 인덱스) 로 단일 source-of-truth, `ownerType` 또는 `detail.code` 변경 시 0으로 리셋.
 

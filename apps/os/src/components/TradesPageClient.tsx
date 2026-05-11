@@ -84,6 +84,7 @@ export default function TradesPageClient() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [customerFilter, setCustomerFilter] = useState<{ id: string; label: string } | null>(null);
+  const [clubFilter, setClubFilter] = useState<{ id: string; label: string } | null>(null);
   const [page, setPage] = useState(1);
   const [editingTrade, setEditingTrade] = useState<MembershipTrade | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -116,11 +117,17 @@ export default function TradesPageClient() {
       sort: sortField,
       order: sortOrder,
       tradeType: filter === "매수" || filter === "매도" ? filter : undefined,
-      search: customerFilter ? undefined : searchQuery.trim() || undefined,
+      // 공개 /consultations 는 clubId 파라미터를 지원하지 않으므로 (docs/api/consultations.md:36)
+      // clubFilter 일 때는 search 로 골프장명을 보낸다. 우선순위: customer > club > 사용자 검색어.
+      search: customerFilter
+        ? undefined
+        : clubFilter
+        ? clubFilter.label
+        : searchQuery.trim() || undefined,
       customerId: customerFilter?.id,
       approvalStatus: filterApproval || undefined,
     });
-  }, [page, filter, searchQuery, sortField, sortOrder, filterApproval, customerFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [page, filter, searchQuery, sortField, sortOrder, filterApproval, customerFilter, clubFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setRawTrades(pageTrades as MembershipTrade[]);
@@ -220,6 +227,7 @@ export default function TradesPageClient() {
     const trimmed = searchInput.trim();
     if (!trimmed) return;
     setCustomerFilter(null);
+    setClubFilter(null);
     pushRecent({ label: trimmed, value: trimmed, kind: "text" });
     setPage(1);
   };
@@ -235,13 +243,29 @@ export default function TradesPageClient() {
     setPage(1);
   };
 
+  const handleClubClick = (trade: MembershipTrade) => {
+    if (!trade.clubId) return;
+    const id = String(trade.clubId);
+    const label = trade.clubName?.trim() || id;
+    setClubFilter({ id, label });
+    setSearchInput("");
+    setSearchQuery("");
+    pushRecent({ label, value: id, kind: "club" });
+    setPage(1);
+  };
+
   const handleChipClick = (item: RecentSearchItem) => {
     if (item.kind === "customer") {
       setCustomerFilter({ id: item.value, label: item.label });
       setSearchInput("");
       setSearchQuery("");
+    } else if (item.kind === "club") {
+      setClubFilter({ id: item.value, label: item.label });
+      setSearchInput("");
+      setSearchQuery("");
     } else {
       setCustomerFilter(null);
+      setClubFilter(null);
       setSearchInput(item.value);
     }
     setPage(1);
@@ -253,11 +277,16 @@ export default function TradesPageClient() {
       setCustomerFilter(null);
       setPage(1);
     }
+    if (item.kind === "club" && clubFilter?.id === item.value) {
+      setClubFilter(null);
+      setPage(1);
+    }
   };
 
   const isChipActive = (item: RecentSearchItem) => {
     if (item.kind === "customer") return customerFilter?.id === item.value;
-    return !customerFilter && searchQuery.trim() === item.value;
+    if (item.kind === "club") return clubFilter?.id === item.value;
+    return !customerFilter && !clubFilter && searchQuery.trim() === item.value;
   };
 
   return (
@@ -298,7 +327,10 @@ export default function TradesPageClient() {
                     onChange={(e) => {
                       const next = e.target.value;
                       setSearchInput(next);
-                      if (customerFilter && next.trim()) setCustomerFilter(null);
+                      if (next.trim()) {
+                        if (customerFilter) setCustomerFilter(null);
+                        if (clubFilter) setClubFilter(null);
+                      }
                     }}
                     onFocus={() => setSearchFocused(true)}
                     onBlur={() => setSearchFocused(false)}
@@ -352,6 +384,15 @@ export default function TradesPageClient() {
                               고객
                             </span>
                           )}
+                          {item.kind === "club" && (
+                            <span
+                              className={`text-[10px] font-bold uppercase ${
+                                active ? "text-white/70" : "text-gray-400"
+                              }`}
+                            >
+                              골프장
+                            </span>
+                          )}
                           <button
                             type="button"
                             onClick={() => handleChipClick(item)}
@@ -377,6 +418,7 @@ export default function TradesPageClient() {
                       onClick={() => {
                         clearRecents();
                         setCustomerFilter(null);
+                        setClubFilter(null);
                       }}
                       className="ml-1 px-1 text-[11px] text-gray-400 hover:text-gray-600"
                     >
@@ -576,7 +618,18 @@ export default function TradesPageClient() {
                                   trade.isDone ? "text-gray-400 line-through" : "text-gray-900"
                                 }`}
                               >
-                                {trade.clubName}
+                                {trade.clubId ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleClubClick(trade)}
+                                    title="이 골프장으로 검색"
+                                    className="rounded px-1 -mx-1 py-0.5 hover:bg-gray-100 hover:text-blue-700"
+                                  >
+                                    {trade.clubName || "—"}
+                                  </button>
+                                ) : (
+                                  trade.clubName
+                                )}
                               </td>
                               <td
                                 className={`px-2.5 py-2 align-middle text-[12.5px] whitespace-nowrap ${

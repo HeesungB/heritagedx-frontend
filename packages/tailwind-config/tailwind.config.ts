@@ -4,7 +4,21 @@ const config: Omit<Config, "content"> = {
   theme: {
     extend: {
       colors: {
-        primary: "#000000",
+        primary: "#0A0A0A",
+        canvas: "#E8E8E6",
+        surface: "#FFFFFF",
+        neutral: {
+          50: "#F5F5F4",
+          100: "#F0F0EE",
+          200: "#ECECEA",
+          300: "#E5E5E3",
+          400: "#A3A3A3",
+          500: "#737373",
+          600: "#525252",
+          700: "#404040",
+          800: "#262626",
+          900: "#0A0A0A",
+        },
         background: {
           DEFAULT: "#ffffff",
           secondary: "#f9fafb",
@@ -15,22 +29,41 @@ const config: Omit<Config, "content"> = {
           dark: "#d1d5db",
         },
         text: {
-          primary: "#111827",
-          secondary: "#6b7280",
-          tertiary: "#9ca3af",
+          primary: "#0A0A0A",
+          secondary: "#525252",
+          tertiary: "#737373",
         },
         success: {
-          light: "#dcfce7",
-          DEFAULT: "#22c55e",
+          light: "#F0F8F0",
+          DEFAULT: "#1F7A3F",
+        },
+        warning: {
+          light: "#FFF8EC",
+          DEFAULT: "#8A5A00",
         },
         error: {
-          light: "#fee2e2",
-          DEFAULT: "#ef4444",
+          light: "#FDECEC",
+          DEFAULT: "#B3261E",
         },
         info: {
           light: "#dbeafe",
           DEFAULT: "#3b82f6",
         },
+      },
+      borderRadius: {
+        shell: "14px",
+        card: "12px",
+      },
+      fontFamily: {
+        mono: [
+          "JetBrains Mono",
+          "ui-monospace",
+          "SFMono-Regular",
+          "Menlo",
+          "Monaco",
+          "Consolas",
+          "monospace",
+        ],
       },
     },
   },

@@ -46,8 +46,9 @@ heritage-dx/
 │       │   ├── app/                 # Next.js App Router ((dashboard)/error.tsx, loading: clubs, trade-memos, trade-records, kpi)
 │       │   ├── components/
 │       │   │   ├── forms/           # ClubForm, DocumentForm, MembershipForm, ScenarioForm
-│       │   │   ├── kpi/             # KpiMiniDashboard, KpiFilterBar, KpiTrendChart, KpiEmployeeComparison
-│       │   │   ├── layout/          # Header, Sidebar, PageContainer
+│       │   │   ├── home/            # HelloHeader, KpiCard, RecentTradesList, RecentConsultationsList, ProfitBreakdown, MonthlyTrendPanel
+│       │   │   ├── kpi/             # KpiFilterBar, KpiTrendChart, KpiEmployeeComparison (KpiMiniDashboard 폐기 → home/MonthlyTrendPanel 로 흡수)
+│       │   │   ├── layout/          # Header (모노톤 V2 리디자인), Sidebar, PageContainer
 │       │   │   └── GoogleAnalytics.tsx  # GA4 이벤트 트래킹
 │       │   ├── contexts/            # AuthContext, DataContext, RepositoryContext
 │       │   ├── hooks/               # useFCMToken, useFCMForeground, useNotifications
@@ -492,16 +493,24 @@ packages/store/
 
 **전역 폰트:** 양쪽 앱 `layout.tsx`에서 `next/font/google`로 Inter(400~800) + Noto Sans KR(400~900)을 로드해 `--font-inter` / `--font-noto-sans-kr` CSS 변수로 주입. 각 앱의 `globals.css` `body`가 두 변수를 폰트 스택의 최우선으로 사용. 로그인 페이지의 `font-extrabold` 등 두꺼운 굵기 합성 깨짐을 방지하기 위함.
 
-**커스텀 색상 팔레트:**
+**커스텀 색상 팔레트 (2026-05 BO V2 시안 반영):**
 ```
-primary:    #000000
+primary:    #0A0A0A  (거의 검정. BO 모노톤화)
+canvas:     #E8E8E6  (외부 베이지 캔버스 - BO shell 바깥)
+surface:    #FFFFFF  (shell 내부 + 카드)
+neutral:    50:#F5F5F4, 100:#F0F0EE, 200:#ECECEA, 300:#E5E5E3,
+            400:#A3A3A3, 500:#737373, 600:#525252, 700:#404040, 800:#262626, 900:#0A0A0A
 background: #ffffff / #f9fafb (secondary) / #f3f4f6 (tertiary)
 border:     #e5e7eb / #d1d5db (dark)
-text:       #111827 (primary) / #6b7280 (secondary) / #9ca3af (tertiary)
-success:    #22c55e / #dcfce7 (light)
-error:      #ef4444 / #fee2e2 (light)
+text:       #0A0A0A (primary) / #525252 (secondary) / #737373 (tertiary)
+success:    #1F7A3F / #F0F8F0 (light)   # 시안 tag-done 색
+warning:    #8A5A00 / #FFF8EC (light)   # 시안 tag-ongoing 색
+error:      #B3261E / #FDECEC (light)
 info:       #3b82f6 / #dbeafe (light)
 ```
+
+**borderRadius:** `shell: 14px` (BO 외곽 shell 컨테이너), `card: 12px` (KPI/패널 카드)
+**fontFamily:** `mono: ['JetBrains Mono', ...]` (날짜·수치 표시 — BO 시안의 monospace 라벨)
 
 ### 4.10. `@heritage-dx/eslint-config`
 
@@ -675,7 +684,7 @@ getInitialData()    // 초기 데이터 프리로드
     │           ├── new/page.tsx          # 서류 등록
     │           └── [docCode]/page.tsx    # 서류 상세
     ├── common-documents/page.tsx         # 공용 서류 관리
-    ├── my-organization/page.tsx          # 조직 설정
+    ├── my-organization/page.tsx          # 조직 설정 — BO_나의조직_V1 시안 적용 (모노톤 panel + section-head + info-row grid 200px/1fr + mono 폰트(사업자번호/전화/팩스/계좌) + 업종 태그 자동 분할(`,`/`·`/`/`) + 입금계좌 sub(예금주=businessName) + 사용자 수 숫자 강조 + 활성/비활성 dot chip + panel-foot(Last updated · {YYYY.MM.DD} / N fields)). "정보 수정" 버튼은 placeholder — sonner toast 로 "준비 중" 안내, 실제 편집 기능은 별도 PR 예정.
     ├── notifications/page.tsx            # 알림 목록
     ├── kpi/page.tsx                       # KPI 통계 대시보드
     ├── trade-memos/page.tsx              # 상담 기록 (승인 UI — useConsultationAdminRepository). 메모 컬럼은 `Consultation.notes.entries` 를 그대로 사용해 최신 한 줄 + `+N` 카운트 표시(서버 JSONB 응답을 직접 소비). 행 클릭 시 우측 Drawer 에 메모 히스토리 타임라인(최신 dot 강조 + dashed 구분선) + 고객 이력 + 반대매매 리스트가 함께 노출. 편집 모드에서는 `notes` 폼 필드를 비워두며 update 페이로드에서 omit — 메모 변경은 별도 엔드포인트로만. **상담일지 추가/수정 Drawer** 안 고객명/연락처 입력 grid 바로 아래에 `MatchedCustomerCard` (apps/back-office/src/components/trade-memos/) 를 배치 — 수정 모드에서 `editingMemo.customerId` 가 있을 때만 카드를 노출(추가 모드는 자동 숨김). 카드는 `useCustomerRepository().getOne` + `getHistorySummary` 를 직접 호출하고 `mapCustomerDtoToEntity`/`mapCustomerHistorySummaryDtoToEntity` 로 entity 변환 — OS 의 `apps/os/src/components/trade-memo/MatchedCustomerCard` 와 시각·매핑 1:1 동일(추후 packages/ui 통합 후보).
@@ -690,8 +699,13 @@ getInitialData()    // 초기 데이터 프리로드
 
 **폼** (`forms/`): `ClubForm`, `DocumentForm`, `MembershipForm`, `ScenarioForm`
 
-**KPI** (`kpi/`): `KpiMiniDashboard`, `KpiFilterBar`, `KpiTrendChart`, `KpiEmployeeComparison`
+**KPI** (`kpi/`): `KpiFilterBar`, `KpiTrendChart`, `KpiEmployeeComparison` (`/kpi` 페이지 전용. 기존 `KpiMiniDashboard` 는 BO 홈 리디자인으로 `home/MonthlyTrendPanel` 에 흡수되어 폐기)
 - react-hook-form + zod 스키마 검증 기반
+
+**홈** (`home/`): `HelloHeader`, `KpiCard`, `RecentTradesList`, `RecentConsultationsList`, `ProfitBreakdown`, `MonthlyTrendPanel`
+- BO_HOME_V2 시안(모노톤 + 14px shell) 적용. KPI 3-col + 카드 안 최근 거래(2) / 최근 상담(4) + 12개월 추이 패널 (6/12 토글)
+- `RecentTradesList` / `RecentConsultationsList` 는 `MembershipTradeEntity` / `ConsultationEntity` props 만 받음. DTO→Entity 변환은 `(dashboard)/page.tsx` 에서 `mapMembershipTradeDtoToEntity` / `mapConsultationDtoToEntity` (from `@heritage-dx/store`) 로 수행해 도메인/뷰 분리 유지
+- `MonthlyTrendPanel` 은 `useKpiSeries({ preset: '6months' | '1year' })` 로 6/12개월 토글. 별도 신규 preset 추가 없이 기존 `1year` 활용
 
 **공통**: `GoogleAnalytics` (GA4 이벤트 트래킹)
 

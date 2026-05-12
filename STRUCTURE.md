@@ -213,7 +213,7 @@ HTTP 클라이언트 + 토큰 관리.
 
 Repository Pattern 기반 API 레이어. General(공개)/Admin(관리자)/Server(ISR) 3가지 카테고리의 리포지토리를 제공한다.
 
-> **API 스펙·실응답 샘플 참조**: [`docs/api/README.md`](docs/api/README.md) (public) · [`docs/api/admin/README.md`](docs/api/admin/README.md) (admin). `https://api.heritage-dx.com/api-docs-json` 기반 113 operations / 149 DTOs 의 도메인별 문서.
+> **API 스펙·실응답 샘플 참조**: [`docs/api/README.md`](docs/api/README.md) (public) · [`docs/api/admin/README.md`](docs/api/admin/README.md) (admin). `https://api.heritage-dx.com/api-docs-json` 기반 도메인별 문서 (스웨거 `v1.0.0+57563d32`, 2026-05-12 캡처. admin 83 ops / 16 파일).
 
 ```
 packages/api/
@@ -226,7 +226,7 @@ packages/api/
 │   ├── interfaces/
 │   │   ├── index.ts                      # GeneralRepositories, AdminRepositories 집합 타입
 │   │   ├── general/                      # 8개 공개 API 인터페이스 (+customer.repository)
-│   │   └── admin/                        # 13개 관리자 API 인터페이스
+│   │   └── admin/                        # 16개 관리자 API 인터페이스 (+ scenario-admin read-only, settlement-admin)
 │   ├── repositories/
 │   │   ├── general/                      # ApiClient 기반 공개 API 구현
 │   │   ├── admin/                        # ApiClient 기반 관리자 API 구현
@@ -256,14 +256,16 @@ packages/api/
 - `packages/api/src/interfaces/general/notice.repository.ts` — `INoticeRepository` 인터페이스 (`NoticeListParams`, `list`, `create`, `update`, `delete`). 읽기는 `/notices` 공개 엔드포인트, 쓰기는 `/admin/notices` 관리자 엔드포인트(서버측 토큰 검증)로 라우팅.
 - `packages/api/src/repositories/general/notice.repository.impl.ts` — `ApiClient` 기반 구현체
 
-**Admin Repository (관리자 API):** 15개 — clubs, scenarios, documents, club-documents, scenario-documents, club-scenario-documents, club-scenarios, global-documents, customer-documents, users, organizations, memberships, kpi, **consultations**(`/admin/consultations*` + `approvalAction`), **membershipTrades**(`/admin/membership-trades*` + `workflowAction`)
+**Admin Repository (관리자 API):** 16개 — clubs, **scenarios**(read-only: `getAll`/`getOne` 만 — 스웨거에 admin 측 mutation 미노출), documents, club-documents, scenario-documents, club-scenario-documents, club-scenarios, global-documents, customer-documents, users, organizations, memberships, kpi, **consultations**(`/admin/consultations*` + `approvalAction`), **membershipTrades**(`/admin/membership-trades*` + `workflowAction`), **settlements**(`/admin/settlements*` — id-keyed list/get/update, 2026-05 신규)
 
 #### 승인 워크플로우
 
-상담(`approvalStatus`)과 거래(`workflowStatus`)는 한 enum을 공유하되, **2026-04 변경**으로 거래는 진행 단계(세무신고/완료)가 추가됐다. 응답 필드명은 상담이 `approvalRequestedAt`/`firstApprovedAt`/`linkedTradeId`, 거래가 `submittedForFinalReviewAt`/`finalApprovedAt`/`finalRejectedAt`/`finalRejectionReason`로 분리. (`holdReason`/`rejectionReason`은 deprecated, 과거 데이터 호환만)
+상담(`approvalStatus`)과 거래(`workflowStatus`)는 서로 다른 enum 을 가지며, 통합 진행 상태는 상담 응답의 `progressStatus` 필드로 노출된다 (2026-05 스웨거 `v1.0.0+57563d32` 확정).
 
-- **상담 상태**: `IN_CONSULTATION(상담중) → PENDING_DEPOSIT(계약금 대기) → DEPOSIT_APPROVED(계약금 승인)`. (구 `DRAFT`/`PENDING_APPROVAL`/`FIRST_APPROVED` 는 각각 `IN_CONSULTATION`/`PENDING_DEPOSIT`/`DEPOSIT_APPROVED` 로 명칭 변경됨 — enum 호환을 위해 코드에는 deprecated 로 남아 있음.) `ON_HOLD`/`REJECTED` 는 도달 불가하며 deprecated.
-- **거래 상태**: 상담 APPROVE_FIRST 이후 자동 생성된 거래는 진행 단계(`TAX_FILING → COMPLETED` 등)로 전환. 정확한 enum 이름은 백엔드 신규 스펙 캡처(Phase B) 후 확정.
+- **상담 `approvalStatus`** (3값): `IN_CONSULTATION(상담중) → PENDING_DEPOSIT(계약금 대기) → DEPOSIT_APPROVED(계약금 승인)`. (구 `DRAFT`/`PENDING_APPROVAL`/`FIRST_APPROVED` 는 각각 `IN_CONSULTATION`/`PENDING_DEPOSIT`/`DEPOSIT_APPROVED` 로 명칭 변경됨 — enum 호환을 위해 코드에는 deprecated 로 남아 있음.) `ON_HOLD`/`REJECTED` 는 도달 불가.
+- **거래 `workflowStatus`** (4값, 확정): `DOCUMENT_AND_BALANCE | TAX_FILING | COMPLETED | REJECTED`. (`TradeWorkflowStatus` 타입으로 좁힘 — `WorkflowStatus` 는 deprecated alias)
+- **통합 `progressStatus`** (5값, 상담 응답에만 존재): `IN_CONSULTATION | PENDING_DEPOSIT | DOCUMENT_AND_BALANCE | TAX_FILING | COMPLETED`. 상담↔거래 평탄화된 진행 단계. 구 `isDone` 대신 `progressStatus === "COMPLETED"` 로 완료 판별 (`packages/store/src/domain/consultation-progress.ts` 의 `isConsultationCompleted` 헬퍼).
+- **응답 필드 분리**: 상담은 `approvalRequestedAt`/`firstApprovedAt`/`linkedTradeId`/`settlementId`/`settlementDocumentGenerated*`, 거래는 `finalApprovedAt`/`settlementId` 만 유지. (`isDone`/`holdReason`/`rejectionReason` 응답 제거, 거래의 `submittedForFinalReviewAt`/`finalRejectedAt`/`finalRejectionReason` 도 응답 제거.)
 - **상담중(DRAFT)** 은 닫는 개념이 없는 디폴트 상태(반대 매물 매칭 탐색용).
 - **액션 분기**:
   - 공개 상담 (`PATCH /consultations/:id/approval-action`) — `REQUEST_APPROVAL` 만.
@@ -280,7 +282,7 @@ packages/api/
 - **상담 리스트 기본 필터**: OS/BO 모두 `isConverted=false` 기본. FIRST_APPROVED 건은 "거래 전환 완료 포함" 토글로 노출.
 - **APPROVE_FIRST 가드 (2026-05-08 갱신)**: BO "계약금 확인" 버튼이 `depositAmount > 0` AND `settlementDocumentGenerated === true` 둘 다 충족할 때만 활성화. 백엔드가 입출금표 문서 생성 완료를 별도 게이트로 두며 미충족 시 400 거부. APPROVE_FIRST 처리 시 상담을 거래내역으로 전환하고 `settlement.membershipTradeId` 에 거래 ID 를 연결한다. 상담 응답에 `settlementId / settlementDocumentGenerated / settlementDocumentGeneratedAt` 메타가 포함된다.
 - **REQUEST_APPROVAL 게이트 (2026-05)**: OS의 ApprovalRequestSheetModal 이 "승인 요청 보내기" 클릭 시, REQUEST_APPROVAL 액션 직전에 `PATCH /api/settlements/:consultationId/document-generated` 를 호출하여 입출금표 문서 생성 완료를 백엔드에 마킹한다. 백엔드는 이 마킹이 있어야 다음 상태로 전이하도록 검증한다.
-- **REOPEN vs REJECT**: REOPEN은 거래 이관 직전 단계에서 무산(상담 DRAFT 복귀), REJECT는 거래 이관 후 무산(거래 물리 삭제 + 상담 DRAFT 복귀). 둘 다 `ActionReasonModal`로 사유를 받는다.
+- **REOPEN vs REJECT**: REOPEN은 거래 이관 직전 단계에서 무산(상담 `IN_CONSULTATION` 복귀), REJECT는 거래 이관 후 무산(거래 물리 삭제 + 상담 `IN_CONSULTATION` 복귀). `ActionReasonModal` 의 사유 입력은 클라이언트 UX 전용으로 서버 DTO 에는 전달되지 않는다 (admin 워크플로우 액션 DTO 에 `reason` 필드 없음).
 - **완료 거래 락**: COMPLETED 거래 자체와 그 거래에 연결된 상담은 수정/삭제가 서버에서 거부된다. UI는 가드 노출.
 - **삭제 권한**: `canDeleteConsultation(user, cons)` — `FIRST_APPROVED`/`linkedTradeId` 있는 상담은 대표/백오피스만 삭제. `canDeleteTrade(user)` — 거래내역은 항상 대표/백오피스만 삭제. OS/BO 삭제 버튼 모두 가드 적용.
 
@@ -294,7 +296,7 @@ packages/api/
 **React Context:**
 - `RepositoryProvider` — general/admin 리포지토리 주입
 - `useClubRepository()`, `useScenarioRepository()`, `useConsultationRepository()`, `useMembershipTradeRepository()`, `useClaimRepository()` — 공개 convenience hooks
-- `useConsultationAdminRepository()`, `useMembershipTradeAdminRepository()` — 관리자 convenience hooks (백오피스 승인 UI에서 사용)
+- `useConsultationAdminRepository()`, `useMembershipTradeAdminRepository()`, `useSettlementAdminRepository()`, `useScenarioAdminRepository()` — 관리자 convenience hooks (백오피스 승인/입출금표/시나리오 카탈로그 UI에서 사용)
 - `useNoticeRepository()` — notice general 리포지토리 convenience hook (훅 내부에서만 소비)
 - `useMarketPriceRepository()` — market-price general 리포지토리 convenience hook (훅 내부에서만 소비)
 - `useCustomerRepository()` — customer general 리포지토리 convenience hook (OS/BO 고객 페이지, 고객 자동완성, 이력 조회에서 사용)

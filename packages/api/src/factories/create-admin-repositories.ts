@@ -15,6 +15,7 @@ import { MembershipAdminRepository } from "../repositories/admin/membership-admi
 import { KpiAdminRepository } from "../repositories/admin/kpi-admin.repository.impl";
 import { ConsultationAdminRepository } from "../repositories/admin/consultation-admin.repository.impl";
 import { MembershipTradeAdminRepository } from "../repositories/admin/membership-trade-admin.repository.impl";
+import { SettlementAdminRepository } from "../repositories/admin/settlement-admin.repository.impl";
 
 export function createAdminRepositories(
   apiClient: ApiClient,
@@ -36,5 +37,6 @@ export function createAdminRepositories(
     kpi: new KpiAdminRepository(apiClient),
     consultations: new ConsultationAdminRepository(apiClient),
     membershipTrades: new MembershipTradeAdminRepository(apiClient),
+    settlements: new SettlementAdminRepository(apiClient),
   };
 }

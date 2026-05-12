@@ -48,9 +48,10 @@ async function findCounterTrades(
     const json = await res.json();
     const allTrades = json.data?.trades || json.trades || [];
 
-    // 같은 골프장 + 미완료만 필터
+    // 같은 골프장 + 미완료만 필터 (progressStatus === "COMPLETED" 가 완료 단계).
     const trades = allTrades.filter(
-      (t: Record<string, unknown>) => t.clubName === clubName && !t.isDone
+      (t: Record<string, unknown>) =>
+        t.clubName === clubName && t.progressStatus !== "COMPLETED",
     );
 
     // 유사가격 판별 (±10%)

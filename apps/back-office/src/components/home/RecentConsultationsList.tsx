@@ -1,6 +1,6 @@
 "use client";
 
-import type { ConsultationEntity } from "@heritage-dx/store";
+import { isConsultationCompleted, type ConsultationEntity } from "@heritage-dx/store";
 
 interface RecentConsultationsListProps {
   items: ConsultationEntity[];
@@ -53,7 +53,7 @@ export default function RecentConsultationsList({
               {consultationMeta(c)}
             </div>
           </div>
-          {c.isDone ? (
+          {isConsultationCompleted(c) ? (
             <span className="text-[10px] font-semibold px-1.5 py-px rounded bg-success-light text-success border border-success/20">
               완료
             </span>

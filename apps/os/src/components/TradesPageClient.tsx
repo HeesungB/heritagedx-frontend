@@ -11,6 +11,7 @@ import {
   useFavoriteConsultations,
   useRecentSearches,
   canDeleteConsultation,
+  isConsultationCompleted,
   type ConsultationNoteEntry,
   type ApprovalStatus,
   type RecentSearchItem,
@@ -586,7 +587,7 @@ export default function TradesPageClient() {
                           <Fragment key={trade.id}>
                             <tr
                               className={`transition-colors ${
-                                trade.isDone
+                                isConsultationCompleted(trade)
                                   ? "bg-green-50/40 opacity-70"
                                   : isExpanded
                                   ? "bg-gray-50"
@@ -608,14 +609,14 @@ export default function TradesPageClient() {
                                 />
                               </td>
                               <td className="px-2.5 py-2 align-middle whitespace-nowrap">
-                                <TypeBadge tradeType={trade.tradeType} isUndecided={undecided} isDone={trade.isDone} />
+                                <TypeBadge tradeType={trade.tradeType} isUndecided={undecided} isCompleted={isConsultationCompleted(trade)} />
                               </td>
                               <td className="px-2.5 py-2 align-middle whitespace-nowrap">
-                                <StatusBadge status={trade.approvalStatus} isDone={trade.isDone} />
+                                <StatusBadge status={trade.approvalStatus} isCompleted={isConsultationCompleted(trade)} />
                               </td>
                               <td
                                 className={`px-2.5 py-2 align-middle text-[13px] font-semibold whitespace-nowrap ${
-                                  trade.isDone ? "text-gray-400 line-through" : "text-gray-900"
+                                  isConsultationCompleted(trade) ? "text-gray-400 line-through" : "text-gray-900"
                                 }`}
                               >
                                 {trade.clubId ? (
@@ -633,14 +634,14 @@ export default function TradesPageClient() {
                               </td>
                               <td
                                 className={`px-2.5 py-2 align-middle text-[12.5px] whitespace-nowrap ${
-                                  trade.isDone ? "text-gray-400" : "text-gray-700"
+                                  isConsultationCompleted(trade) ? "text-gray-400" : "text-gray-700"
                                 }`}
                               >
                                 {trade.membershipType}
                               </td>
                               <td
                                 className={`px-2.5 py-2 align-middle text-[13px] font-semibold whitespace-nowrap ${
-                                  trade.isDone ? "text-gray-400 line-through" : "text-gray-900"
+                                  isConsultationCompleted(trade) ? "text-gray-400 line-through" : "text-gray-900"
                                 }`}
                               >
                                 {trade.customerId ? (
@@ -658,7 +659,7 @@ export default function TradesPageClient() {
                               </td>
                               <td
                                 className={`px-2.5 py-2 align-middle font-mono text-[12.5px] whitespace-nowrap ${
-                                  trade.isDone ? "text-gray-400" : "text-gray-700"
+                                  isConsultationCompleted(trade) ? "text-gray-400" : "text-gray-700"
                                 }`}
                               >
                                 {trade.customerId ? (
@@ -684,7 +685,7 @@ export default function TradesPageClient() {
                               </td>
                               <td
                                 className={`px-2.5 py-2 align-middle text-right tabular-nums whitespace-nowrap text-[13px] font-semibold ${
-                                  trade.isDone ? "text-gray-400 line-through" : "text-gray-900"
+                                  isConsultationCompleted(trade) ? "text-gray-400 line-through" : "text-gray-900"
                                 }`}
                               >
                                 {formatPrice(trade.offerPrice)}
@@ -692,7 +693,7 @@ export default function TradesPageClient() {
                               </td>
                               <td
                                 className={`px-2.5 py-2 align-middle text-right tabular-nums whitespace-nowrap text-[13px] font-semibold ${
-                                  trade.isDone ? "text-gray-400 line-through" : "text-gray-900"
+                                  isConsultationCompleted(trade) ? "text-gray-400 line-through" : "text-gray-900"
                                 }`}
                               >
                                 {formatPrice(trade.desiredPrice)}
@@ -700,7 +701,7 @@ export default function TradesPageClient() {
                               </td>
                               <td
                                 className={`px-2.5 py-2 align-middle font-mono text-[12px] whitespace-nowrap ${
-                                  trade.isDone ? "text-gray-400" : "text-gray-700"
+                                  isConsultationCompleted(trade) ? "text-gray-400" : "text-gray-700"
                                 }`}
                               >
                                 {trade.registrationDate}
@@ -986,36 +987,30 @@ function MemoHistoryRow({ trade, entries, draft, onDraftChange, onSubmit, submit
 
 // ─── Status badge (legacy color-dot) ───────────────────────────────
 
+// progressStatus 5값 (IN_CONSULTATION / PENDING_DEPOSIT / DOCUMENT_AND_BALANCE / TAX_FILING / COMPLETED) +
+// approvalStatus 3값 (IN_CONSULTATION / PENDING_DEPOSIT / DEPOSIT_APPROVED) 의 합집합.
 const APPROVAL_DOT: Record<string, string> = {
   IN_CONSULTATION: "bg-gray-400",
-  DRAFT: "bg-gray-400",
   PENDING_DEPOSIT: "bg-amber-500",
-  PENDING_APPROVAL: "bg-amber-500",
   DEPOSIT_APPROVED: "bg-emerald-500",
-  FIRST_APPROVED: "bg-emerald-500",
+  DOCUMENT_AND_BALANCE: "bg-emerald-500",
   TAX_FILING: "bg-sky-500",
   COMPLETED: "bg-emerald-600",
-  ON_HOLD: "bg-orange-500",
-  REJECTED: "bg-red-500",
 };
 const APPROVAL_LABEL: Record<string, string> = {
   IN_CONSULTATION: "상담중",
-  DRAFT: "상담중",
   PENDING_DEPOSIT: "검토중",
-  PENDING_APPROVAL: "검토중",
   DEPOSIT_APPROVED: "승인",
-  FIRST_APPROVED: "승인",
+  DOCUMENT_AND_BALANCE: "잔금/문서",
   TAX_FILING: "세무신고",
   COMPLETED: "완료",
-  ON_HOLD: "보류",
-  REJECTED: "반려",
 };
 
-function StatusBadge({ status, isDone }: { status: string; isDone: boolean }) {
+function StatusBadge({ status, isCompleted }: { status: string; isCompleted: boolean }) {
   return (
     <span
       className={`inline-flex h-[22px] items-center gap-1.5 rounded px-2 text-[11.5px] font-semibold ${
-        isDone ? "text-gray-400" : "text-gray-700"
+        isCompleted ? "text-gray-400" : "text-gray-700"
       } bg-gray-50 border border-gray-100`}
     >
       <span className={`inline-block h-1.5 w-1.5 rounded-full ${APPROVAL_DOT[status] ?? "bg-gray-300"}`} />

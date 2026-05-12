@@ -6,6 +6,7 @@ export function mapMembershipTradeDtoToEntity(dto: MembershipTrade): MembershipT
     id: dto.id,
     customerId: dto.customerId,
     sourceConsultationId: dto.sourceConsultationId,
+    settlementId: dto.settlementId ?? null,
     clubId: dto.clubId,
     clubName: dto.clubName ?? "",
     membershipId: dto.membershipId,
@@ -47,10 +48,7 @@ export function mapMembershipTradeDtoToEntity(dto: MembershipTrade): MembershipT
       balanceCompleted: dto.balanceCompleted,
     },
 
-    submittedForFinalReviewAt: dto.submittedForFinalReviewAt,
     finalApprovedAt: dto.finalApprovedAt,
-    finalRejectedAt: dto.finalRejectedAt,
-    finalRejectionReason: dto.finalRejectionReason,
 
     manager: dto.manager,
     description: dto.description,

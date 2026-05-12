@@ -15,6 +15,7 @@ export type {
 export type {
   IClubAdminRepository,
   IScenarioAdminRepository,
+  AdminScenarioListParams,
   IDocumentAdminRepository,
   IClubDocumentAdminRepository,
   IScenarioDocumentAdminRepository,
@@ -28,6 +29,8 @@ export type {
   IKpiAdminRepository,
   IConsultationAdminRepository,
   IMembershipTradeAdminRepository,
+  ISettlementAdminRepository,
+  AdminSettlementListParams,
 } from "./admin";
 
 import type {
@@ -58,6 +61,7 @@ import type {
   IKpiAdminRepository,
   IConsultationAdminRepository,
   IMembershipTradeAdminRepository,
+  ISettlementAdminRepository,
 } from "./admin";
 
 export interface GeneralRepositories {
@@ -88,6 +92,7 @@ export interface AdminRepositories {
   kpi: IKpiAdminRepository;
   consultations: IConsultationAdminRepository;
   membershipTrades: IMembershipTradeAdminRepository;
+  settlements: ISettlementAdminRepository;
 }
 
 export interface ServerRepositories {

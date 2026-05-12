@@ -1,4 +1,8 @@
-import type { ApprovalStatus, WorkflowStatus } from "./approval";
+import type {
+  ApprovalStatus,
+  ProgressStatus,
+  TradeWorkflowStatus,
+} from "./approval";
 import type { Pagination } from "./api";
 
 // 거래 유형 (OpenAPI 스펙 enum)
@@ -55,12 +59,11 @@ export interface Consultation {
   registrationDate: string | null;
   tradeDate: string | null;
   remarks: string | null;
-  isDone: boolean;
   approvalStatus: ApprovalStatus;
+  // 상담↔거래 통합 진행 상태 (스웨거 v1.0.0+57563d32 신규).
+  progressStatus: ProgressStatus;
   approvalRequestedAt: string | null;
   firstApprovedAt: string | null;
-  holdReason: string | null;
-  rejectionReason: string | null;
   linkedTradeId: string | null;
   // 연결된 입출금표 메타 (백엔드 2026-05-08 추가).
   // REQUEST_APPROVAL / APPROVE_FIRST 게이트는 settlementDocumentGenerated 가 true 일 때만 통과.
@@ -129,7 +132,7 @@ export interface ConsultationAiResponse {
 }
 
 // 상담 생성/수정 입력.
-// - 백엔드가 isDone 필드를 거부하므로 입력 페이로드에서 제외 (응답 Consultation 에는 표시용으로 존재).
+// - 응답에 isDone 이 없으므로 입력에도 없음. 완료 판별은 progressStatus === "COMPLETED".
 // - notes 는 **상담 생성 시에만** 1개의 첫 entry 텍스트로 사용. PUT /consultations/:id 에서는
 //   notes 직접 수정이 금지되어 있으므로 update 호출 시에는 반드시 omit 해야 한다.
 //   메모 추가/수정/삭제는 별도 엔드포인트(POST/PATCH/DELETE /consultations/:id/notes[/:noteId]) 사용.
@@ -165,7 +168,7 @@ export interface MembershipTrade {
   contact: string;
   tradeType: TradeType;
   membershipName: string;
-  workflowStatus: WorkflowStatus;
+  workflowStatus: TradeWorkflowStatus;
   contractDate: string | null;
   amount: number | null;
   depositAmount: number | null;
@@ -186,10 +189,9 @@ export interface MembershipTrade {
   invoicePurchase: number | null;
   remarks: string | null;
   actualTransactionDate: string | null;
-  submittedForFinalReviewAt: string | null;
   finalApprovedAt: string | null;
-  finalRejectedAt: string | null;
-  finalRejectionReason: string | null;
+  /** 연결된 입출금표 ID (스웨거 v1.0.0+57563d32 신규). */
+  settlementId: string | null;
   createdByName?: string;
   createdAt: string;
   updatedAt: string;

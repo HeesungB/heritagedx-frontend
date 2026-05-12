@@ -1,4 +1,8 @@
-import type { ApprovalStatus, Pagination, WorkflowStatus } from "@heritage-dx/types";
+import type {
+  ApprovalStatus,
+  Pagination,
+  TradeWorkflowStatus,
+} from "@heritage-dx/types";
 
 export interface ListParams {
   page?: number;
@@ -12,13 +16,14 @@ export interface TradeListParams extends ListParams {
   sort?: string;
   order?: "ASC" | "DESC";
   isShared?: boolean;
+  isConverted?: boolean;
   organizationId?: string;
   customerId?: string;
   // 상담 전용
   approvalStatus?: ApprovalStatus;
   linkedTradeId?: string;
   // 거래 전용
-  workflowStatus?: WorkflowStatus;
+  workflowStatus?: TradeWorkflowStatus;
   sourceConsultationId?: string;
 }
 

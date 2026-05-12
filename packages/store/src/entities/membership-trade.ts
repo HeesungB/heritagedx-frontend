@@ -1,14 +1,15 @@
-import type { WorkflowStatus } from "@heritage-dx/types";
+import type { TradeWorkflowStatus } from "@heritage-dx/types";
 
 export interface MembershipTradeEntity {
   id: string;
   customerId: string | null;
   sourceConsultationId: string | null;
+  settlementId: string | null;
   clubId: string | null;
   clubName: string;
   membershipId: string | null;
   tradeType: "매수" | "매도";
-  workflowStatus: WorkflowStatus;
+  workflowStatus: TradeWorkflowStatus;
 
   customer: {
     name: string;
@@ -45,10 +46,7 @@ export interface MembershipTradeEntity {
     balanceCompleted: boolean;
   };
 
-  submittedForFinalReviewAt: string | null;
   finalApprovedAt: string | null;
-  finalRejectedAt: string | null;
-  finalRejectionReason: string | null;
 
   manager: string | null;
   description: string | null;

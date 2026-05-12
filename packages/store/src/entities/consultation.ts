@@ -1,4 +1,8 @@
-import type { ApprovalStatus, ConsultationNoteEntry } from "@heritage-dx/types";
+import type {
+  ApprovalStatus,
+  ConsultationNoteEntry,
+  ProgressStatus,
+} from "@heritage-dx/types";
 
 export interface ConsultationEntity {
   id: string;
@@ -22,13 +26,12 @@ export interface ConsultationEntity {
   registrationDate: string | null;
   tradeDate: string | null;
   remarks: string | null;
-  isDone: boolean;
   isShared: boolean;
   approvalStatus: ApprovalStatus;
+  // 상담↔거래 통합 진행 상태 (스웨거 v1.0.0+57563d32). 완료/세무신고 단계 판별에 사용.
+  progressStatus: ProgressStatus;
   approvalRequestedAt: string | null;
   firstApprovedAt: string | null;
-  holdReason: string | null;
-  rejectionReason: string | null;
   linkedTradeId: string | null;
   /** 연결된 입출금표 ID (백엔드 2026-05-08 추가). */
   settlementId: string | null;

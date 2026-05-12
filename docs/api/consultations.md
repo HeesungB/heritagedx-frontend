@@ -172,7 +172,7 @@ Cookie: hdx_access_token=<JWT>
 - **OperationId**: `ConsultationsController_create`
 - **인증**: 필요 (쿠키 `hdx_access_token`)
 
-새로운 상담 기록을 등록합니다. club/membership은 UUID(기존 데이터 참조) 또는 텍스트(직접 입력) 모드로 모두 지원하며, isDone 미전송 시 false로 저장됩니다.
+새로운 상담 기록을 등록합니다. club/membership은 UUID(기존 데이터 참조) 또는 텍스트(직접 입력) 모드로 모두 지원하며, 완료 판별은 응답의 `progressStatus === "COMPLETED"` 로 한다.
 
 #### Request Body
 
@@ -258,7 +258,7 @@ Cookie: hdx_access_token=<JWT>
 - **OperationId**: `ConsultationsController_update`
 - **인증**: 필요 (쿠키 `hdx_access_token`)
 
-기존 상담 기록을 부분 수정합니다. club/membership을 함께 보내면 UUID 또는 텍스트 모드로 갱신되며, isDone 미전송 시 기존 값이 유지됩니다.
+기존 상담 기록을 부분 수정합니다. club/membership을 함께 보내면 UUID 또는 텍스트 모드로 갱신되며, 완료 단계 전환은 admin 워크플로우 액션을 통해서만 가능하다.
 
 #### 파라미터
 
@@ -397,14 +397,15 @@ Cookie: hdx_access_token=<JWT>
 | `registrationDate` | string (date-time) |  | 등록일자 |
 | `tradeDate` | string (date-time) |  | 거래일 |
 | `remarks` | string |  | 비고 |
-| `isDone` | boolean | ✓ | 거래 완료 여부 |
 | `isShared` | boolean | ✓ | 공유 여부 _예: `False`_ |
-| `approvalStatus` | `DRAFT` \| `PENDING_APPROVAL` \| `FIRST_APPROVED` \| `ON_HOLD` \| `REJECTED` | ✓ | 상담 승인 상태 |
+| `approvalStatus` | `IN_CONSULTATION` \| `PENDING_DEPOSIT` \| `DEPOSIT_APPROVED` | ✓ | 상담 승인 상태 |
+| `progressStatus` | `IN_CONSULTATION` \| `PENDING_DEPOSIT` \| `DOCUMENT_AND_BALANCE` \| `TAX_FILING` \| `COMPLETED` | ✓ | 상담↔거래 통합 진행 상태 (2026-05 신규). 완료 판별은 `progressStatus === "COMPLETED"`. |
 | `approvalRequestedAt` | string (date-time) |  | 승인 요청 일시 |
 | `firstApprovedAt` | string (date-time) |  | 1차 승인 일시 |
-| `holdReason` | string |  | 보류 사유 |
-| `rejectionReason` | string |  | 반려 사유 |
 | `linkedTradeId` | string |  | 연결된 거래 UUID |
+| `settlementId` | string |  | 연결된 입출금표 UUID (nullable) |
+| `settlementDocumentGenerated` | boolean | ✓ | 입출금표 문서 생성 완료 여부 |
+| `settlementDocumentGeneratedAt` | string (date-time) |  | 문서 생성 완료 시각 |
 | `createdByName` | string | ✓ | 작성자 이름 |
 | `createdAt` | string (date-time) | ✓ | 생성일시 |
 | `updatedAt` | string (date-time) | ✓ | 수정일시 |
@@ -429,7 +430,6 @@ Cookie: hdx_access_token=<JWT>
 | `registrationDate` | string |  | 등록일자 (YYYY-MM-DD) _예: `2024-02-09`_ |
 | `tradeDate` | string |  | 거래일 (YYYY-MM-DD) _예: `2024-02-15`_ |
 | `remarks` | string |  | 비고 _예: `계약금 입금 완료`_ |
-| `isDone` | boolean |  | 거래 완료 여부 (미전송/null/빈 문자열이면 false로 저장됩니다.) _예: `False`_ |
 | `isShared` | boolean |  | 공유 여부 (같은 조직의 다른 에디터에게 조회 허용) _예: `False`_ |
 
 ### UpdateConsultationDto
@@ -451,6 +451,5 @@ Cookie: hdx_access_token=<JWT>
 | `registrationDate` | string |  | 등록일자 (YYYY-MM-DD) _예: `2024-02-09`_ |
 | `tradeDate` | string |  | 거래일 (YYYY-MM-DD) _예: `2024-02-15`_ |
 | `remarks` | string |  | 비고 _예: `계약금 입금 완료`_ |
-| `isDone` | boolean |  | 거래 완료 여부 (미전송/null/빈 문자열이면 false로 저장됩니다.) _예: `False`_ |
 | `isShared` | boolean |  | 공유 여부 (같은 조직의 다른 에디터에게 조회 허용) _예: `False`_ |
 | `customFields` | object |  | 상담별 자유형 커스텀 필드. 전송하면 기존 객체를 전체 교체하고, 생략하면 기존 값을 유지합니다. _예: `{'VIP': False}`_ |

@@ -233,10 +233,17 @@ export type { ClubUpdateField } from "./mappers/index";
 
 // Approval workflow constants/types (re-export from @heritage-dx/types so views
 // don't need to import the types package directly)
-export { APPROVAL_STATUS, APPROVAL_ACTIONS } from "@heritage-dx/types";
+export {
+  APPROVAL_STATUS,
+  APPROVAL_ACTIONS,
+  TRADE_WORKFLOW_STATUS,
+  PROGRESS_STATUS,
+} from "@heritage-dx/types";
 export type {
   ApprovalStatus,
   WorkflowStatus,
+  TradeWorkflowStatus,
+  ProgressStatus,
   ApprovalAction,
   UserApprovalAction,
   UserConsultationAction,
@@ -244,6 +251,12 @@ export type {
   AdminTradeAction,
   ApprovalActionInput,
 } from "@heritage-dx/types";
+
+// Consultation progress helpers (isDone 대체)
+export {
+  isConsultationCompleted,
+  isInTradeStage,
+} from "./domain/consultation-progress";
 
 // 고객 update 입력 타입 — 뷰의 인라인 편집(`InlineField`) 콜백에서 사용
 export type { CustomerUpdateInput } from "@heritage-dx/types";
@@ -254,6 +267,9 @@ export type {
   SettlementInput,
   SettlementUpdateInput,
   SettlementDraftResponse,
+  SettlementEntityType,
+  SettlementRoute,
+  SettlementsResponse,
 } from "@heritage-dx/types";
 
 // 상담 메모 (notes JSONB) 타입 — 뷰는 @heritage-dx/store 경유로만 import

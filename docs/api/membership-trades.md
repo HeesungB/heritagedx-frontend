@@ -436,10 +436,7 @@ Cookie: hdx_access_token=<JWT>
 | `invoicePurchase` | number |  | 계산서 매입 (원 단위) |
 | `remarks` | string |  | 비고 |
 | `actualTransactionDate` | string |  | 실거래 자료 (날짜 텍스트) |
-| `submittedForFinalReviewAt` | string (date-time) |  | 승인 요청 일시 |
-| `finalApprovedAt` | string (date-time) |  | 승인 완료 일시 |
-| `finalRejectedAt` | string (date-time) |  | 반려 일시 |
-| `finalRejectionReason` | string |  | 반려 사유 |
+| `finalApprovedAt` | string (date-time) |  | 최종 승인 완료 일시 (`ADVANCE_TO_COMPLETED` 시점) |
 | `createdByName` | string | ✓ | 작성자 이름 |
 | `createdAt` | string (date-time) | ✓ | 생성일시 |
 | `updatedAt` | string (date-time) | ✓ | 수정일시 |

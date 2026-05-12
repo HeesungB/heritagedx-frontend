@@ -77,10 +77,14 @@ export type {
 export {
   APPROVAL_STATUS,
   APPROVAL_ACTIONS,
+  TRADE_WORKFLOW_STATUS,
+  PROGRESS_STATUS,
 } from "./approval";
 export type {
   ApprovalStatus,
   WorkflowStatus,
+  TradeWorkflowStatus,
+  ProgressStatus,
   ApprovalAction,
   UserApprovalAction,
   UserConsultationAction,
@@ -118,10 +122,13 @@ export type { Notice, NoticeFile, NoticeInput, NoticesData } from "./notice";
 
 export type {
   Settlement,
+  SettlementEntityType,
+  SettlementRoute,
   SettlementInput,
   SettlementUpdateInput,
   SettlementDraftRequest,
   SettlementDraftResponse,
+  SettlementsResponse,
 } from "./settlement";
 
 export type {

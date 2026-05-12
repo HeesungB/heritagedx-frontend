@@ -28,7 +28,7 @@ import {
 } from "@heritage-dx/ui";
 import { useMembershipTradeAdminRepository, useClubRepository } from "@heritage-dx/api";
 import type { MembershipTrade, Club, Pagination } from "@heritage-dx/types";
-import type { WorkflowStatus } from "@heritage-dx/store";
+import type { TradeWorkflowStatus } from "@heritage-dx/store";
 import { canDeleteTrade, useTopClubs } from "@heritage-dx/store";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
@@ -69,7 +69,7 @@ export default function MembershipTradesPage() {
   const [memberships, setMemberships] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [filterWorkflow, setFilterWorkflow] = useState<"" | WorkflowStatus>("");
+  const [filterWorkflow, setFilterWorkflow] = useState<"" | TradeWorkflowStatus>("");
   const [approvalBusyId, setApprovalBusyId] = useState<string | null>(null);
   // 거래내역의 사유 입력 모달은 REJECT 액션 전용
   const [reasonModal, setReasonModal] = useState<{ recordId: string } | null>(null);
@@ -533,15 +533,14 @@ export default function MembershipTradesPage() {
             </div>
             <select
               value={filterWorkflow}
-              onChange={(e) => { setFilterWorkflow(e.target.value as "" | WorkflowStatus); setPage(1); }}
+              onChange={(e) => { setFilterWorkflow(e.target.value as "" | TradeWorkflowStatus); setPage(1); }}
               className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 bg-white w-[140px] h-[34px]"
             >
               <option value="">진행 단계 전체</option>
-              <option value="IN_CONSULTATION">상담중</option>
-              <option value="PENDING_DEPOSIT">계약금 대기</option>
-              <option value="DEPOSIT_APPROVED">계약금 승인</option>
+              <option value="DOCUMENT_AND_BALANCE">잔금/문서 진행</option>
               <option value="TAX_FILING">세무신고</option>
               <option value="COMPLETED">완료</option>
+              <option value="REJECTED">반려</option>
             </select>
             <ClubSearchSelect
               clubs={availableClubs}

@@ -37,7 +37,6 @@ export interface ConsultationStoreState {
   create: (data: ConsultationInput) => Promise<ConsultationEntity | null>;
   update: (id: string, data: ConsultationInput) => Promise<ConsultationEntity | null>;
   remove: (id: string) => Promise<boolean>;
-  toggleDone: (id: string, isDone: boolean) => Promise<boolean>;
   // 메모(notes JSONB entry) CRUD — 응답으로 갱신된 상담 entity 를 반환하고
   // store 의 items 도 같이 동기화한다. content 길이/권한/완료 거래 차단 등 검증은 서버 책임.
   addNote: (id: string, content: string) => Promise<ConsultationEntity | null>;
@@ -162,18 +161,6 @@ export function createConsultationStore(repos: GeneralRepositories) {
       } catch {
         return false;
       }
-    },
-
-    // 백엔드가 ConsultationInput 으로 isDone 을 더 이상 받지 않아 서버 영구화는 보류 상태.
-    // 새로고침 시 토글 결과가 사라질 수 있으므로 별도 토글 엔드포인트가 생기면 그쪽으로 연결.
-    toggleDone: async (id: string, isDone: boolean) => {
-      const { items } = get();
-      const item = items.find((i) => i.id === id);
-      if (!item) return false;
-      set((s) => ({
-        items: s.items.map((i) => (i.id === id ? { ...i, isDone } : i)),
-      }));
-      return true;
     },
 
     addNote: async (id, content) => {

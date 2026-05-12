@@ -1,6 +1,26 @@
-import type { Consultation, ConsultationInput } from "@heritage-dx/types";
+import type {
+  Consultation,
+  ConsultationInput,
+  ProgressStatus,
+} from "@heritage-dx/types";
+import { PROGRESS_STATUS } from "@heritage-dx/types";
 import type { ConsultationEntity } from "../entities/consultation";
 import { coerceToNumber } from "./helpers";
+
+// 백엔드 응답에 progressStatus 가 누락된 과거 row 가 섞여 올 경우의 폴백.
+// approvalStatus 기준으로 가장 가까운 진행 단계로 추정한다.
+function deriveProgressStatusFallback(dto: Consultation): ProgressStatus {
+  switch (dto.approvalStatus) {
+    case "DEPOSIT_APPROVED":
+    case "FIRST_APPROVED":
+      return PROGRESS_STATUS.DOCUMENT_AND_BALANCE;
+    case "PENDING_DEPOSIT":
+    case "PENDING_APPROVAL":
+      return PROGRESS_STATUS.PENDING_DEPOSIT;
+    default:
+      return PROGRESS_STATUS.IN_CONSULTATION;
+  }
+}
 
 export function mapConsultationDtoToEntity(dto: Consultation): ConsultationEntity {
   return {
@@ -26,13 +46,11 @@ export function mapConsultationDtoToEntity(dto: Consultation): ConsultationEntit
     registrationDate: dto.registrationDate,
     tradeDate: dto.tradeDate,
     remarks: dto.remarks,
-    isDone: dto.isDone,
     isShared: dto.isShared ?? false,
     approvalStatus: dto.approvalStatus,
+    progressStatus: dto.progressStatus ?? deriveProgressStatusFallback(dto),
     approvalRequestedAt: dto.approvalRequestedAt,
     firstApprovedAt: dto.firstApprovedAt,
-    holdReason: dto.holdReason,
-    rejectionReason: dto.rejectionReason,
     linkedTradeId: dto.linkedTradeId,
     settlementId: dto.settlementId ?? null,
     settlementDocumentGenerated: dto.settlementDocumentGenerated ?? false,

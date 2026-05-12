@@ -1,6 +1,6 @@
 # Admin 회원권 거래 API
 
-> spec: `v1.0.0+d8345ee2` · captured: `2026-04-22`
+> spec: `v1.0.0+57563d32` · captured: `2026-05-12`
 > base URL: `https://api.heritage-dx.com`
 > 인증: 쿠키 `hdx_access_token` 필수 (SUPER_ADMIN / ORG_ADMIN / EDITOR 중 권한 보유자만)
 
@@ -38,7 +38,7 @@ ORG_ADMIN은 소속 조직 + 익명 글로벌 데이터를 조회하고, SUPER_A
 | `query` | `tradeType` | `매도` \| `매수` |  | 거래 유형 필터 _예: `매수`_ |
 | `query` | `customerId` | string (uuid) |  | 고객 UUID 필터 _예: `550e8400-e29b-41d4-a716-446655440000`_ |
 | `query` | `sourceConsultationId` | string (uuid) |  | 원천 상담 UUID 필터 _예: `550e8400-e29b-41d4-a716-446655440001`_ |
-| `query` | `workflowStatus` | `DRAFT` \| `PENDING_APPROVAL` \| `FIRST_APPROVED` \| `ON_HOLD` \| `REJECTED` |  | 거래 승인 상태 필터 _예: `PENDING_APPROVAL`_ |
+| `query` | `workflowStatus` | `DOCUMENT_AND_BALANCE` \| `TAX_FILING` \| `COMPLETED` \| `REJECTED` |  | 거래 워크플로우 상태 필터 _예: `DOCUMENT_AND_BALANCE`_ |
 | `query` | `sort` | `contractDate` \| `createdAt` \| `clubName` \| `membershipName` \| `amount` \| `tradeAmount` |  | 정렬 기준 _예: `contractDate`_ |
 | `query` | `order` | `ASC` \| `DESC` |  | 정렬 방향 _예: `DESC`_ |
 
@@ -307,6 +307,12 @@ Cookie: hdx_access_token=<JWT>
 
 #### 응답
 
+- `200` 액션 처리 성공 → `oneOf [` [`MembershipTradeDetailResponseDto`](#membershiptradedetailresponsedto) `,` [`MembershipTradeDeleteResponseDto`](#membershiptradedeleteresponsedto) `]`
+  - `ADVANCE_TO_TAX_FILING` / `ADVANCE_TO_COMPLETED` → Detail 응답
+  - `REJECT` → Delete 응답 (success/message/timestamp)
+
+#### 응답
+
 - `200` 액션 처리 성공 → [`MembershipTradeDetailResponseDto`](#membershiptradedetailresponsedto)
 
 ---
@@ -399,7 +405,8 @@ Cookie: hdx_access_token=<JWT>
 | `membershipId` | string | ✓ | 회원권 UUID |
 | `membershipName` | string | ✓ | 회원권명 |
 | `contractDate` | string (date-time) |  | 계약일 |
-| `workflowStatus` | `DRAFT` \| `PENDING_APPROVAL` \| `FIRST_APPROVED` \| `ON_HOLD` \| `REJECTED` | ✓ | 거래 승인 상태 |
+| `workflowStatus` | `DOCUMENT_AND_BALANCE` \| `TAX_FILING` \| `COMPLETED` \| `REJECTED` | ✓ | 거래 워크플로우 상태 |
+| `settlementId` | string |  | 연결된 입출금표 UUID (nullable, 2026-05 신규) |
 | `amount` | number |  | 금액 (원 단위) |
 | `depositAmount` | number |  | 계약금 (원 단위) |
 | `tradingPartner` | string |  | 거래처 |
@@ -419,10 +426,7 @@ Cookie: hdx_access_token=<JWT>
 | `invoicePurchase` | number |  | 계산서 매입 (원 단위) |
 | `remarks` | string |  | 비고 |
 | `actualTransactionDate` | string |  | 실거래 자료 (날짜 텍스트) |
-| `submittedForFinalReviewAt` | string (date-time) |  | 승인 요청 일시 |
-| `finalApprovedAt` | string (date-time) |  | 승인 완료 일시 |
-| `finalRejectedAt` | string (date-time) |  | 반려 일시 |
-| `finalRejectionReason` | string |  | 반려 사유 |
+| `finalApprovedAt` | string (date-time) |  | 최종 승인 완료 일시 (`ADVANCE_TO_COMPLETED` 시점) |
 | `createdByName` | string | ✓ | 작성자 이름 |
 | `createdAt` | string (date-time) | ✓ | 생성일시 |
 | `updatedAt` | string (date-time) | ✓ | 수정일시 |
@@ -431,8 +435,11 @@ Cookie: hdx_access_token=<JWT>
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `action` | `REQUEST_APPROVAL` \| `APPROVE_FIRST` \| `HOLD` \| `REJECT` \| `REOPEN` | ✓ | 거래 승인 액션 _예: `REQUEST_APPROVAL`_ |
-| `reason` | string |  | 처리 사유 (REJECT에서 사용) _예: `거래금액 증빙을 보완해 주세요.`_ |
+| `action` | `ADVANCE_TO_TAX_FILING` \| `ADVANCE_TO_COMPLETED` \| `REJECT` | ✓ | 거래 워크플로우 액션 _예: `ADVANCE_TO_TAX_FILING`_ |
+
+> 서버 DTO 에는 `reason` 필드가 없다. UI 의 사유 입력 모달은 클라이언트 UX 전용이며 서버에 전달되지 않는다.
+> `REJECT` 는 거래 레코드를 *물리 삭제*하고 원천 상담을 `IN_CONSULTATION` 으로 복귀시킨다. 응답은 `MembershipTradeDeleteResponseDto` (success/message/timestamp) 로 분기되며, 200 응답이 `oneOf [MembershipTradeDetailResponseDto, MembershipTradeDeleteResponseDto]` 임에 주의.
+> `ADVANCE_TO_COMPLETED` 시 `finalApprovedAt` 이 갱신된다. COMPLETED 도달 후 거래·연결 상담은 수정/삭제가 서버에서 거부된다.
 
 ### UpdateMembershipTradeDto
 

@@ -1,6 +1,6 @@
 // 상담·거래 워크플로우 상수·타입
-// 상담은 ApprovalStatus(DRAFT/PENDING_APPROVAL/FIRST_APPROVED), 거래는 추가로 단계 전환 상태를 갖는다.
-// ON_HOLD/REJECTED는 더 이상 도달 불가하지만 과거 데이터 호환을 위해 enum에 남겨둔다.
+// 상담 approvalStatus 와 거래 workflowStatus 는 분리된 enum 이며, Consultation 응답의
+// progressStatus 는 두 단계를 합친 통합 진행 상태이다.
 
 export const APPROVAL_STATUS = {
   // 2026-04 백엔드 신규 명세
@@ -21,9 +21,31 @@ export const APPROVAL_STATUS = {
 
 export type ApprovalStatus = (typeof APPROVAL_STATUS)[keyof typeof APPROVAL_STATUS];
 
-// 거래 워크플로우 상태는 상담 + 단계 전환 상태(예: TAX_FILING/COMPLETED)를 포함한다.
-// 백엔드 스펙 확정 전이라 일단 string으로 열어두고 비교는 string literal로 한다.
-export type WorkflowStatus = ApprovalStatus | (string & {});
+// 거래(MembershipTrade) workflowStatus enum (스웨거 v1.0.0+57563d32 확정).
+export const TRADE_WORKFLOW_STATUS = {
+  DOCUMENT_AND_BALANCE: "DOCUMENT_AND_BALANCE",
+  TAX_FILING: "TAX_FILING",
+  COMPLETED: "COMPLETED",
+  REJECTED: "REJECTED",
+} as const;
+
+export type TradeWorkflowStatus =
+  (typeof TRADE_WORKFLOW_STATUS)[keyof typeof TRADE_WORKFLOW_STATUS];
+
+// 상담↔거래 통합 진행 상태 (Consultation.progressStatus). 백엔드가 두 단계의 상태를
+// 하나의 enum 으로 평탄화해 내려준다. REJECTED 단계는 거래쪽에만 존재해 여기엔 포함 안 됨.
+export const PROGRESS_STATUS = {
+  IN_CONSULTATION: "IN_CONSULTATION",
+  PENDING_DEPOSIT: "PENDING_DEPOSIT",
+  DOCUMENT_AND_BALANCE: "DOCUMENT_AND_BALANCE",
+  TAX_FILING: "TAX_FILING",
+  COMPLETED: "COMPLETED",
+} as const;
+
+export type ProgressStatus = (typeof PROGRESS_STATUS)[keyof typeof PROGRESS_STATUS];
+
+/** @deprecated TradeWorkflowStatus 로 대체. 다음 PR 에서 제거 예정. */
+export type WorkflowStatus = TradeWorkflowStatus;
 
 export const APPROVAL_ACTIONS = {
   REQUEST_APPROVAL: "REQUEST_APPROVAL",

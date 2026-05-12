@@ -14,7 +14,11 @@ import {
  * 응답에 없는 키는 base 의 null 값을 그대로 둔다.
  */
 export function mapSettlementDtoToEntity(dto: Settlement): SettlementEntity {
-  const entity = EMPTY_SETTLEMENT_ENTITY(dto.consultationId);
+  // general 경로는 consultationId-keyed URL 이라 항상 non-null. admin 경로는 consultationId
+  // 가 null 인 row 도 오는데, 이때는 settlement.id 를 PK 로 폴백하여 cache 충돌을 막는다.
+  // 어느 쪽도 없으면 빈 문자열 (실제로 도달하지 않는 안전망).
+  const pk = dto.consultationId ?? dto.id ?? "";
+  const entity = EMPTY_SETTLEMENT_ENTITY(pk);
   entity.membershipTradeId = dto.membershipTradeId ?? null;
   entity.documentGeneratedAt = dto.documentGeneratedAt ?? null;
   entity.documentGeneratedByUserId = dto.documentGeneratedByUserId ?? null;

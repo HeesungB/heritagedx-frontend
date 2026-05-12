@@ -1,6 +1,6 @@
 # Admin 시세 API
 
-> spec: `v1.0.0+d8345ee2` · captured: `2026-04-22`
+> spec: `v1.0.0+57563d32` · captured: `2026-05-12`
 > base URL: `https://api.heritage-dx.com`
 > 인증: 쿠키 `hdx_access_token` 필수 (SUPER_ADMIN / ORG_ADMIN / EDITOR 중 권한 보유자만)
 

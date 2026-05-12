@@ -11,7 +11,6 @@ export function useConsultations(store: ConsultationStore) {
   const create = useStore(store, (s) => s.create);
   const update = useStore(store, (s) => s.update);
   const remove = useStore(store, (s) => s.remove);
-  const toggleDone = useStore(store, (s) => s.toggleDone);
   const addNote = useStore(store, (s) => s.addNote);
   const updateNote = useStore(store, (s) => s.updateNote);
   const deleteNote = useStore(store, (s) => s.deleteNote);
@@ -28,7 +27,6 @@ export function useConsultations(store: ConsultationStore) {
     create,
     update,
     remove,
-    toggleDone,
     addNote,
     updateNote,
     deleteNote,

@@ -39,6 +39,7 @@ import type {
 import {
   buildClubMembershipPair,
   canDeleteConsultation,
+  isConsultationCompleted,
   useTopClubs,
   type ApprovalStatus,
 } from "@heritage-dx/store";
@@ -180,7 +181,8 @@ export default function ConsultationsPage() {
   }, [selectedClubCode]);
 
   // 클라이언트 필터링 (골프장 + 회원권 + 기간 + 완료여부 + 거래 전환 완료 포함)
-  // isDone/isConverted 쿼리 파라미터는 백엔드가 거부하므로 모두 클라이언트 사이드에서 적용한다.
+  // isConverted 쿼리 파라미터는 백엔드가 거부하므로 클라이언트 사이드에서 적용한다.
+  // "완료" 기준은 progressStatus === "COMPLETED" (isDone 필드는 스웨거에서 제거됨).
   const displayMemos = useMemo(() => {
     let result = rawMemos;
     if (selectedClubCode) {
@@ -199,17 +201,14 @@ export default function ConsultationsPage() {
       result = result.filter((m) => m.registrationDate && m.registrationDate <= dateTo);
     }
     if (filterDone === "done") {
-      result = result.filter((m) => m.isDone === true);
+      result = result.filter((m) => isConsultationCompleted(m));
     } else if (filterDone === "notDone") {
-      result = result.filter((m) => !m.isDone);
+      result = result.filter((m) => !isConsultationCompleted(m));
     }
     // showConverted=false 면 거래로 전환된 상담(linkedTradeId 있음 또는 DEPOSIT_APPROVED) 제외
     if (!showConverted) {
       result = result.filter(
-        (m) =>
-          !m.linkedTradeId &&
-          m.approvalStatus !== "DEPOSIT_APPROVED" &&
-          m.approvalStatus !== "FIRST_APPROVED",
+        (m) => !m.linkedTradeId && m.approvalStatus !== "DEPOSIT_APPROVED",
       );
     }
     return result;
@@ -326,8 +325,8 @@ export default function ConsultationsPage() {
 
     setIsLoading(true);
     try {
-      // 백엔드가 isDone/isConverted 쿼리 파라미터를 거부하므로 서버 필터에서 제외.
-      // 완료/진행중·거래전환 필터는 클라이언트 사이드(displayMemos)에서 적용한다.
+      // 백엔드가 isConverted 쿼리 파라미터를 거부하므로 서버 필터에서 제외.
+      // 완료(progressStatus === "COMPLETED")·거래전환 필터는 클라이언트 사이드(displayMemos)에서 적용한다.
       const response = await consultationsRepo.getAll({
         page,
         limit: 20,
@@ -522,15 +521,6 @@ export default function ConsultationsPage() {
     setManualMembershipInput(false);
   };
 
-  // 백엔드가 ConsultationInput 으로 isDone 을 더 이상 받지 않아 서버 영구화는 보류 상태.
-  // 별도 토글 엔드포인트가 생기면 그쪽으로 연결한다. (현재는 로컬 상태만 변경)
-  const handleToggleDone = async (memo: Consultation) => {
-    const newIsDone = !memo.isDone;
-    setRawMemos(prev => prev.map(m => m.id === memo.id ? { ...m, isDone: newIsDone } : m));
-    setSelectedMemo(prev => prev && prev.id === memo.id ? { ...prev, isDone: newIsDone } : prev);
-    setRelatedMemos(prev => prev.map(m => m.id === memo.id ? { ...m, isDone: newIsDone } : m));
-  };
-
   const runApprovalAction = async (
     memo: Consultation,
     action: "APPROVE_FIRST" | "REOPEN",
@@ -597,8 +587,8 @@ export default function ConsultationsPage() {
 
   const sortedRelatedMemos = useMemo(() => {
     let filtered = [...relatedMemos];
-    if (relatedFilterDone === "done") filtered = filtered.filter(m => m.isDone);
-    if (relatedFilterDone === "notDone") filtered = filtered.filter(m => !m.isDone);
+    if (relatedFilterDone === "done") filtered = filtered.filter(m => isConsultationCompleted(m));
+    if (relatedFilterDone === "notDone") filtered = filtered.filter(m => !isConsultationCompleted(m));
     if (relatedSort === "price") {
       filtered.sort(
         (a, b) => (Number(b.offerPrice) || 0) - (Number(a.offerPrice) || 0)
@@ -793,11 +783,10 @@ export default function ConsultationsPage() {
                 </thead>
                 <tbody>
                   {displayMemos.map((trade) => (
-                    <tr key={trade.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors group cursor-pointer ${trade.isDone ? "opacity-50" : ""}`} onClick={() => handleRowClick(trade)}>
+                    <tr key={trade.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors group cursor-pointer ${isConsultationCompleted(trade) ? "opacity-50" : ""}`} onClick={() => handleRowClick(trade)}>
                       <td className="py-2.5 pr-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1.5">
-                          {(trade.approvalStatus === "IN_CONSULTATION" ||
-                            trade.approvalStatus === "DRAFT") && (
+                          {trade.approvalStatus === "IN_CONSULTATION" && (
                             <span
                               className="text-xs text-gray-400"
                               title="OS 에서 승인 요청 시 처리 가능"
@@ -805,8 +794,7 @@ export default function ConsultationsPage() {
                               상담중
                             </span>
                           )}
-                          {(trade.approvalStatus === "PENDING_DEPOSIT" ||
-                            trade.approvalStatus === "PENDING_APPROVAL") && (() => {
+                          {trade.approvalStatus === "PENDING_DEPOSIT" && (() => {
                             const hasDeposit = !!trade.depositAmount && trade.depositAmount > 0;
                             const docReady = !!trade.settlementDocumentGenerated;
                             const blockedReason = !hasDeposit
@@ -828,7 +816,7 @@ export default function ConsultationsPage() {
                               </button>
                             );
                           })()}
-                          {(trade.approvalStatus === "DEPOSIT_APPROVED" || trade.approvalStatus === "FIRST_APPROVED") && (
+                          {trade.approvalStatus === "DEPOSIT_APPROVED" && (
                             <>
                               <button
                                 type="button"
@@ -1135,7 +1123,7 @@ export default function ConsultationsPage() {
             {/* 선택한 메모 하이라이트 카드 */}
             <div
               className={`rounded-lg p-4 border ${
-                selectedMemo.isDone
+                isConsultationCompleted(selectedMemo)
                   ? "bg-emerald-50 border-emerald-200"
                   : selectedMemo.tradeType === "매수"
                     ? "bg-blue-50 border-blue-200"
@@ -1160,15 +1148,9 @@ export default function ConsultationsPage() {
                     </span>
                   )}
                 </div>
-                <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={selectedMemo.isDone}
-                    onChange={() => handleToggleDone(selectedMemo)}
-                    className="w-4 h-4 rounded border-gray-300 text-emerald-600 cursor-pointer"
-                  />
-                  <span className="text-sm text-gray-600">완료</span>
-                </label>
+                {isConsultationCompleted(selectedMemo) && (
+                  <Badge variant="success">완료</Badge>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div>
@@ -1383,7 +1365,7 @@ export default function ConsultationsPage() {
                     <div
                       key={related.id}
                       className={`rounded-lg border p-3 ${
-                        related.isDone ? "opacity-60" : ""
+                        isConsultationCompleted(related) ? "opacity-60" : ""
                       } ${
                         related.tradeType === "매수"
                           ? "border-blue-100"
@@ -1407,19 +1389,10 @@ export default function ConsultationsPage() {
                               {related.membershipName}
                             </span>
                           )}
-                          {related.isDone && (
+                          {isConsultationCompleted(related) && (
                             <Badge variant="success">완료</Badge>
                           )}
                         </div>
-                        <label className="flex items-center gap-1 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={related.isDone}
-                            onChange={() => handleToggleDone(related)}
-                            className="w-3.5 h-3.5 rounded border-gray-300 text-emerald-600 cursor-pointer"
-                          />
-                          <span className="text-xs text-gray-500">완료</span>
-                        </label>
                       </div>
                       <div className="grid grid-cols-2 gap-1 text-sm">
                         <div>

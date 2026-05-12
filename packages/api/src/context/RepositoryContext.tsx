@@ -98,3 +98,11 @@ export function useConsultationAdminRepository() {
 export function useMembershipTradeAdminRepository() {
   return useAdminRepositories().membershipTrades;
 }
+
+export function useSettlementAdminRepository() {
+  return useAdminRepositories().settlements;
+}
+
+export function useScenarioAdminRepository() {
+  return useAdminRepositories().scenarios;
+}

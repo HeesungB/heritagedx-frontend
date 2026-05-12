@@ -1,6 +1,6 @@
 # Admin 상담 기록 API
 
-> spec: `v1.0.0+d8345ee2` · captured: `2026-04-22`
+> spec: `v1.0.0+57563d32` · captured: `2026-05-12`
 > base URL: `https://api.heritage-dx.com`
 > 인증: 쿠키 `hdx_access_token` 필수 (SUPER_ADMIN / ORG_ADMIN / EDITOR 중 권한 보유자만)
 
@@ -36,11 +36,10 @@ ORG_ADMIN은 소속 조직 + 익명 글로벌 데이터를 조회하고, SUPER_A
 | `query` | `limit` | number |  | 페이지당 항목 수 _예: `20`_ |
 | `query` | `search` | string |  | 검색어 (골프장명, 회원권명, 고객명, 연락처) _예: `골든비치`_ |
 | `query` | `tradeType` | `매도` \| `매수` |  | 거래 유형 필터 _예: `매수`_ |
-| `query` | `approvalStatus` | `DRAFT` \| `PENDING_APPROVAL` \| `FIRST_APPROVED` \| `ON_HOLD` \| `REJECTED` |  | 상담 승인 상태 필터 _예: `PENDING_APPROVAL`_ |
+| `query` | `approvalStatus` | `IN_CONSULTATION` \| `PENDING_DEPOSIT` \| `DEPOSIT_APPROVED` |  | 상담 승인 상태 필터 _예: `PENDING_DEPOSIT`_ |
 | `query` | `customerId` | string (uuid) |  | 고객 UUID 필터 _예: `550e8400-e29b-41d4-a716-446655440000`_ |
 | `query` | `linkedTradeId` | string (uuid) |  | 연결된 거래 UUID 필터 _예: `550e8400-e29b-41d4-a716-446655440001`_ |
 | `query` | `isConverted` | boolean |  | 거래 초안 생성 여부 필터 _예: `True`_ |
-| `query` | `isDone` | boolean |  | 거래 완료 여부 필터 |
 | `query` | `isShared` | boolean |  | 공유 여부 필터 _예: `True`_ |
 | `query` | `sort` | `registrationDate` \| `createdAt` \| `clubName` \| `membershipName` \| `offerPrice` \| `desiredPrice` |  | 정렬 기준 _예: `registrationDate`_ |
 | `query` | `order` | `ASC` \| `DESC` |  | 정렬 방향 _예: `DESC`_ |
@@ -49,7 +48,7 @@ ORG_ADMIN은 소속 조직 + 익명 글로벌 데이터를 조회하고, SUPER_A
 
 - `200` 목록 조회 성공 → [`ConsultationListResponseDto`](#consultationlistresponsedto)
 
-#### 실호출 샘플 (2026-04-17)
+#### 실호출 샘플 (2026-04-17, 캡처 시점 enum 사용 — 신규 스펙은 `progressStatus` 포함 + 신 `approvalStatus` 값)
 
 ```http
 GET /api/admin/consultations?page=1&limit=3
@@ -296,7 +295,7 @@ Cookie: hdx_access_token=<JWT>
 #### Request Body
 
 - Content-Type: `application/json`
-- Schema: [`ConsultationApprovalActionDto`](#consultationapprovalactiondto)
+- Schema: [`ConsultationAdminApprovalActionDto`](#consultationadminapprovalactiondto)
 
 #### 응답
 
@@ -308,12 +307,14 @@ Cookie: hdx_access_token=<JWT>
 
 공통 DTO(`ApiResponseDto`, `ErrorDto`, `ErrorResponseDto`, `PaginationMetaDto`)는 [`../README.md`](../README.md) 참고.
 
-### ConsultationApprovalActionDto
+### ConsultationAdminApprovalActionDto
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `action` | `REQUEST_APPROVAL` \| `APPROVE_FIRST` \| `HOLD` \| `REJECT` \| `REOPEN` | ✓ | 상담 승인 액션 _예: `REQUEST_APPROVAL`_ |
-| `reason` | string |  | 처리 사유 (HOLD, REJECT에서 사용) _예: `계약금 확인 후 재요청 바랍니다.`_ |
+| `action` | `APPROVE_FIRST` \| `REOPEN` | ✓ | admin 상담 승인 액션. `APPROVE_FIRST` 는 계약금 확인 후 거래내역으로 이관, `REOPEN` 은 거래 이관 직전 단계에서 무산 시 상담을 `IN_CONSULTATION` 으로 복귀. _예: `APPROVE_FIRST`_ |
+
+> 서버 DTO 에는 `reason` 필드가 없다. UI 의 사유 입력 모달은 클라이언트 UX 전용이며 서버에 전달되지 않는다.
+> `REQUEST_APPROVAL` / `HOLD` / `REJECT` 는 admin 액션에 포함되지 않음 (공개 상담은 `REQUEST_APPROVAL` 만 가능, `HOLD`/`REJECT` 는 신규 워크플로우에서 미사용).
 
 ### ConsultationDeleteResponseDto
 
@@ -360,36 +361,39 @@ Cookie: hdx_access_token=<JWT>
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `id` | string | ✓ | ID (UUID) |
-| `customerId` | string |  | 고객 UUID |
-| `clubId` | string |  | 골프장 UUID (ID 모드일 때) |
+| `customerId` | string |  | 고객 UUID (nullable) |
+| `clubId` | string |  | 골프장 UUID (ID 모드일 때, nullable) |
 | `clubName` | string | ✓ | 골프장명 _예: `강남골프클럽`_ |
-| `membershipId` | string |  | 회원권 UUID (ID 모드일 때) |
+| `membershipId` | string |  | 회원권 UUID (ID 모드일 때, nullable) |
 | `membershipName` | string | ✓ | 회원권명 _예: `개인정회원`_ |
 | `tradeType` | `매도` \| `매수` | ✓ | 거래 유형 |
 | `customerName` | string | ✓ | 고객명 |
 | `contact` | string | ✓ | 연락처 |
-| `offerPrice` | number |  | 제시가 (원 단위) |
-| `offerPriceNote` | string |  | 제시가 메모 |
-| `desiredPrice` | number |  | 희망가 (원 단위) |
-| `desiredPriceNote` | string |  | 희망가 메모 |
-| `depositAmount` | number |  | 계약금 (원 단위) |
-| `accountNumber` | string |  | 계좌번호 |
+| `accountNumber` | string |  | 계좌번호 (nullable) |
+| `offerPrice` | number |  | 제시가 (원 단위, nullable) |
+| `offerPriceNote` | string |  | 제시가 메모 (nullable) |
+| `desiredPrice` | number |  | 희망가 (원 단위, nullable) |
+| `desiredPriceNote` | string |  | 희망가 메모 (nullable) |
+| `depositAmount` | number |  | 계약금 (원 단위, nullable) |
 | `customFields` | object | ✓ | 상담별 자유형 커스텀 필드 _예: `{'희망지역': '제주', 'VIP': True}`_ |
-| `notes` | string |  | 특기사항 |
-| `registrationDate` | string (date-time) |  | 등록일자 |
-| `tradeDate` | string (date-time) |  | 거래일 |
-| `remarks` | string |  | 비고 |
-| `isDone` | boolean | ✓ | 거래 완료 여부 |
+| `notes` | object | ✓ | JSONB 메모: `{ entries: ConsultationNoteEntry[] }` |
+| `registrationDate` | string (date-time) |  | 등록일자 (nullable) |
+| `tradeDate` | string (date-time) |  | 거래일 (nullable) |
+| `remarks` | string |  | 비고 (nullable) |
 | `isShared` | boolean | ✓ | 공유 여부 _예: `False`_ |
-| `approvalStatus` | `DRAFT` \| `PENDING_APPROVAL` \| `FIRST_APPROVED` \| `ON_HOLD` \| `REJECTED` | ✓ | 상담 승인 상태 |
-| `approvalRequestedAt` | string (date-time) |  | 승인 요청 일시 |
-| `firstApprovedAt` | string (date-time) |  | 1차 승인 일시 |
-| `holdReason` | string |  | 보류 사유 |
-| `rejectionReason` | string |  | 반려 사유 |
-| `linkedTradeId` | string |  | 연결된 거래 UUID |
+| `approvalStatus` | `IN_CONSULTATION` \| `PENDING_DEPOSIT` \| `DEPOSIT_APPROVED` | ✓ | 상담 승인 상태 |
+| `progressStatus` | `IN_CONSULTATION` \| `PENDING_DEPOSIT` \| `DOCUMENT_AND_BALANCE` \| `TAX_FILING` \| `COMPLETED` | ✓ | 상담↔거래 통합 진행 상태 (2026-05 신규). 완료 판별은 `progressStatus === "COMPLETED"`. |
+| `approvalRequestedAt` | string (date-time) |  | 승인 요청 일시 (nullable) |
+| `firstApprovedAt` | string (date-time) |  | 1차 승인 일시 (nullable) |
+| `linkedTradeId` | string |  | 연결된 거래 UUID (nullable) |
+| `settlementId` | string |  | 연결된 입출금표 UUID (nullable). |
+| `settlementDocumentGenerated` | boolean | ✓ | 입출금표 문서 생성 완료 여부. `REQUEST_APPROVAL` / `APPROVE_FIRST` 게이트. |
+| `settlementDocumentGeneratedAt` | string (date-time) |  | 문서 생성 완료 시각 (nullable) |
 | `createdByName` | string | ✓ | 작성자 이름 |
 | `createdAt` | string (date-time) | ✓ | 생성일시 |
 | `updatedAt` | string (date-time) | ✓ | 수정일시 |
+
+> 2026-05 변경: `isDone`, `holdReason`, `rejectionReason` 필드는 응답에서 제거됨. 완료 단계 판별은 `progressStatus === "COMPLETED"` 사용.
 
 ### CreateConsultationDto
 
@@ -411,7 +415,6 @@ Cookie: hdx_access_token=<JWT>
 | `registrationDate` | string |  | 등록일자 (YYYY-MM-DD) _예: `2024-02-09`_ |
 | `tradeDate` | string |  | 거래일 (YYYY-MM-DD) _예: `2024-02-15`_ |
 | `remarks` | string |  | 비고 _예: `계약금 입금 완료`_ |
-| `isDone` | boolean |  | 거래 완료 여부 (미전송/null/빈 문자열이면 false로 저장됩니다.) _예: `False`_ |
 | `isShared` | boolean |  | 공유 여부 (같은 조직의 다른 에디터에게 조회 허용) _예: `False`_ |
 
 ### UpdateConsultationDto
@@ -433,6 +436,5 @@ Cookie: hdx_access_token=<JWT>
 | `registrationDate` | string |  | 등록일자 (YYYY-MM-DD) _예: `2024-02-09`_ |
 | `tradeDate` | string |  | 거래일 (YYYY-MM-DD) _예: `2024-02-15`_ |
 | `remarks` | string |  | 비고 _예: `계약금 입금 완료`_ |
-| `isDone` | boolean |  | 거래 완료 여부 (미전송/null/빈 문자열이면 false로 저장됩니다.) _예: `False`_ |
 | `isShared` | boolean |  | 공유 여부 (같은 조직의 다른 에디터에게 조회 허용) _예: `False`_ |
 | `customFields` | object |  | 상담별 자유형 커스텀 필드. 전송하면 기존 객체를 전체 교체하고, 생략하면 기존 값을 유지합니다. _예: `{'VIP': False}`_ |

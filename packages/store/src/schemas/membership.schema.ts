@@ -14,25 +14,14 @@ export const membershipSchema = z.object({
   // 시세 정보
   recentMarketPrice: z.string().optional(),
   recentPriceUpdateDate: z.string().optional(),
-  avgMarketPrice3y: z.string().optional(),
   dealerPriceRange: z.string().optional(),
-
-  // 거래 정보
-  minTransactionUnit: z.string().optional(),
-  transactionTendency: z.string().optional(),
-  recentTransactionType: z.string().optional(),
-  tradableTypeSummary: z.string().optional(),
-  registrationDifficulty: z.string().optional(),
-  additionalDocumentFrequency: z.string().optional(),
-  balanceRisk: z.string().optional(),
-  transactionRiskMemo: z.string().optional(),
+  estimatedSalePrice: z.string().optional(),
+  estimatedPriceDate: z.string().optional(),
 
   // 분양/입회 정보
   initialSalePrice: z.string().optional(),
   initialSaleYear: z.string().optional(),
   initialSaleMethod: z.string().optional(),
-  estimatedSalePrice: z.string().optional(),
-  estimatedPriceDate: z.string().optional(),
   registeredPersonCount: optionalNumber,
 
   // 회원 혜택/특이사항

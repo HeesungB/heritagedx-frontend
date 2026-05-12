@@ -7,7 +7,6 @@ import { clubBaseSchema, type ClubFormValues } from "@heritage-dx/store/schemas"
 import {
   Button,
   Input,
-  Textarea,
   Card,
   CardHeader,
   CardTitle,
@@ -40,14 +39,12 @@ export default function ClubForm({
           address: initialData.address || "",
           openingDate: initialData.openingDate || "",
           holes: initialData.holes || "",
+          totalLength: initialData.totalLength || "",
           memberCount:
             typeof initialData.memberCount === "number"
               ? String(initialData.memberCount)
               : (initialData.memberCount as string) || "",
-          cityAccessibility: initialData.cityAccessibility || "",
           website: initialData.website || "",
-          memo: initialData.memo || "",
-          dealerMemo: initialData.dealerMemo || "",
         }
       : {
           code: "",
@@ -113,7 +110,7 @@ export default function ClubForm({
           <CardTitle>코스 정보</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
               label="개장일"
               type="date"
@@ -124,40 +121,19 @@ export default function ClubForm({
               placeholder="36홀"
               {...register("holes")}
             />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="코스거리"
+              placeholder="6,484m(동코스), 6,427m(서코스)"
+              {...register("totalLength")}
+            />
             <Input
               label="회원수"
               placeholder="1,979명"
               {...register("memberCount")}
             />
           </div>
-
-          <Input
-            label="도심 접근성"
-            placeholder="서울에서 40분"
-            {...register("cityAccessibility")}
-          />
-        </CardContent>
-      </Card>
-
-      {/* 내부 메모 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>내부 메모</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Textarea
-            label="메모"
-            minRows={3}
-            placeholder="기타 참고사항"
-            {...register("memo")}
-          />
-
-          <Textarea
-            label="딜러 메모"
-            minRows={3}
-            placeholder="딜러 특이사항"
-            {...register("dealerMemo")}
-          />
         </CardContent>
       </Card>
 

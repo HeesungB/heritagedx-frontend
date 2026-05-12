@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import type { MembershipEntity } from "@heritage-dx/store";
 import { membershipSchema, type MembershipFormValues } from "@heritage-dx/store/schemas";
 import {
@@ -14,7 +14,6 @@ import {
   CardHeader,
   CardTitle,
   CardContent,
-  Select,
 } from "@heritage-dx/ui";
 
 interface MembershipFormProps {
@@ -23,15 +22,6 @@ interface MembershipFormProps {
   onCancel?: () => void;
   isLoading?: boolean;
 }
-
-const riskOptions = [
-  { value: "", label: "선택" },
-  { value: "1", label: "1 (매우 낮음)" },
-  { value: "2", label: "2 (낮음)" },
-  { value: "3", label: "3 (보통)" },
-  { value: "4", label: "4 (높음)" },
-  { value: "5", label: "5 (매우 높음)" },
-];
 
 // 기본 그린피 유형
 const DEFAULT_FEE_TYPES = ["정회원", "준회원", "무기명회원", "비회원", "위임", "동반"];
@@ -49,11 +39,9 @@ function buildGreenFeeRows(initialData?: MembershipEntity): GreenFeeRow[] {
   const allTypes = new Set([...Object.keys(weekday), ...Object.keys(weekend)]);
 
   if (allTypes.size === 0) {
-    // 기본 4종류
     return ["정회원", "준회원", "비회원"].map((t) => ({ type: t, weekday: "", weekend: "" }));
   }
 
-  // 정렬
   const order = DEFAULT_FEE_TYPES;
   const sorted = Array.from(allTypes).sort((a, b) => {
     const ai = order.indexOf(a);
@@ -77,7 +65,6 @@ export default function MembershipEntityForm({
   onCancel,
   isLoading = false,
 }: MembershipFormProps) {
-  const [showExtra, setShowExtra] = useState(false);
   const [greenFeeRows, setGreenFeeRows] = useState<GreenFeeRow[]>(() =>
     buildGreenFeeRows(initialData)
   );
@@ -85,7 +72,6 @@ export default function MembershipEntityForm({
   const {
     register,
     handleSubmit,
-    control,
     formState: { errors },
   } = useForm<MembershipFormValues>({
     resolver: zodResolver(membershipSchema),
@@ -97,21 +83,12 @@ export default function MembershipEntityForm({
           memberDaySchedule: initialData.memberDaySchedule || "",
           recentMarketPrice: initialData.recentMarketPrice || "",
           recentPriceUpdateDate: initialData.recentPriceUpdateDate || "",
-          avgMarketPrice3y: initialData.avgMarketPrice3y || "",
           dealerPriceRange: initialData.dealerPriceRange || "",
-          minTransactionUnit: initialData.minTransactionUnit || "",
-          transactionTendency: initialData.transactionTendency || "",
-          recentTransactionType: initialData.recentTransactionType || "",
-          tradableTypeSummary: initialData.tradableTypeSummary || "",
-          registrationDifficulty: initialData.registrationDifficulty != null ? String(initialData.registrationDifficulty) : "",
-          additionalDocumentFrequency: initialData.additionalDocumentFrequency != null ? String(initialData.additionalDocumentFrequency) : "",
-          balanceRisk: initialData.balanceRisk != null ? String(initialData.balanceRisk) : "",
-          transactionRiskMemo: initialData.transactionRiskMemo || "",
+          estimatedSalePrice: initialData.estimatedSalePrice || "",
+          estimatedPriceDate: initialData.estimatedPriceDate || "",
           initialSalePrice: initialData.initialSalePrice || "",
           initialSaleYear: initialData.initialSaleYear || "",
           initialSaleMethod: initialData.initialSaleMethod || "",
-          estimatedSalePrice: initialData.estimatedSalePrice || "",
-          estimatedPriceDate: initialData.estimatedPriceDate || "",
           registeredPersonCount: initialData.registeredPersonCount ?? undefined,
           memberBenefits: initialData.memberBenefits || "",
           specialNotes: initialData.specialNotes || "",
@@ -129,7 +106,6 @@ export default function MembershipEntityForm({
         },
   });
 
-  // 그린피 행 관리
   const updateGreenFeeRow = (index: number, field: keyof GreenFeeRow, value: string) => {
     setGreenFeeRows((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
   };
@@ -142,7 +118,7 @@ export default function MembershipEntityForm({
     setGreenFeeRows((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // PUT 시 제외해야 하는 필드 (폼 관리 + 메타 + 관계 데이터)
+  // PUT 시 폼이 관리하는 필드 + 그린피 + 관계/메타. 나머지는 initialData 에서 보존.
   const EXCLUDE_FROM_PUT = new Set([
     ...Object.keys(membershipSchema.shape),
     "weekdayGreenFee",
@@ -156,13 +132,10 @@ export default function MembershipEntityForm({
     "club",
   ]);
 
-  // 폼 제출: Zod 데이터 + 그린피 Record + initialData의 미관리 필드 합치기
   const handleFormSubmit = (data: MembershipFormValues) => {
-    console.log("🟢 MembershipEntityForm handleFormSubmit 진입, data:", data);
     const cleaned: Record<string, unknown> = {};
 
-    // 1) initialData에서 폼이 관리하지 않는 필드 보존 (reservationSystem 등)
-    //    단, 배열은 관계 데이터일 가능성이 높으므로 제외
+    // 1) initialData에서 폼이 관리하지 않는 필드 보존 (거래/리스크/3년평균 등 OS 미노출이지만 백엔드에 보존된 값)
     if (initialData) {
       for (const [key, value] of Object.entries(initialData)) {
         if (EXCLUDE_FROM_PUT.has(key)) continue;
@@ -175,12 +148,6 @@ export default function MembershipEntityForm({
     // 2) 폼 데이터 처리
     for (const [key, value] of Object.entries(data)) {
       if (value === "" || value === null || value === undefined) continue;
-      // 1-5 정수 필드
-      if (["registrationDifficulty", "additionalDocumentFrequency", "balanceRisk"].includes(key)) {
-        cleaned[key] = parseInt(value as string, 10);
-        continue;
-      }
-      // 숫자 필드
       if (key === "registeredPersonCount" || key === "displayOrder") {
         const num = Number(value);
         if (!isNaN(num)) {
@@ -210,17 +177,7 @@ export default function MembershipEntityForm({
   };
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit, (errors) => {
-      console.error("🔴 MembershipEntityForm 유효성 검증 실패:", errors);
-      console.error("🔴 에러 필드:", Object.keys(errors));
-      Object.entries(errors).forEach(([field, error]) => {
-        const message =
-          error && typeof error === "object" && "message" in error
-            ? (error as { message?: unknown }).message
-            : error;
-        console.error(`  - ${field}:`, message);
-      });
-    })} className="space-y-6">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
       {/* 기본 정보 */}
       <Card>
         <CardHeader>
@@ -253,7 +210,7 @@ export default function MembershipEntityForm({
         </CardContent>
       </Card>
 
-      {/* 비용 정보 (그린피) */}
+      {/* 그린피 정보 */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -334,11 +291,18 @@ export default function MembershipEntityForm({
           <CardTitle>시세 정보</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Input
-            label="최근 시세"
-            placeholder="1억 2천만원"
-            {...register("recentMarketPrice")}
-          />
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="최근 시세"
+              placeholder="1억 2천만원"
+              {...register("recentMarketPrice")}
+            />
+            <Input
+              label="시세 업데이트 일자"
+              type="date"
+              {...register("recentPriceUpdateDate")}
+            />
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <Input
               label="추정 시세"
@@ -351,6 +315,11 @@ export default function MembershipEntityForm({
               {...register("estimatedPriceDate")}
             />
           </div>
+          <Input
+            label="매도가 범위"
+            placeholder="8,500~9,200"
+            {...register("dealerPriceRange")}
+          />
         </CardContent>
       </Card>
 
@@ -360,7 +329,7 @@ export default function MembershipEntityForm({
           <CardTitle>분양/입회 정보</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <Input
               label="분양가"
               placeholder="1억원"
@@ -371,6 +340,18 @@ export default function MembershipEntityForm({
               type="number"
               placeholder="명"
               {...register("registeredPersonCount")}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="분양 연도"
+              placeholder="예: 2020"
+              {...register("initialSaleYear")}
+            />
+            <Input
+              label="분양 방식"
+              placeholder="공개분양, 회원모집"
+              {...register("initialSaleMethod")}
             />
           </div>
         </CardContent>
@@ -450,144 +431,35 @@ export default function MembershipEntityForm({
         </CardContent>
       </Card>
 
-      {/* ========== 엑스트라 정보 (접이식) ========== */}
-      <div className="border rounded-lg">
-        <button
-          type="button"
-          onClick={() => setShowExtra(!showExtra)}
-          className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
-        >
-          <span className="text-sm font-medium text-gray-600">엑스트라 정보</span>
-          {showExtra ? (
-            <ChevronDown className="w-4 h-4 text-gray-400" />
-          ) : (
-            <ChevronRight className="w-4 h-4 text-gray-400" />
-          )}
-        </button>
-
-        {showExtra && (
-          <div className="p-4 pt-0 space-y-6">
-            {/* 추가 시세 정보 */}
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium text-gray-700">추가 시세 정보</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <Input
-                  label="시세 업데이트 일자"
-                  type="date"
-                  {...register("recentPriceUpdateDate")}
+      {/* 메타 정보 */}
+      <Card>
+        <CardHeader>
+          <CardTitle>표시 설정</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                  {...register("isActive")}
                 />
-                <Input
-                  label="3년 평균 시세"
-                  placeholder="1억 1천만원"
-                  {...register("avgMarketPrice3y")}
-                />
-              </div>
-              <Input
-                label="딜러 체감 가격대"
-                placeholder="1억 ~ 1.5억"
-                {...register("dealerPriceRange")}
-              />
+                <span className="text-sm font-medium text-gray-700">활성화</span>
+              </label>
+              <p className="text-xs text-gray-500 mt-1">
+                비활성화하면 목록에서 숨김 처리됩니다
+              </p>
             </div>
-
-            {/* 거래 정보 */}
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium text-gray-700">거래 정보</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <Input
-                  label="거래 최소 단위"
-                  placeholder="1구좌"
-                  {...register("minTransactionUnit")}
-                />
-                <Input
-                  label="체결 성향"
-                  placeholder="안정적"
-                  {...register("transactionTendency")}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <Input
-                  label="최근 거래 형태"
-                  placeholder="직거래, 중개거래"
-                  {...register("recentTransactionType")}
-                />
-                <Input
-                  label="거래 가능 유형 요약"
-                  placeholder="개인/법인 거래 가능"
-                  {...register("tradableTypeSummary")}
-                />
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <Select
-                  label="명의개서 난이도"
-                  options={riskOptions}
-                  {...register("registrationDifficulty")}
-                />
-                <Select
-                  label="추가 서류 빈도"
-                  options={riskOptions}
-                  {...register("additionalDocumentFrequency")}
-                />
-                <Select
-                  label="잔금 리스크"
-                  options={riskOptions}
-                  {...register("balanceRisk")}
-                />
-              </div>
-              <Textarea
-                label="거래 리스크 메모"
-                minRows={2}
-                placeholder="거래 시 주의사항"
-                {...register("transactionRiskMemo")}
-              />
-            </div>
-
-            {/* 추가 분양 정보 */}
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium text-gray-700">추가 분양 정보</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <Input
-                  label="분양 연도"
-                  placeholder="예: 2020"
-                  {...register("initialSaleYear")}
-                />
-                <Input
-                  label="분양 방식"
-                  placeholder="공개분양, 회원모집"
-                  {...register("initialSaleMethod")}
-                />
-              </div>
-            </div>
-
-            {/* 메타 정보 */}
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium text-gray-700">메타 정보</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
-                      {...register("isActive")}
-                    />
-                    <span className="text-sm font-medium text-gray-700">
-                      활성화
-                    </span>
-                  </label>
-                  <p className="text-xs text-gray-500 mt-1">
-                    비활성화하면 목록에서 숨김 처리됩니다
-                  </p>
-                </div>
-                <Input
-                  label="표시 순서"
-                  type="number"
-                  placeholder="0"
-                  {...register("displayOrder")}
-                />
-              </div>
-            </div>
+            <Input
+              label="표시 순서"
+              type="number"
+              placeholder="0"
+              {...register("displayOrder")}
+            />
           </div>
-        )}
-      </div>
+        </CardContent>
+      </Card>
 
       {/* 버튼 */}
       <div className="flex justify-end gap-3 pt-4 border-t">

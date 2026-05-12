@@ -43,8 +43,9 @@ heritage-dx/
 │   │   └── package.json
 │   └── back-office/                 # 관리자 백오피스 (포트 3001)
 │       ├── src/
-│       │   ├── app/                 # Next.js App Router ((dashboard)/error.tsx, loading: clubs, trade-memos, trade-records, kpi)
+│       │   ├── app/                 # Next.js App Router ((dashboard)/error.tsx, loading: clubs, trade-memos, trade-records, kpi). customers: 목록(`/customers` — V2 시안 panel + 9컬럼 grid table, URL state `?q&page&owner`) + 상세(`/customers/[id]` — crumb·페이저·인물 카드 + 기본 정보·상담 이력·거래 건수·보유 회원권·메모 5개 카드)
 │       │   ├── components/
+│       │   │   ├── customer/        # 고객 관리·상세 V2 시안 — PageHeadingV2, CustomerListPanel, CustomerListTable, CustomerDetailHeader(CrumbRow 만 — 공유/편집 액션 제거됨), CustomerPersonCard, CustomerCardShell, CustomerBasicInfoCard(OS BasicInfoCard 동일 — 인라인 편집 모드 토글, customerGrade 4칩 토글, name/contact 필수 검증, 변경 필드만 추려 onPatch), CustomerConsultationHistoryCard(stat-strip + 접힘/펼침 + 행별 진행/완료/대기/취소 dot), CustomerDealsCard(매수/매도 + workflowStatus 클라이언트 집계 파이프라인 + 최근 거래), CustomerMembershipsCard(OS MembershipCard 동일 — 행별 연필/휴지통 액션, 추가/편집은 OwnedMembershipFormModal, 삭제는 ConfirmModal, persistList 로 전체 배열 PUT), CustomerNotesCard(OS NotesCard 동일 — `appendCustomerMemoEntry` 로 `__MEMO_V1__` entry 누적, 시간 내림차순 카드 리스트, 첫 줄 제목 자동 분리), OwnedMembershipFormModal(OS 동명 모달 BO 포팅 — ClubSearchSelect + useClubDetail 로 회원권 동적 로드, status/quantity/note/displayOrder 입력, useAppStores().club 사용), trade-status(공용 분류 헬퍼 — classifyTradeStatus/TRADE_STATUS_LABEL/TRADE_STATUS_COLOR 4구간)
 │       │   │   ├── forms/           # ClubForm, DocumentForm, MembershipForm, ScenarioForm
 │       │   │   ├── home/            # HelloHeader, KpiCard, RecentTradesList, RecentConsultationsList, ProfitBreakdown, MonthlyTrendPanel
 │       │   │   ├── kpi/             # KpiFilterBar, KpiTrendChart, KpiEmployeeComparison (KpiMiniDashboard 폐기 → home/MonthlyTrendPanel 로 흡수)
@@ -167,12 +168,9 @@ heritage-dx/
 **`korean.ts`** — 한글 처리:
 - `getKoreanInitial(str)` — 초성 추출
 - `normalizeInitial(initial)` — 쌍자음→단자음
-- `getProvince(region)`: 첫 단어 도/시 약칭 정규화
-- `getRegionGroup(region)`: 지역 그룹핑. 2-pass 매칭. (1) 첫 단어 약칭 → REGION_GROUP_MAP, (2) 미매칭이면 region 전체에서 한국 키워드 부분 문자열 매칭(`제주시`/`서귀포시` 처럼 도 prefix 없는 단독 시 표기 정확 분류). 둘 다 미매칭이면 `해외`, 빈 region 은 `null`.
-- `extractRegionFromAddress(address)`: address에서 "도 시" 두 토큰 추출
-- `getEffectiveRegion(region, address)`: region이 비어있으면 address에서 보충
-- `INITIALS`: 14개 초성 + `"0-9"`
-- `REGION_GROUPS`: `수도권`, `강원도`, `충청도`, `전라도`, `경상도`, `제주도`, `해외` (해외 = 한국 시/도 어느 키워드와도 매칭되지 않은 region 의 폴백)
+- `getProvince(region)` / `getRegionGroup(region)` — 지역 그룹핑
+- `INITIALS` — 14개 초성 + `"0-9"`
+- `REGION_GROUPS` — `수도권`, `강원도`, `충청도`, `전라도`, `경상도`, `제주도`
 
 **`phone.ts`** — 한국 휴대폰 번호:
 - `formatPhoneNumber(value)` — 숫자만 추출해 길이별로 `010-1234-5678` 형태 자동 포맷
@@ -353,9 +351,9 @@ packages/store/
 │   ├── schemas/              # 도메인 Zod 검증 스키마 (React/Browser API 금지)
 │   │   ├── index.ts          # 배럴 export
 │   │   ├── _shared.ts        # optionalNumber preprocess 헬퍼
-│   │   ├── club.schema.ts    # clubBaseSchema, clubDetailSchema + ClubFormValues, ClubDetailFormValues
+│   │   ├── club.schema.ts    # clubBaseSchema, clubDetailSchema + ClubFormValues, ClubDetailFormValues. OS 노출 기준 — `totalLength` 포함, `cityAccessibility`/`memo`/`dealerMemo` 미포함(BO 폼 슬림화 이후 검증 대상에서 제외, 응답엔 여전히 흘러올 수 있으므로 머지 보존)
 │   │   ├── scenario.schema.ts# createScenarioSchema, updateScenarioSchema + normalizeSide/OwnerType
-│   │   ├── membership.schema.ts # membershipSchema + MembershipFormValues
+│   │   ├── membership.schema.ts # membershipSchema + MembershipFormValues. OS 노출 기준 — 시세/분양/예약/혜택/명의개서 필드만. 거래성향/`minTransactionUnit`/`recentTransactionType`/`tradableTypeSummary`/`registrationDifficulty`/`additionalDocumentFrequency`/`balanceRisk`/`transactionRiskMemo`/`avgMarketPrice3y`/`weekendReservationDifficulty` 검증 대상에서 제외
 │   │   └── document.schema.ts   # documentSchema + DocumentFormValues
 │   ├── stores/               # Zustand 스토어 (stale-while-revalidate)
 │   │   ├── index.ts
@@ -563,12 +561,12 @@ ESLint 9 flat config 공유 패키지. `eslint-config-next`의 `core-web-vitals`
 `ClubProfile`, `ClubDirectory`, `GolfClubDetail`, `GolfClubTable`, `GolfClubSearch`, `NaverMap`, `MapSidebar`
 
 **골프장 검색** (`club-search/`):
-`ClubSearchPanel`: `/clubs` 디렉토리 뷰. 검색 입력 + 지역 칩(`전체` + `@heritage-dx/utils` `REGION_GROUPS` 를 순회해 자동 생성: 수도권/강원도/충청도/전라도/경상도/제주도/해외) + 한글 초성 박스(`INITIALS` + `0-9` 디바이더) + 카드 그리드. 그리드는 뷰포트 폭에 따라 단계적으로 컬럼 수가 변하는 반응형(`grid-cols-1 sm:2 lg:3 xl:4 2xl:5`). 카드는 지역(utils 정본 라벨)/운영타입/홀수 배지 + 골프장명 + 주소 + 연락처. 컨테이너 `max-w-[1500px]`. `useClubs(clubStore)` 로 전체 목록을 받고 검색·필터링은 클라이언트에서 메모이즈. 지역 분류는 `getRegionGroup(getEffectiveRegion(region, address))`. '해외' 그룹은 한국 시/도 키워드 어느 것과도 매칭되지 않는 region(예: `일본`, `베트남`) 을 자동으로 모은다. **로컬 region 유틸 중복 제거 (2026-05)**: 이전엔 `ClubDirectory` 가 자체 `INITIALS`/`REGION_GROUPS`/`PROVINCE_TO_GROUP`/`getRegionGroup`/`extractRegionFromAddress`/`getEffectiveRegion` 을 정의하고 `HomeClient`/`ClubSwitcher` 가 거기서 re-export 를 import 했는데, 모두 `@heritage-dx/utils` 직접 import 로 일원화. back-office Sidebar 와 `/clubs` 페이지의 region 버튼도 동일한 `REGION_GROUPS` 를 참조하므로 '해외' 탭이 자동 노출된다.
+`ClubSearchPanel` — `/clubs` 디렉토리 뷰. 검색 입력 + 7지역 칩(전체/수도권/강원/충청/전라/경상/제주) + 한글 초성 박스(`@heritage-dx/utils` `INITIALS` + `0-9` 디바이더) + 카드 그리드. 그리드는 뷰포트 폭에 따라 단계적으로 컬럼 수가 변하는 반응형(`grid-cols-1 sm:2 lg:3 xl:4 2xl:5`). 카드는 지역/운영타입/홀수 배지 + 골프장명 + 주소 + 연락처. 컨테이너 `max-w-[1500px]`. `useClubs(clubStore)` 로 전체 목록을 받고 검색·필터링은 클라이언트에서 메모이즈
 
 **골프장 프로필 섹션** (`club-profile/`):
 `ClubBasicInfoTable`, `MembershipInfoSection`, `EstimateSection`, `CostCalculatorSection`, `GreenFeeField`, `InfoField`, `BenefitsSheetSection`, `DocumentsSection`, `MarketPriceSummary`, `NearbyClubPrices`, `PriceChart`, `SectionCard`, `ClubSwitcher`, `SoldPriceBanner`
 
-**시트 공용 디자인 (`sheet-common/` — 2026-05 혜택지/견적서 리디자인)**: 골프장 프로필의 `혜택지` / `견적서` 두 탭이 공유하는 A4 1페이지 컴팩트 레이아웃. 새 시각 시스템은 모노크롬 + Pretendard + 섹션 헤더 underline + KV 2컬럼 그리드 + sharp border, hover/focus highlight 는 emerald → neutral/yellow (`#f7f8fa` hover / `#fffbe6` focus). `apps/os/src/components/sheet-common/` 에 분리: `sheet.module.css` (CSS Modules — 디자인 토큰 + `.sheetStage`/`.paper`/`.kvGrid`/`.kvRow`/`.editCell`/`.tbl`/`.docFoot`/`.psChip` 등), `SheetToolbar` (좌 `혜택지|견적서` 라벨 + vertical separator + 옵션 `클릭 편집` 뱃지 / 우 인쇄·JPEG pill 버튼), `PrintItemSelector` (혜택지 전용 chip 그리드 셀렉터 — `groups: { title, items: { key, label, hasData? }[] }` props, `hidden:Set<string>`/`onChange` 로 외부 상태 연결, 헤더 토글로 접힘). 시트 본문은 `.paper`(794×1123 min-height, padding `28px 40px 80px`, position:relative) 안에 섹션이 자연 배치되고 `.docFoot` 는 position:absolute로 항상 A4 바닥에 고정. 데이터가 길어지면 페이퍼는 자연스럽게 늘어나고, 인쇄/JPEG 경로는 기존 `sheet-print.ts` 의 fit-to-page zoom 로직이 그대로 처리 (변경 없음). `MembershipInfoSheet`(혜택지 본문)과 `EstimateSheet`(견적서 본문)는 둘 다 이 시스템 사용. `MembershipInfoSheet` 섹션 = 골프장 정보 (KV 그리드) / 회원권 정보 (KV + multiline med/tall) / 그린피 정보 (`.gfWrap` — 평일/주말 × 회원유형 테이블 + 카트비/캐디비 카드) / 기타 비용 + 기타 사항 (`.etcRow` 좌우 분할: 비용 4컬럼 테이블 + 메모 영역). `EstimateSheet` 섹션 = 수신자 정보 / 공급자 정보 / 견적 내역 (회원권명/{tradeType}금액/명의개서료/중개수수료/인지세/기타비용 + 합계/계약금/잔금 sumHead/sumRow) / `{매수|매도}시 구비서류` / disclaimer notes. 매수·매도 토글은 시안의 별도 카드 대신 제목 안 inline 버튼(`.tradeToggle` global selector) 유지 — 클릭하면 `onTradeTypeChange("매수"↔"매도")` 호출 + 구비서류·라벨 자동 전환. 컨테이너는 `BenefitsSheetSection`(툴바 + PrintItemSelector + `MembershipInfoSheet`)과 `EstimateSection`(툴바 + `EstimateSheet`)이며 `useSheetStorage`(localStorage `hdx:sheet:{clubCode}:{benefits|estimate}`) 의 `fieldOverrides`/`hiddenItems`/`customItems` 모델은 그대로 - 인라인 편집/항목 hide-show/커스텀 항목 추가 기능 유지. **`MembershipInfoSheet` 의 인라인 편집 셀 컴포넌트(`KVRow`, `CustomRows`)는 module scope 에 선언** - 부모 함수 안에 두면 매 렌더마다 새 function reference 가 만들어져 React 가 다른 component type 으로 간주하고 `<input>`/`<textarea>` 를 unmount/remount 시켜 포커스가 끊기는 (한 글자 입력 후 다음 키 입력 불가) 증상이 생긴다. 부모 컴포넌트는 `kvCtx = { hiddenItems, fieldOverrides, isEditable, onFieldOverrideChange }` 를 한 번 조립해 `<KVRow {...kvCtx} .../>` 로 spread 하고 `<CustomRows customItems={...} onCustomItemsChange={...} />` 는 따로 prop drilling. `EstimateSheet` 은 component 가 아닌 helper 함수(`renderText`/`renderNumWithAuto`)로 JSX element 를 값으로 반환하므로 reconciler 가 input 을 remount 시키지 않는다 (inner 정의여도 안전).
+**시트 공용 디자인 (`sheet-common/` — 2026-05 혜택지/견적서 리디자인)**: 골프장 프로필의 `혜택지` / `견적서` 두 탭이 공유하는 A4 1페이지 컴팩트 레이아웃. 새 시각 시스템은 모노크롬 + Pretendard + 섹션 헤더 underline + KV 2컬럼 그리드 + sharp border, hover/focus highlight 는 emerald → neutral/yellow (`#f7f8fa` hover / `#fffbe6` focus). `apps/os/src/components/sheet-common/` 에 분리: `sheet.module.css` (CSS Modules — 디자인 토큰 + `.sheetStage`/`.paper`/`.kvGrid`/`.kvRow`/`.editCell`/`.tbl`/`.docFoot`/`.psChip` 등), `SheetToolbar` (좌 `혜택지|견적서` 라벨 + vertical separator + 옵션 `클릭 편집` 뱃지 / 우 인쇄·JPEG pill 버튼), `PrintItemSelector` (혜택지 전용 chip 그리드 셀렉터 — `groups: { title, items: { key, label, hasData? }[] }` props, `hidden:Set<string>`/`onChange` 로 외부 상태 연결, 헤더 토글로 접힘). 시트 본문은 `.paper`(794×1123 min-height, padding `28px 40px 80px`, position:relative) 안에 섹션이 자연 배치되고 `.docFoot` 는 position:absolute로 항상 A4 바닥에 고정. 데이터가 길어지면 페이퍼는 자연스럽게 늘어나고, 인쇄/JPEG 경로는 기존 `sheet-print.ts` 의 fit-to-page zoom 로직이 그대로 처리 (변경 없음). `MembershipInfoSheet`(혜택지 본문)과 `EstimateSheet`(견적서 본문)는 둘 다 이 시스템 사용. `MembershipInfoSheet` 섹션 = 골프장 정보 (KV 그리드) / 회원권 정보 (KV + multiline med/tall) / 그린피 정보 (`.gfWrap` — 평일/주말 × 회원유형 테이블 + 카트비/캐디비 카드) / 기타 비용 + 기타 사항 (`.etcRow` 좌우 분할: 비용 4컬럼 테이블 + 메모 영역). `EstimateSheet` 섹션 = 수신자 정보 / 공급자 정보 / 견적 내역 (회원권명/{tradeType}금액/명의개서료/중개수수료/인지세/기타비용 + 합계/계약금/잔금 sumHead/sumRow) / `{매수|매도}시 구비서류` / disclaimer notes. 매수·매도 토글은 시안의 별도 카드 대신 제목 안 inline 버튼(`.tradeToggle` global selector) 유지 — 클릭하면 `onTradeTypeChange("매수"↔"매도")` 호출 + 구비서류·라벨 자동 전환. 컨테이너는 `BenefitsSheetSection`(툴바 + PrintItemSelector + `MembershipInfoSheet`)과 `EstimateSection`(툴바 + `EstimateSheet`)이며 `useSheetStorage`(localStorage `hdx:sheet:{clubCode}:{benefits|estimate}`) 의 `fieldOverrides`/`hiddenItems`/`customItems` 모델은 그대로 — 인라인 편집/항목 hide-show/커스텀 항목 추가 기능 유지.
 
 **ClubProfile 화면 구조 (2026-05 detail.html V3 기반 재설계)**: 글로벌 `AppHeader` 의 actions 슬롯은 비우고(`setActions(null)`) `ClubSwitcher` 는 본문 sticky 툴바로 이동. ClubProfile 본문 최상단은 단일 sticky 툴바 한 줄로 `ClubSwitcher (88CC + 다른 골프장으로 이동)` · `36홀` · `[개인|법인]` 사각 토글 · `[membershipName ...]` pill 토글(필터된 `memberships[]` 을 회색 트랙 안 흰색 active pill 로 노출 — 데이터에 정/준회원 외 다양한 종류가 있어도 모두 동적 렌더) · 우측 `매물 시세 · 갱신일` · `[지도]` · `[상담일지]` 버튼. 그 아래 `SoldPriceBanner` (선택 회원권 `dealerPriceRange` + `{개인|법인}-{membershipName} 기준` 컨텍스트), 탭 바 `회원권 정보 / 혜택지 / 견적서`, 회원권 정보 탭은 6개 `SectionCard` 2열 그리드(`01 골프장 정보` / `02 회원권 정보` / `03 그린피 정보` / `04 시세 추이` / `05 기타 비용` / `06 구비서류`). 회원권 선택은 `selectedMembershipIndex` (filtered 인덱스) 로 단일 source-of-truth, `ownerType` 또는 `detail.code` 변경 시 0으로 리셋.
 
@@ -679,8 +677,8 @@ getInitialData()    // 초기 데이터 프리로드
     │   ├── page.tsx                      # 골프장 목록
     │   ├── new/page.tsx                  # 골프장 생성
     │   └── [code]/
-    │       ├── page.tsx                  # 골프장 상세/편집
-    │       └── documents/
+    │       ├── page.tsx                  # 골프장 상세/편집 — **OS 노출 기준 2탭 구조**(기본정보 / 회원권). INFO 탭은 OS `ClubBasicInfoTable` 가 보여주는 필드만(name, companyName, region, address, website, openingDate, holes, totalLength, memberCount, facilities, introduction, membershipInfo, contacts.contactPerson/phoneNumber, caddyFee, cartFee, registrationFee, stampDuty, agencyFee, otherCosts). 도심접근성/팩스/부서/이메일/계좌정보/내부메모/딜러메모는 입력 영역에서 제거 — 단 저장 시 응답값을 머지하여 백엔드 보존 필드(`memo`, `dealerMemo`, `cityAccessibility`, `coordinates`, `admissionAge`, `operationType`, `taxOfficial`, `courseNames` 등)와 관계 컬렉션(`contacts`, `bankAccounts`)은 손실 없이 유지(CLUB_UPDATE_EXCLUDE set 으로 배열/메타 제외, 스칼라 머지). 시나리오/골프장 서류/개인 구비서류 탭은 제거(라우트 `/clubs/[code]/documents/*` 는 여전히 존재하지만 골프장 상세에서 진입 없음).
+    │       └── documents/                # 골프장 서류 라우트 — 현재 BO 골프장 상세에 진입 입구 없음(레거시 유지)
     │           ├── new/page.tsx          # 서류 등록
     │           └── [docCode]/page.tsx    # 서류 상세
     ├── common-documents/page.tsx         # 공용 서류 관리
@@ -690,14 +688,14 @@ getInitialData()    // 초기 데이터 프리로드
     ├── trade-memos/page.tsx              # 상담 기록 (승인 UI — useConsultationAdminRepository). 메모 컬럼은 `Consultation.notes.entries` 를 그대로 사용해 최신 한 줄 + `+N` 카운트 표시(서버 JSONB 응답을 직접 소비). 행 클릭 시 우측 Drawer 에 메모 히스토리 타임라인(최신 dot 강조 + dashed 구분선) + 고객 이력 + 반대매매 리스트가 함께 노출. 편집 모드에서는 `notes` 폼 필드를 비워두며 update 페이로드에서 omit — 메모 변경은 별도 엔드포인트로만. **상담일지 추가/수정 Drawer** 안 고객명/연락처 입력 grid 바로 아래에 `MatchedCustomerCard` (apps/back-office/src/components/trade-memos/) 를 배치 — 수정 모드에서 `editingMemo.customerId` 가 있을 때만 카드를 노출(추가 모드는 자동 숨김). 카드는 `useCustomerRepository().getOne` + `getHistorySummary` 를 직접 호출하고 `mapCustomerDtoToEntity`/`mapCustomerHistorySummaryDtoToEntity` 로 entity 변환 — OS 의 `apps/os/src/components/trade-memo/MatchedCustomerCard` 와 시각·매핑 1:1 동일(추후 packages/ui 통합 후보).
     ├── trade-records/page.tsx            # 거래 내역 (승인 UI — useMembershipTradeAdminRepository)
     ├── customers/page.tsx                # 고객 목록 + 담당자 필터 + 이력 Drawer (useCustomerRepository)
-    └── users/page.tsx                    # 사용자 관리
+    └── users/page.tsx                    # 사용자 관리 — BO_사용자관리_V1 시안(V2 모노톤) 적용. 페이지 헤더(kicker `User Management` + 24px bold + subtitle) + panel(검색 row + grid 행 `[40px_1fr_120px_130px_24px]` + 좌측 호버 stripe + chev shift) + 클라이언트 페이지네이션 7건/페이지(검색어 변경 시 page=1 리셋, prev/next disabled). Role pill 3종(EDITOR=보라 #F0EEF8/#4D3FAA · ORG_ADMIN=회색 · SUPER_ADMIN=검정)은 `ROLE_PILL_STYLE` 인라인 매핑. **모달은 page.tsx 내부 인라인** — `ModalShell` (rounded-14px, 검정 backdrop+blur, ESC/backdrop close + body scroll lock 훅) 위에 `NewUserModal` (480px, 보라 info-callout) / `UserDetailModal` (560px, 계정 정보 + 수정 폼 + split footer = 삭제(danger ghost) / 비밀번호 초기화 · 닫기) 구성. 도메인 로직은 `useUsers` + `useUserMutations` + `getAssignableRoles` + `canAccessUsersPage` 그대로 유지하고 alert() 사용. 삭제/초기화 확인은 기존 `ConfirmModal` 중첩.
 ```
 
 #### 컴포넌트 (13개)
 
 **레이아웃** (`layout/`): `Header`, `Sidebar`, `PageContainer`
 
-**폼** (`forms/`): `ClubForm`, `DocumentForm`, `MembershipForm`, `ScenarioForm`
+**폼** (`forms/`): `ClubForm` (OS 노출 기준 — 코드/골프장명/회사명/지역/주소/홈페이지/개장일/코스규모/코스거리/회원수만. 도심접근성/메모/딜러메모 제거), `DocumentForm`, `MembershipForm` (OS 노출 기준 — extra 접이식 영역 폐기, 매도가 범위 dealerPriceRange/분양 연도/분양 방식/회원의 날/시세 업데이트 일자 메인 승격. 거래성향/리스크/3년평균/명의개서 난이도/추가서류 빈도 등 OS 비노출 필드 제거. PUT 시 폼 외 응답 필드는 머지하여 백엔드 보존), `ScenarioForm`
 
 **KPI** (`kpi/`): `KpiFilterBar`, `KpiTrendChart`, `KpiEmployeeComparison` (`/kpi` 페이지 전용. 기존 `KpiMiniDashboard` 는 BO 홈 리디자인으로 `home/MonthlyTrendPanel` 에 흡수되어 폐기)
 - react-hook-form + zod 스키마 검증 기반

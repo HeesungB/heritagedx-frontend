@@ -10,11 +10,9 @@ export const clubBaseSchema = z.object({
   address: z.string().optional(),
   openingDate: z.string().optional(),
   holes: z.string().optional(),
+  totalLength: z.string().optional(),
   memberCount: z.string().optional(),
-  cityAccessibility: z.string().optional(),
   website: z.string().optional(),
-  memo: z.string().optional(),
-  dealerMemo: z.string().optional(),
 });
 
 export type ClubFormValues = z.infer<typeof clubBaseSchema>;
@@ -27,10 +25,8 @@ export const clubDetailSchema = z.object({
   address: z.string().optional(),
   openingDate: z.string().optional(),
   holes: z.string().optional(),
+  totalLength: z.string().optional(),
   memberCount: z.string().optional(),
-  cityAccessibility: z.string().optional(),
-  memo: z.string().optional(),
-  dealerMemo: z.string().optional(),
   membershipInfo: z.string().optional(),
   introduction: z.string().optional(),
   facilities: z.string().optional(),

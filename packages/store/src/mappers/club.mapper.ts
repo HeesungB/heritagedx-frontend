@@ -104,3 +104,78 @@ export function mapClubDetailDtoToEntity(dto: ClubDetail): ClubDetailEntity {
     documentsCustomer: (dto.documentsCustomer ?? []).map(mapCustomerDocumentDtoToEntity),
   };
 }
+
+// PUT /admin/clubs/:id 의 UpdateClubDto 화이트리스트 (docs/api/admin/clubs.md 기준).
+// 응답에는 포함되지만 update 본문에서는 허용되지 않는 필드(taxOfficial, operationType 등)는
+// 의도적으로 제외한다.
+export const CLUB_UPDATE_ALLOWED_FIELDS = [
+  "code",
+  "name",
+  "companyName",
+  "region",
+  "address",
+  "coordinates",
+  "registrationFee",
+  "taxOfficialRaw",
+  "memo",
+  "registrationHours",
+  "documentLink",
+  "registrationProcedure",
+  "dealerMemo",
+  "membershipInfo",
+  "openingDate",
+  "holes",
+  "totalLength",
+  "memberCount",
+  "cityAccessibility",
+  "courseNames",
+  "courseComposition",
+  "claimFrequency",
+  "website",
+  "operatorCompany",
+  "admissionAge",
+  "introduction",
+  "facilities",
+  "operationTypes",
+  "stampDuty",
+  "agencyFee",
+  "otherCosts",
+  "caddyFee",
+  "cartFee",
+] as const;
+
+export type ClubUpdateField = (typeof CLUB_UPDATE_ALLOWED_FIELDS)[number];
+
+// 응답(source) + 폼(overrides) 을 머지해 update 본문을 구성. 허용 필드 외엔 모두 제거되므로
+// 백엔드의 forbidNonWhitelisted 검증에 걸리지 않는다.
+export function pickClubUpdatePayload(
+  source: Record<string, unknown> | null | undefined,
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const payload: Record<string, unknown> = {};
+  if (source) {
+    for (const key of CLUB_UPDATE_ALLOWED_FIELDS) {
+      const value = source[key];
+      if (value === null || value === undefined) continue;
+      payload[key] = value;
+    }
+  }
+  for (const key of CLUB_UPDATE_ALLOWED_FIELDS) {
+    if (!(key in overrides)) continue;
+    const value = overrides[key];
+    if (value === undefined) continue;
+    payload[key] = value;
+  }
+  // operationTypes 정규화: 키 이름은 복수지만 UpdateClubDto 는 단일 enum 값을 요구한다
+  // (응답에는 `operationTypes: Array<...>` 와 `operationType: "..."`(singular) 가 함께 옴).
+  // array → 첫 원소, 비어있으면 singular fallback, 아무것도 없으면 키 제거.
+  let opType: unknown = payload.operationTypes;
+  if (opType === undefined && source) opType = source.operationType;
+  if (Array.isArray(opType)) opType = opType[0];
+  if (typeof opType === "string" && opType.length > 0) {
+    payload.operationTypes = opType;
+  } else {
+    delete payload.operationTypes;
+  }
+  return payload;
+}

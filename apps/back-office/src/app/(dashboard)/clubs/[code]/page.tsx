@@ -14,6 +14,7 @@ import {
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { clubDetailSchema, type ClubDetailFormValues } from "@heritage-dx/store/schemas";
+import { pickClubUpdatePayload } from "@heritage-dx/store/mappers";
 
 import type { ClubDetailResponse } from "@/types";
 import type { Membership } from "@heritage-dx/types";
@@ -36,21 +37,6 @@ import MembershipForm from "@/components/forms/MembershipForm";
 interface PageProps {
   params: Promise<{ code: string }>;
 }
-
-// PUT 시 폼이 관리하지 않는 club 응답 필드도 같이 보내야 백엔드 데이터 손실 방지.
-// 관계 컬렉션/메타 필드는 update body 에서 제외한다.
-const CLUB_UPDATE_EXCLUDE = new Set([
-  "id",
-  "code",
-  "createdAt",
-  "updatedAt",
-  "contacts",
-  "bankAccounts",
-  "memberships",
-  "scenarios",
-  "documentsGlobal",
-  "documentsCustomer",
-]);
 
 export default function ClubDetailPage({ params }: PageProps) {
   const clubsRepo = useClubRepository();
@@ -128,7 +114,8 @@ export default function ClubDetailPage({ params }: PageProps) {
     loadData();
   }, [loadData]);
 
-  // 기본정보 인라인 저장 - 폼 외 필드는 응답값으로 머지하여 데이터 손실 방지
+  // 기본정보 인라인 저장 - UpdateClubDto 화이트리스트로 페이로드 구성 (응답의 read-only
+  // 필드 taxOfficial, operationType 등 제거 → forbidNonWhitelisted 방지)
   const handleClubInfoSave = async (data: ClubDetailFormValues) => {
     const clubId = club?.id;
     if (!clubId) {
@@ -137,14 +124,10 @@ export default function ClubDetailPage({ params }: PageProps) {
     }
     setIsSaving(true);
     try {
-      const preserved: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(club)) {
-        if (CLUB_UPDATE_EXCLUDE.has(key)) continue;
-        if (value === null || value === undefined) continue;
-        if (Array.isArray(value)) continue;
-        preserved[key] = value;
-      }
-      const payload = { ...preserved, ...data };
+      const payload = pickClubUpdatePayload(
+        club as unknown as Record<string, unknown>,
+        data as unknown as Record<string, unknown>,
+      );
       const response = await clubsAdmin.update(clubId, payload);
       if (response.success) {
         alert("저장되었습니다.");

@@ -340,7 +340,7 @@ packages/store/
 │   │   └── memo-history.ts   # `flattenMemoHistoryNotes(notes)` 만 — 백엔드가 notes JSONB 로 정규화되면서 client-side `__MEMO_V1__` 인코딩/디코딩 경로는 폐기. 단일 텍스트 필드(예: customer.memo) 에 과거 마커가 흘러들어왔을 때 `flattenMemoHistoryNotes` 로 entries content 를 시간순 join 한 plain text 로 정규화 (마커 없으면 통과, 파싱 실패 시 데이터 손실 방지로 원본 유지)
 │   ├── mappers/              # DTO ↔ Entity 변환 (순수 함수)
 │   │   ├── index.ts
-│   │   ├── club.mapper.ts
+│   │   ├── club.mapper.ts            # mapClubDtoToEntity, mapClubDetailDtoToEntity (응답 → entity), `CLUB_UPDATE_ALLOWED_FIELDS` + `pickClubUpdatePayload(source, overrides)` (PUT /admin/clubs/:id UpdateClubDto 화이트리스트 — 응답에만 존재하는 read-only 필드 `taxOfficial` 등 자동 제거로 `forbidNonWhitelisted` 방지. `operationTypes` 는 키명만 복수일 뿐 단일 enum 값을 요구하는 백엔드 특이점 때문에 응답 배열의 첫 원소(없으면 singular `operationType` fallback)를 단일 값으로 펴서 보냄)
 │   │   ├── consultation.mapper.ts
 │   │   ├── customer.mapper.ts       # mapCustomerDtoToEntity (memo 는 flattenMemoHistoryNotes 로 정규화 — `__MEMO_V1__` 마커가 들어오면 entries.content 시간순 join, ownedMemberships 는 displayOrder 오름차순 정렬), mapCustomerEntityToInput, mapCustomerEntityToUpdateInput (ownedMemberships 키가 명시 entry 일 때만 페이로드에 포함 — 미포함=유지/[]=전체삭제/[...]=전체교체), mapOwnedMembershipDtoToEntity, mapOwnedMembershipEntityToInput
 │   │   ├── settlement.mapper.ts     # mapSettlementDtoToEntity (SETTLEMENT_CELL_KEYS 로 알려진 셀만 흡수), mapSettlementEntityToInput (POST /api/settlements 전체 페이로드, documentGenerated 계열/createdAt 제외), mapSettlementEntityToUpdateInput (partial entity → PUT 페이로드, dirty 키만)
@@ -401,6 +401,7 @@ packages/store/
 
 **Mapper:**
 - 순수 함수: `mapClubDtoToEntity(dto)`, `mapConsultationDtoToEntity(dto)`, `mapMembershipTradeDtoToEntity(dto)` 등
+- 페이로드 셰이퍼: `pickClubUpdatePayload(club, formValues)` 는 응답 + 폼 값을 머지하되 UpdateClubDto 화이트리스트만 통과시켜 백엔드 `forbidNonWhitelisted` 거부를 방지한다 (`CLUB_UPDATE_ALLOWED_FIELDS` 상수가 진실 기준).
 - 역방향: `mapConsultationEntityToInput(entity)`, `mapMembershipTradeEntityToInput(entity)` (쓰기용)
 - 상담 매퍼는 응답의 `offerPrice`/`desiredPrice` (string numeric) → `coerceToNumber`로 `number | null` 변환
 - `buildClubMembershipPair({ clubId, clubName, membershipId, membershipType })` — 백엔드가 `club`/`membership`을 모두 UUID 또는 모두 텍스트로만 받기 때문에, 두 ID가 모두 있을 때만 ID 모드로 보내고 하나라도 빠지면 텍스트 모드로 다운그레이드한다. 상담일지 생성/수정 페이로드 빌더(`mapConsultationEntityToInput`, 백오피스 `trade-memos/page.tsx`)에서 공용 사용
@@ -677,7 +678,7 @@ getInitialData()    // 초기 데이터 프리로드
     │   ├── page.tsx                      # 골프장 목록
     │   ├── new/page.tsx                  # 골프장 생성
     │   └── [code]/
-    │       ├── page.tsx                  # 골프장 상세/편집 — **OS 노출 기준 2탭 구조**(기본정보 / 회원권). INFO 탭은 OS `ClubBasicInfoTable` 가 보여주는 필드만(name, companyName, region, address, website, openingDate, holes, totalLength, memberCount, facilities, introduction, membershipInfo, contacts.contactPerson/phoneNumber, caddyFee, cartFee, registrationFee, stampDuty, agencyFee, otherCosts). 도심접근성/팩스/부서/이메일/계좌정보/내부메모/딜러메모는 입력 영역에서 제거 — 단 저장 시 응답값을 머지하여 백엔드 보존 필드(`memo`, `dealerMemo`, `cityAccessibility`, `coordinates`, `admissionAge`, `operationType`, `taxOfficial`, `courseNames` 등)와 관계 컬렉션(`contacts`, `bankAccounts`)은 손실 없이 유지(CLUB_UPDATE_EXCLUDE set 으로 배열/메타 제외, 스칼라 머지). 시나리오/골프장 서류/개인 구비서류 탭은 제거(라우트 `/clubs/[code]/documents/*` 는 여전히 존재하지만 골프장 상세에서 진입 없음).
+    │       ├── page.tsx                  # 골프장 상세/편집 — **OS 노출 기준 2탭 구조**(기본정보 / 회원권). INFO 탭은 OS `ClubBasicInfoTable` 가 보여주는 필드만(name, companyName, region, address, website, openingDate, holes, totalLength, memberCount, facilities, introduction, membershipInfo, contacts.contactPerson/phoneNumber, caddyFee, cartFee, registrationFee, stampDuty, agencyFee, otherCosts). 도심접근성/팩스/부서/이메일/계좌정보/내부메모/딜러메모는 입력 영역에서 제거 — 단 저장 시 `pickClubUpdatePayload(club, formValues)` (packages/store) 가 UpdateClubDto 화이트리스트(`memo`, `dealerMemo`, `cityAccessibility`, `coordinates`, `admissionAge`, `operationTypes`, `taxOfficialRaw`, `courseNames` 등) 만 통과시켜 손실 없이 머지하고 응답 전용 필드(`taxOfficial`, `operationType`(singular) 등) 는 자동 제거. `operationTypes` 는 헬퍼가 응답의 array/singular 값을 단일 enum 으로 평탄화. 시나리오/골프장 서류/개인 구비서류 탭은 제거(라우트 `/clubs/[code]/documents/*` 는 여전히 존재하지만 골프장 상세에서 진입 없음).
     │       └── documents/                # 골프장 서류 라우트 — 현재 BO 골프장 상세에 진입 입구 없음(레거시 유지)
     │           ├── new/page.tsx          # 서류 등록
     │           └── [docCode]/page.tsx    # 서류 상세

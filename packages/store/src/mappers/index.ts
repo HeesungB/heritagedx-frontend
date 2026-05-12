@@ -1,5 +1,11 @@
 export { coerceToNumber, normalizeGreenFee, normalizePagination } from "./helpers";
-export { mapClubDtoToEntity, mapClubDetailDtoToEntity } from "./club.mapper";
+export {
+  mapClubDtoToEntity,
+  mapClubDetailDtoToEntity,
+  pickClubUpdatePayload,
+  CLUB_UPDATE_ALLOWED_FIELDS,
+} from "./club.mapper";
+export type { ClubUpdateField } from "./club.mapper";
 export {
   mapConsultationDtoToEntity,
   mapConsultationEntityToInput,

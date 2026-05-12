@@ -211,6 +211,8 @@ export type {
 export {
   mapClubDtoToEntity,
   mapClubDetailDtoToEntity,
+  pickClubUpdatePayload,
+  CLUB_UPDATE_ALLOWED_FIELDS,
   mapConsultationDtoToEntity,
   mapConsultationEntityToInput,
   buildClubMembershipPair,
@@ -227,6 +229,7 @@ export {
   mapSettlementEntityToUpdateInput,
   normalizePagination,
 } from "./mappers/index";
+export type { ClubUpdateField } from "./mappers/index";
 
 // Approval workflow constants/types (re-export from @heritage-dx/types so views
 // don't need to import the types package directly)

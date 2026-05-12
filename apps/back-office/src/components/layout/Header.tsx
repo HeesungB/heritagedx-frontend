@@ -15,23 +15,18 @@ import {
   Bell,
   BarChart3,
   UserCircle,
+  LayoutGrid,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/hooks/useNotifications";
 import { ROLE_LABELS, canManageOrg } from "@heritage-dx/store";
 
 // 시안의 정적 카운트 배지. 추후 라이브 데이터로 교체 시 hook 으로 대체.
-const STATIC_BADGES = {
-  clubs: "160",
-  consultations: "4",
-} as const;
-
 interface NavLink {
   href: string;
   label: string;
   icon: React.ReactNode;
   isActive: (pathname: string) => boolean;
-  badge?: string;
 }
 
 const PRIMARY_NAV: NavLink[] = [
@@ -46,7 +41,6 @@ const PRIMARY_NAV: NavLink[] = [
     label: "골프장",
     icon: <Building2 className="w-3.5 h-3.5" />,
     isActive: (p) => p.startsWith("/clubs"),
-    badge: STATIC_BADGES.clubs,
   },
   {
     href: "/customers",
@@ -59,7 +53,6 @@ const PRIMARY_NAV: NavLink[] = [
     label: "상담일지",
     icon: <MessageSquare className="w-3.5 h-3.5" />,
     isActive: (p) => p.startsWith("/trade-memos"),
-    badge: STATIC_BADGES.consultations,
   },
   {
     href: "/trade-records",
@@ -114,11 +107,6 @@ export default function Header() {
               >
                 {link.icon}
                 <span>{link.label}</span>
-                {link.badge && (
-                  <span className="text-[10px] font-semibold leading-[1.4] px-[5px] py-px rounded-[3px] bg-neutral-900 text-white">
-                    {link.badge}
-                  </span>
-                )}
               </Link>
             );
           })}
@@ -147,7 +135,7 @@ export default function Header() {
                     : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50"
                 }`}
               >
-                <Building2 className="w-3.5 h-3.5" />
+                <LayoutGrid className="w-3.5 h-3.5" />
                 <span>나의 조직</span>
               </Link>
             </>
@@ -219,11 +207,6 @@ export default function Header() {
                 >
                   {link.icon}
                   <span>{link.label}</span>
-                  {link.badge && (
-                    <span className="ml-auto text-[10px] font-semibold leading-[1.4] px-[5px] py-px rounded-[3px] bg-neutral-900 text-white">
-                      {link.badge}
-                    </span>
-                  )}
                 </Link>
               );
             })}
@@ -269,7 +252,7 @@ export default function Header() {
                       : "text-neutral-700 hover:text-neutral-900 hover:bg-neutral-50 font-medium"
                   }`}
                 >
-                  <Building2 className="w-4 h-4" />
+                  <LayoutGrid className="w-4 h-4" />
                   <span>나의 조직</span>
                 </Link>
               </>

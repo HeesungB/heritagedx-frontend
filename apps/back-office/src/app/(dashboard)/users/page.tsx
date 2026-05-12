@@ -1,87 +1,158 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import {
-  Search,
-  Plus,
-  Trash2,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
+import {
+  AlertCircle,
+  ChevronLeft,
   ChevronRight,
-  Users,
-  Loader2,
   KeyRound,
+  Loader2,
+  Plus,
+  Search,
+  Trash2,
+  UserPlus,
+  Users,
+  X,
 } from "lucide-react";
-import { PageContainer } from "@/components/layout";
+import { ConfirmModal } from "@heritage-dx/ui";
 import {
-  PageLoading,
-  Button,
-  Input,
-  Select,
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  ConfirmModal,
-  Drawer,
-  Badge,
-} from "@heritage-dx/ui";
-import {
-  useUsers,
-  useUserMutations,
   ROLE_LABELS,
-  ROLE_BADGE_VARIANTS,
-  getAssignableRoles,
   canAccessUsersPage,
+  getAssignableRoles,
+  useUserMutations,
+  useUsers,
 } from "@heritage-dx/store";
-import { useAuth } from "@/contexts/AuthContext";
 import type { AdminUserEntity as AdminUser, UserRole } from "@heritage-dx/store";
+import { useAuth } from "@/contexts/AuthContext";
 
+const PAGE_SIZE = 7;
 const DEFAULT_ORGANIZATION_ID = "00000000-0000-0000-0000-000000000001";
+
+const ROLE_PILL_STYLE: Record<UserRole, CSSProperties> = {
+  EDITOR: {
+    backgroundColor: "#F0EEF8",
+    color: "#4D3FAA",
+    border: "1px solid #E2DEF1",
+  },
+  ORG_ADMIN: {
+    backgroundColor: "#F5F5F4",
+    color: "#2D2D2D",
+    border: "1px solid #DCDCD8",
+  },
+  SUPER_ADMIN: {
+    backgroundColor: "#0A0A0A",
+    color: "#FFFFFF",
+    border: "1px solid #0A0A0A",
+  },
+};
+
+function formatRelative(iso?: string | null): string {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "-";
+  const diff = Date.now() - d.getTime();
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return "방금 전";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}분 전`;
+  const hour = Math.floor(min / 60);
+  if (hour < 24) return `${hour}시간 전`;
+  const day = Math.floor(hour / 24);
+  if (day < 7) return `${day}일 전`;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}.${m}.${dd}`;
+}
+
+function formatDate(iso?: string | null): string {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "-";
+  return d.toLocaleDateString("ko-KR");
+}
+
+function useModalShell(isOpen: boolean, onClose: () => void) {
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [isOpen, onClose]);
+}
 
 export default function UsersPage() {
   const { data: users, isLoading, refetch: loadUsers } = useUsers({ limit: 100 });
-  const { create: createUser, update: updateUser, remove: deleteUser, resetPassword: resetUserPassword } = useUserMutations();
+  const {
+    create: createUser,
+    update: updateUser,
+    remove: deleteUser,
+    resetPassword: resetUserPassword,
+  } = useUserMutations();
   const { user: currentUser } = useAuth();
-  const [filteredUsers, setFilteredUsers] = useState<AdminUser[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
 
-  // Drawer 상태
-  const [showAddDrawer, setShowAddDrawer] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [page, setPage] = useState(1);
+
+  const [isAddOpen, setIsAddOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
 
-  // 추가 폼 상태
   const [newEmail, setNewEmail] = useState("");
   const [newName, setNewName] = useState("");
   const [newRole, setNewRole] = useState<UserRole>("EDITOR");
   const [isSaving, setIsSaving] = useState(false);
 
-  // 수정 폼 상태
   const [editName, setEditName] = useState("");
   const [editRole, setEditRole] = useState<UserRole>("EDITOR");
   const [editIsActive, setEditIsActive] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
 
-  // 삭제 상태
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [resetTarget, setResetTarget] = useState<AdminUser | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
 
-  // 비밀번호 초기화 상태
-  const [resetPasswordTarget, setResetPasswordTarget] =
-    useState<AdminUser | null>(null);
-  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const filteredUsers = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return users;
+    return users.filter(
+      (u) =>
+        (u.name || "").toLowerCase().includes(q) ||
+        (u.email || "").toLowerCase().includes(q),
+    );
+  }, [searchTerm, users]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedUsers = useMemo(
+    () =>
+      filteredUsers.slice(
+        (currentPage - 1) * PAGE_SIZE,
+        currentPage * PAGE_SIZE,
+      ),
+    [filteredUsers, currentPage],
+  );
+  const rangeStart =
+    filteredUsers.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(currentPage * PAGE_SIZE, filteredUsers.length);
 
   useEffect(() => {
-    if (searchTerm) {
-      setFilteredUsers(
-        users.filter(
-          (u) =>
-            (u.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (u.email || "").toLowerCase().includes(searchTerm.toLowerCase()),
-        ),
-      );
-    } else {
-      setFilteredUsers(users);
-    }
-  }, [searchTerm, users]);
+    setPage(1);
+  }, [searchTerm]);
 
   useEffect(() => {
     if (selectedUser) {
@@ -90,6 +161,19 @@ export default function UsersPage() {
       setEditIsActive(selectedUser.isActive !== false);
     }
   }, [selectedUser]);
+
+  const roleOptions = currentUser ? getAssignableRoles(currentUser.role) : [];
+
+  const closeAddModal = useCallback(() => {
+    setIsAddOpen(false);
+    setNewEmail("");
+    setNewName("");
+    setNewRole("EDITOR");
+  }, []);
+
+  const closeDetailModal = useCallback(() => {
+    setSelectedUser(null);
+  }, []);
 
   const handleAddUser = async () => {
     if (!newEmail.trim()) {
@@ -103,14 +187,13 @@ export default function UsersPage() {
     setIsSaving(true);
     try {
       await createUser({
-        email: newEmail,
-        name: newName,
+        email: newEmail.trim(),
+        name: newName.trim(),
         role: newRole,
         organizationId: currentUser?.organizationId || DEFAULT_ORGANIZATION_ID,
       });
       alert("사용자가 등록되었습니다. 임시 비밀번호가 이메일로 발송됩니다.");
-      setShowAddDrawer(false);
-      resetAddForm();
+      closeAddModal();
       loadUsers();
     } catch {
       alert("사용자 등록 중 오류가 발생했습니다.");
@@ -127,7 +210,7 @@ export default function UsersPage() {
     setIsEditing(true);
     try {
       await updateUser(selectedUser.id, {
-        name: editName,
+        name: editName.trim(),
         role: editRole,
         isActive: editIsActive,
       });
@@ -135,7 +218,7 @@ export default function UsersPage() {
       loadUsers();
       setSelectedUser({
         ...selectedUser,
-        name: editName,
+        name: editName.trim(),
         role: editRole,
         isActive: editIsActive,
       });
@@ -162,386 +245,238 @@ export default function UsersPage() {
   };
 
   const handleResetPassword = async () => {
-    if (!resetPasswordTarget?.id) return;
-    setIsResettingPassword(true);
+    if (!resetTarget?.id) return;
+    setIsResetting(true);
     try {
-      await resetUserPassword(resetPasswordTarget.id);
-      alert(
-        "비밀번호가 초기화되었습니다. 임시 비밀번호가 이메일로 발송됩니다.",
-      );
+      await resetUserPassword(resetTarget.id);
+      alert("비밀번호가 초기화되었습니다. 임시 비밀번호가 이메일로 발송됩니다.");
     } catch {
       alert("비밀번호 초기화 중 오류가 발생했습니다.");
     }
-    setIsResettingPassword(false);
-    setResetPasswordTarget(null);
+    setIsResetting(false);
+    setResetTarget(null);
   };
 
-  const resetAddForm = () => {
-    setNewEmail("");
-    setNewName("");
-    setNewRole("EDITOR");
-  };
-
-  // 권한 체크: EDITOR는 접근 불가
   if (currentUser && !canAccessUsersPage(currentUser)) {
     return (
-      <PageContainer>
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500 text-lg">권한이 없습니다</p>
-            <p className="text-gray-400 text-sm mt-1">
-              사용자 관리는 관리자 이상만 접근할 수 있습니다.
-            </p>
-          </div>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <AlertCircle className="w-10 h-10 text-neutral-300 mx-auto mb-3" />
+          <p className="text-sm font-medium text-neutral-700">권한이 없습니다</p>
+          <p className="text-xs text-neutral-400 mt-1">
+            사용자 관리는 관리자 이상만 접근할 수 있습니다.
+          </p>
         </div>
-      </PageContainer>
+      </div>
     );
   }
 
   if (isLoading) {
-    return <PageLoading />;
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-7 h-7 animate-spin text-neutral-400" />
+      </div>
+    );
   }
 
-  const roleOptions = currentUser ? getAssignableRoles(currentUser.role) : [];
-
   return (
-    <PageContainer>
-      {/* 헤더 */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-            <Users className="w-5 h-5 text-primary" />
+    <div className="px-10 pt-10 pb-14 overflow-y-auto">
+      <div className="max-w-[920px] mx-auto">
+        {/* Page header */}
+        <div className="flex justify-between items-start gap-6 mb-7">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-[10px] bg-neutral-50 grid place-items-center text-neutral-900 flex-shrink-0">
+              <Users className="w-[18px] h-[18px]" strokeWidth={1.6} />
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-[10.5px] font-semibold tracking-[0.14em] text-neutral-400 uppercase">
+                User Management
+              </span>
+              <h1 className="text-2xl font-bold tracking-[-0.025em] leading-[1.2] text-neutral-900 m-0">
+                사용자 관리
+              </h1>
+              <span className="text-[12.5px] text-neutral-500 mt-0.5 tracking-[-0.005em]">
+                시스템 사용자 계정을 관리합니다
+              </span>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">사용자 관리</h1>
-            <p className="text-sm text-gray-500">
-              시스템 사용자 계정을 관리합니다
-            </p>
+          <div className="flex gap-2 flex-shrink-0 pt-1.5">
+            <button
+              type="button"
+              onClick={() => setIsAddOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-semibold text-white bg-neutral-900 border border-neutral-900 rounded-lg hover:bg-neutral-800 transition-colors tracking-[-0.005em]"
+            >
+              <Plus className="w-[13px] h-[13px]" strokeWidth={2} />
+              <span>새 사용자</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Panel */}
+        <div className="border border-neutral-100 rounded-card bg-surface overflow-hidden">
+          {/* panel head */}
+          <div className="px-6 pt-[18px] pb-[14px] border-b border-neutral-100 flex items-baseline justify-between gap-4">
+            <h2 className="text-[13.5px] font-semibold text-neutral-900 tracking-[-0.01em] m-0 inline-flex items-baseline gap-2.5">
+              사용자 목록
+              <span className="text-[11px] font-semibold px-1.5 py-px rounded bg-neutral-50 text-neutral-600 border border-neutral-200 font-mono">
+                {users.length}
+              </span>
+            </h2>
+            <span className="text-[11.5px] text-neutral-400 font-mono tracking-[0.02em]">
+              all roles · active
+            </span>
+          </div>
+
+          {/* search */}
+          <div className="px-6 py-4 border-b border-neutral-100 bg-neutral-50/60">
+            <div className="relative">
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-400 pointer-events-none"
+                strokeWidth={1.7}
+              />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="이름 또는 이메일로 검색…"
+                className="w-full h-[38px] pl-9 pr-3 text-[13px] text-neutral-900 bg-surface border border-neutral-200 rounded-lg outline-none placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-[3px] focus:ring-neutral-900/10 transition-colors"
+              />
+            </div>
+          </div>
+
+          {/* list */}
+          {filteredUsers.length === 0 ? (
+            <div className="px-6 py-16 text-center">
+              <div className="w-12 h-12 mx-auto rounded-full bg-neutral-50 grid place-items-center mb-3">
+                <Users className="w-5 h-5 text-neutral-400" />
+              </div>
+              <p className="text-sm font-medium text-neutral-700">
+                {searchTerm ? "검색 결과가 없습니다" : "등록된 사용자가 없습니다"}
+              </p>
+              {!searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setIsAddOpen(true)}
+                  className="mt-2 text-[12.5px] text-neutral-500 hover:text-neutral-900 underline underline-offset-2"
+                >
+                  새 사용자 등록하기
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col">
+              {pagedUsers.map((u, idx) => {
+                const indexNumber =
+                  (currentPage - 1) * PAGE_SIZE + idx + 1;
+                const indexLabel = String(indexNumber).padStart(2, "0");
+                return (
+                  <button
+                    key={u.id}
+                    type="button"
+                    onClick={() => setSelectedUser(u)}
+                    className={`group relative grid grid-cols-[40px_1fr_120px_130px_24px] items-center gap-5 px-6 py-4 text-left transition-colors hover:bg-neutral-50/60 ${
+                      idx === 0 ? "" : "border-t border-neutral-50"
+                    }`}
+                  >
+                    <span className="absolute left-0 top-0 bottom-0 w-[2px] bg-transparent group-hover:bg-neutral-900 transition-colors" />
+                    <span className="text-[11px] font-medium text-neutral-400 font-mono tracking-[0.04em]">
+                      {indexLabel}
+                    </span>
+                    <div className="flex flex-col gap-1 min-w-0">
+                      <span className="text-[15px] font-semibold text-neutral-900 tracking-[-0.015em] truncate">
+                        {u.name || "이름 없음"}
+                      </span>
+                      <span className="text-[12.5px] text-neutral-500 font-mono leading-[1.4] truncate">
+                        {u.email}
+                      </span>
+                    </div>
+                    <span
+                      className="justify-self-start inline-flex items-center text-[11px] font-semibold px-2.5 py-1 rounded leading-[1.5] whitespace-nowrap"
+                      style={ROLE_PILL_STYLE[u.role]}
+                    >
+                      {ROLE_LABELS[u.role]}
+                    </span>
+                    <div className="flex flex-col gap-[3px] text-right">
+                      <span className="text-[10.5px] font-medium text-neutral-400 tracking-[-0.005em]">
+                        마지막 로그인
+                      </span>
+                      <span className="text-[12.5px] font-medium text-neutral-600 tracking-[-0.01em]">
+                        {formatRelative(u.lastLoginAt)}
+                      </span>
+                    </div>
+                    <span className="grid place-items-center text-neutral-300 group-hover:text-neutral-900 transition-transform group-hover:translate-x-0.5">
+                      <ChevronRight className="w-3.5 h-3.5" strokeWidth={1.8} />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* panel foot */}
+          <div className="px-6 py-3.5 border-t border-neutral-100 bg-neutral-50/60 flex items-center justify-between">
+            <span className="text-[11.5px] text-neutral-400 font-mono tracking-[0.02em]">
+              Showing {rangeStart}–{rangeEnd} of {filteredUsers.length}
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                aria-label="이전"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage <= 1}
+                className="w-[26px] h-[26px] grid place-items-center rounded-md border border-neutral-200 bg-surface text-neutral-600 hover:text-neutral-900 hover:border-neutral-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft className="w-3 h-3" strokeWidth={1.8} />
+              </button>
+              <span className="px-1.5 text-[11.5px] text-neutral-600 font-mono tracking-[0.02em]">
+                {currentPage} / {totalPages}
+              </span>
+              <button
+                type="button"
+                aria-label="다음"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+                className="w-[26px] h-[26px] grid place-items-center rounded-md border border-neutral-200 bg-surface text-neutral-600 hover:text-neutral-900 hover:border-neutral-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronRight className="w-3 h-3" strokeWidth={1.8} />
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* 메인 카드 */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <CardTitle>사용자 목록</CardTitle>
-              <Badge variant="default">{users.length}명</Badge>
-            </div>
-            <Button size="sm" onClick={() => setShowAddDrawer(true)}>
-              <Plus className="w-4 h-4 mr-1" />새 사용자
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {/* 검색 */}
-          <div className="mb-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <Input
-                placeholder="이름 또는 이메일로 검색..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </div>
+      {/* New User Modal */}
+      <NewUserModal
+        isOpen={isAddOpen}
+        onClose={closeAddModal}
+        email={newEmail}
+        name={newName}
+        role={newRole}
+        onEmailChange={setNewEmail}
+        onNameChange={setNewName}
+        onRoleChange={setNewRole}
+        roleOptions={roleOptions}
+        isSaving={isSaving}
+        onSubmit={handleAddUser}
+      />
 
-          {/* 사용자 목록 */}
-          <div className="space-y-2 max-h-[600px] overflow-y-auto">
-            {filteredUsers.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Users className="w-8 h-8 text-gray-400" />
-                </div>
-                <p className="text-gray-500 mb-2">
-                  {searchTerm
-                    ? "검색 결과가 없습니다"
-                    : "등록된 사용자가 없습니다"}
-                </p>
-                {!searchTerm && (
-                  <button
-                    onClick={() => setShowAddDrawer(true)}
-                    className="text-primary hover:underline text-sm"
-                  >
-                    새 사용자 등록하기
-                  </button>
-                )}
-              </div>
-            ) : (
-              filteredUsers.map((u) => (
-                <div
-                  key={u.id}
-                  onClick={() => setSelectedUser(u)}
-                  className="flex items-center justify-between p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center">
-                      <span className="text-sm font-semibold text-blue-600">
-                        {(u.name || "?").charAt(0)}
-                      </span>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-gray-900">
-                          {u.name}
-                        </span>
-                        <Badge variant={ROLE_BADGE_VARIANTS[u.role]}>
-                          {ROLE_LABELS[u.role]}
-                        </Badge>
-                        {u.isActive === false && (
-                          <Badge variant="error">비활성</Badge>
-                        )}
-                      </div>
-                      <div className="text-sm text-gray-500">{u.email}</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeleteTarget(u);
-                      }}
-                      className="p-2 hover:bg-gray-200 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <Trash2 className="w-4 h-4 text-gray-400 hover:text-error" />
-                    </button>
-                    <ChevronRight className="w-4 h-4 text-gray-400" />
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      {/* User Detail Modal */}
+      <UserDetailModal
+        user={selectedUser}
+        onClose={closeDetailModal}
+        editName={editName}
+        editRole={editRole}
+        editIsActive={editIsActive}
+        onNameChange={setEditName}
+        onRoleChange={setEditRole}
+        onActiveToggle={() => setEditIsActive((v) => !v)}
+        roleOptions={roleOptions}
+        isEditing={isEditing}
+        onSubmit={handleUpdateUser}
+        onDelete={() => selectedUser && setDeleteTarget(selectedUser)}
+        onResetPassword={() => selectedUser && setResetTarget(selectedUser)}
+      />
 
-      {/* 사용자 추가 Drawer */}
-      <Drawer
-        isOpen={showAddDrawer}
-        onClose={() => {
-          setShowAddDrawer(false);
-          resetAddForm();
-        }}
-        title="새 사용자 등록"
-        width="lg"
-      >
-        <div className="space-y-6">
-          <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
-            <div className="flex items-start gap-3">
-              <Users className="w-5 h-5 text-blue-500 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-blue-900">
-                  사용자 계정 생성
-                </p>
-                <p className="text-sm text-blue-700 mt-1">
-                  등록된 이메일로 임시 비밀번호가 발송됩니다. 첫 로그인 시
-                  비밀번호를 변경해야 합니다.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                이메일 <span className="text-red-500">*</span>
-              </label>
-              <Input
-                type="email"
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
-                placeholder="user@example.com"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                이름 <span className="text-red-500">*</span>
-              </label>
-              <Input
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="홍길동"
-              />
-            </div>
-
-            <Select
-              label="역할"
-              required
-              value={newRole}
-              onChange={(e) => setNewRole(e.target.value as UserRole)}
-              options={roleOptions}
-            />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowAddDrawer(false);
-                resetAddForm();
-              }}
-            >
-              취소
-            </Button>
-            <Button onClick={handleAddUser} disabled={isSaving}>
-              {isSaving ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                  등록 중...
-                </>
-              ) : (
-                "등록"
-              )}
-            </Button>
-          </div>
-        </div>
-      </Drawer>
-
-      {/* 사용자 상세/수정 Drawer */}
-      <Drawer
-        isOpen={!!selectedUser}
-        onClose={() => setSelectedUser(null)}
-        title="사용자 상세"
-        width="lg"
-      >
-        {selectedUser && (
-          <div className="space-y-6">
-            {/* 기본 정보 (읽기 전용) */}
-            <Card>
-              <CardHeader>
-                <CardTitle>계정 정보</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div>
-                    <span className="text-sm text-gray-500">이메일</span>
-                    <p className="font-medium text-gray-900">
-                      {selectedUser.email}
-                    </p>
-                  </div>
-                  {selectedUser.createdAt && (
-                    <div>
-                      <span className="text-sm text-gray-500">생성일</span>
-                      <p className="font-medium text-gray-900">
-                        {new Date(selectedUser.createdAt).toLocaleDateString(
-                          "ko-KR",
-                        )}
-                      </p>
-                    </div>
-                  )}
-                  {selectedUser.lastLoginAt && (
-                    <div>
-                      <span className="text-sm text-gray-500">
-                        마지막 로그인
-                      </span>
-                      <p className="font-medium text-gray-900">
-                        {new Date(selectedUser.lastLoginAt).toLocaleDateString(
-                          "ko-KR",
-                        )}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* 수정 가능 정보 */}
-            <Card>
-              <CardHeader>
-                <CardTitle>사용자 정보 수정</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      이름 <span className="text-red-500">*</span>
-                    </label>
-                    <Input
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      placeholder="이름을 입력하세요"
-                    />
-                  </div>
-
-                  <Select
-                    label="역할"
-                    required
-                    value={editRole}
-                    onChange={(e) => setEditRole(e.target.value as UserRole)}
-                    options={roleOptions}
-                  />
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      상태
-                    </label>
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setEditIsActive(!editIsActive)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          editIsActive ? "bg-primary" : "bg-gray-300"
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            editIsActive ? "translate-x-6" : "translate-x-1"
-                          }`}
-                        />
-                      </button>
-                      <span className="text-sm text-gray-700">
-                        {editIsActive ? "활성" : "비활성"}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end">
-                    <Button onClick={handleUpdateUser} disabled={isEditing}>
-                      {isEditing ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                          저장 중...
-                        </>
-                      ) : (
-                        "저장"
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* 하단 버튼 */}
-            <div className="flex justify-between pt-4 border-t">
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setDeleteTarget(selectedUser)}
-                  className="text-red-600 border-red-300 hover:bg-red-50"
-                >
-                  <Trash2 className="w-4 h-4 mr-1" />
-                  삭제
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setResetPasswordTarget(selectedUser)}
-                >
-                  <KeyRound className="w-4 h-4 mr-1" />
-                  비밀번호 초기화
-                </Button>
-              </div>
-              <Button variant="outline" onClick={() => setSelectedUser(null)}>
-                닫기
-              </Button>
-            </div>
-          </div>
-        )}
-      </Drawer>
-
-      {/* 삭제 확인 모달 */}
       <ConfirmModal
         isOpen={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
@@ -553,17 +488,462 @@ export default function UsersPage() {
         isLoading={isDeleting}
       />
 
-      {/* 비밀번호 초기화 확인 모달 */}
       <ConfirmModal
-        isOpen={!!resetPasswordTarget}
-        onClose={() => setResetPasswordTarget(null)}
+        isOpen={!!resetTarget}
+        onClose={() => setResetTarget(null)}
         onConfirm={handleResetPassword}
         title="비밀번호 초기화"
-        message={`"${resetPasswordTarget?.name}" 사용자의 비밀번호를 초기화하시겠습니까? 임시 비밀번호가 이메일로 발송됩니다.`}
+        message={`"${resetTarget?.name}" 사용자의 비밀번호를 초기화하시겠습니까? 임시 비밀번호가 이메일로 발송됩니다.`}
         confirmText="초기화"
         variant="primary"
-        isLoading={isResettingPassword}
+        isLoading={isResetting}
       />
-    </PageContainer>
+    </div>
+  );
+}
+
+interface ModalShellProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  maxWidth: number;
+  children: ReactNode;
+  footer: ReactNode;
+}
+
+function ModalShell({
+  isOpen,
+  onClose,
+  title,
+  maxWidth,
+  children,
+  footer,
+}: ModalShellProps) {
+  useModalShell(isOpen, onClose);
+  if (!isOpen) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-6 transition-opacity"
+      style={{ backgroundColor: "rgba(10,10,10,0.42)", backdropFilter: "blur(2px)" }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-labelledby="modal-title"
+        className="w-full bg-surface rounded-[14px] flex flex-col overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.18),0_0_0_1px_rgba(0,0,0,0.04)] max-h-[calc(100vh-48px)]"
+        style={{ maxWidth }}
+      >
+        <div className="px-6 py-[18px] border-b border-neutral-100 flex items-center justify-between flex-shrink-0">
+          <h3
+            id="modal-title"
+            className="text-[15.5px] font-bold text-neutral-900 tracking-[-0.02em] m-0"
+          >
+            {title}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="닫기"
+            className="w-7 h-7 grid place-items-center text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900 rounded-md transition-colors"
+          >
+            <X className="w-4 h-4" strokeWidth={1.8} />
+          </button>
+        </div>
+        <div className="px-6 py-5 overflow-y-auto flex-1">{children}</div>
+        {footer}
+      </div>
+    </div>
+  );
+}
+
+interface NewUserModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  email: string;
+  name: string;
+  role: UserRole;
+  onEmailChange: (v: string) => void;
+  onNameChange: (v: string) => void;
+  onRoleChange: (v: UserRole) => void;
+  roleOptions: { value: UserRole; label: string }[];
+  isSaving: boolean;
+  onSubmit: () => void;
+}
+
+function NewUserModal({
+  isOpen,
+  onClose,
+  email,
+  name,
+  role,
+  onEmailChange,
+  onNameChange,
+  onRoleChange,
+  roleOptions,
+  isSaving,
+  onSubmit,
+}: NewUserModalProps) {
+  return (
+    <ModalShell
+      isOpen={isOpen}
+      onClose={onClose}
+      title="새 사용자 등록"
+      maxWidth={480}
+      footer={
+        <div className="px-6 py-3.5 border-t border-neutral-100 bg-neutral-50/60 flex items-center justify-end gap-2 flex-shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-semibold text-neutral-600 bg-surface border border-neutral-200 rounded-lg hover:border-neutral-300 hover:text-neutral-900 transition-colors"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={isSaving}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-semibold text-white bg-neutral-900 border border-neutral-900 rounded-lg hover:bg-neutral-800 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                등록 중…
+              </>
+            ) : (
+              "등록"
+            )}
+          </button>
+        </div>
+      }
+    >
+      <div
+        className="flex gap-3 p-3.5 rounded-[10px] mb-5"
+        style={{
+          backgroundColor: "#F0EEF8",
+          border: "1px solid #E2DEF1",
+        }}
+      >
+        <div
+          className="w-7 h-7 rounded-lg grid place-items-center flex-shrink-0"
+          style={{
+            backgroundColor: "#FFFFFF",
+            border: "1px solid #E2DEF1",
+            color: "#4D3FAA",
+          }}
+        >
+          <UserPlus className="w-3.5 h-3.5" strokeWidth={1.8} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span
+            className="text-[13px] font-semibold tracking-[-0.01em]"
+            style={{ color: "#2D2476" }}
+          >
+            사용자 계정 생성
+          </span>
+          <span
+            className="text-[12.5px] leading-[1.55] tracking-[-0.005em]"
+            style={{ color: "#4D3FAA" }}
+          >
+            등록된 이메일로 임시 비밀번호가 발송됩니다. 첫 로그인 시 비밀번호를
+            변경해야 합니다.
+          </span>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-4">
+        <FormField label="이메일" required htmlFor="nu-email">
+          <input
+            id="nu-email"
+            type="email"
+            value={email}
+            onChange={(e) => onEmailChange(e.target.value)}
+            placeholder="user@example.com"
+            className="w-full h-10 px-3 text-[13.5px] text-neutral-900 bg-surface border border-neutral-200 rounded-lg outline-none placeholder:text-neutral-300 focus:border-neutral-900 focus:ring-[3px] focus:ring-neutral-900/10 transition-colors"
+          />
+        </FormField>
+        <FormField label="이름" required htmlFor="nu-name">
+          <input
+            id="nu-name"
+            type="text"
+            value={name}
+            onChange={(e) => onNameChange(e.target.value)}
+            placeholder="홍길동"
+            className="w-full h-10 px-3 text-[13.5px] text-neutral-900 bg-surface border border-neutral-200 rounded-lg outline-none placeholder:text-neutral-300 focus:border-neutral-900 focus:ring-[3px] focus:ring-neutral-900/10 transition-colors"
+          />
+        </FormField>
+        <FormField label="역할" required htmlFor="nu-role">
+          <RoleSelect
+            id="nu-role"
+            value={role}
+            onChange={onRoleChange}
+            options={roleOptions}
+          />
+        </FormField>
+      </div>
+    </ModalShell>
+  );
+}
+
+interface UserDetailModalProps {
+  user: AdminUser | null;
+  onClose: () => void;
+  editName: string;
+  editRole: UserRole;
+  editIsActive: boolean;
+  onNameChange: (v: string) => void;
+  onRoleChange: (v: UserRole) => void;
+  onActiveToggle: () => void;
+  roleOptions: { value: UserRole; label: string }[];
+  isEditing: boolean;
+  onSubmit: () => void;
+  onDelete: () => void;
+  onResetPassword: () => void;
+}
+
+function UserDetailModal({
+  user,
+  onClose,
+  editName,
+  editRole,
+  editIsActive,
+  onNameChange,
+  onRoleChange,
+  onActiveToggle,
+  roleOptions,
+  isEditing,
+  onSubmit,
+  onDelete,
+  onResetPassword,
+}: UserDetailModalProps) {
+  return (
+    <ModalShell
+      isOpen={!!user}
+      onClose={onClose}
+      title="사용자 상세"
+      maxWidth={560}
+      footer={
+        <div className="px-6 py-3.5 border-t border-neutral-100 bg-neutral-50/60 flex items-center justify-between gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onDelete}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-[13px] font-semibold rounded-lg bg-surface transition-colors"
+              style={{
+                color: "#DC2626",
+                border: "1px solid #F4CCCC",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "#FDF4F4";
+                e.currentTarget.style.borderColor = "#E89999";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "#FFFFFF";
+                e.currentTarget.style.borderColor = "#F4CCCC";
+              }}
+            >
+              <Trash2 className="w-3.5 h-3.5" strokeWidth={1.8} />
+              <span>삭제</span>
+            </button>
+            <button
+              type="button"
+              onClick={onResetPassword}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-[13px] font-semibold text-neutral-600 bg-surface border border-neutral-200 rounded-lg hover:border-neutral-300 hover:text-neutral-900 transition-colors"
+            >
+              <KeyRound className="w-3.5 h-3.5" strokeWidth={1.8} />
+              <span>비밀번호 초기화</span>
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-semibold text-neutral-600 bg-surface border border-neutral-200 rounded-lg hover:border-neutral-300 hover:text-neutral-900 transition-colors"
+          >
+            닫기
+          </button>
+        </div>
+      }
+    >
+      {user && (
+        <div className="flex flex-col gap-3.5">
+          {/* Account info section */}
+          <div className="border border-neutral-100 rounded-[10px] bg-surface overflow-hidden">
+            <div className="px-4 py-3 border-b border-neutral-100 bg-neutral-50/60">
+              <h4 className="text-[12.5px] font-bold text-neutral-900 tracking-[-0.01em] m-0">
+                계정 정보
+              </h4>
+            </div>
+            <div className="px-4 py-3.5">
+              <InfoRow label="이메일">
+                <span className="font-mono text-[12.5px] text-neutral-900 font-medium break-all">
+                  {user.email}
+                </span>
+              </InfoRow>
+              <InfoRow label="생성일" withDivider>
+                <span className="text-[13px] text-neutral-900 font-medium tracking-[-0.01em]">
+                  {formatDate(user.createdAt)}
+                </span>
+              </InfoRow>
+              <InfoRow label="마지막 로그인" withDivider>
+                <span className="text-[13px] text-neutral-900 font-medium tracking-[-0.01em]">
+                  {user.lastLoginAt ? formatDate(user.lastLoginAt) : "-"}
+                </span>
+              </InfoRow>
+            </div>
+          </div>
+
+          {/* Edit section */}
+          <div className="border border-neutral-100 rounded-[10px] bg-surface overflow-hidden">
+            <div className="px-4 py-3 border-b border-neutral-100 bg-neutral-50/60">
+              <h4 className="text-[12.5px] font-bold text-neutral-900 tracking-[-0.01em] m-0">
+                사용자 정보 수정
+              </h4>
+            </div>
+            <div className="p-4 flex flex-col gap-3.5">
+              <FormField label="이름" required htmlFor="ud-name">
+                <input
+                  id="ud-name"
+                  type="text"
+                  value={editName}
+                  onChange={(e) => onNameChange(e.target.value)}
+                  className="w-full h-10 px-3 text-[13.5px] text-neutral-900 bg-surface border border-neutral-200 rounded-lg outline-none focus:border-neutral-900 focus:ring-[3px] focus:ring-neutral-900/10 transition-colors"
+                />
+              </FormField>
+              <FormField label="역할" required htmlFor="ud-role">
+                <RoleSelect
+                  id="ud-role"
+                  value={editRole}
+                  onChange={onRoleChange}
+                  options={roleOptions}
+                />
+              </FormField>
+              <FormField label="상태">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={editIsActive}
+                    onClick={onActiveToggle}
+                    className={`relative w-10 h-[22px] rounded-full transition-colors flex-shrink-0 ${
+                      editIsActive ? "bg-neutral-900" : "bg-neutral-300"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 w-[18px] h-[18px] bg-white rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.18)] transition-transform ${
+                        editIsActive ? "translate-x-[18px]" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                  <span className="text-[13px] text-neutral-900 font-medium tracking-[-0.01em]">
+                    {editIsActive ? "활성" : "비활성"}
+                  </span>
+                </div>
+              </FormField>
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={onSubmit}
+                  disabled={isEditing}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-semibold text-white bg-neutral-900 border border-neutral-900 rounded-lg hover:bg-neutral-800 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isEditing ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      저장 중…
+                    </>
+                  ) : (
+                    "저장"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </ModalShell>
+  );
+}
+
+function FormField({
+  label,
+  required,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  htmlFor?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-[7px]">
+      <label
+        htmlFor={htmlFor}
+        className="text-[12.5px] font-semibold text-neutral-900 tracking-[-0.01em] inline-flex items-center gap-1"
+      >
+        {label}
+        {required && (
+          <span className="text-[#DC2626] font-bold">*</span>
+        )}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function InfoRow({
+  label,
+  withDivider,
+  children,
+}: {
+  label: string;
+  withDivider?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className={`grid grid-cols-[92px_1fr] gap-3 items-baseline py-1.5 ${
+        withDivider ? "border-t border-neutral-50 pt-2.5 mt-1" : ""
+      }`}
+    >
+      <span className="text-[11.5px] font-medium text-neutral-400 tracking-[-0.005em]">
+        {label}
+      </span>
+      <div>{children}</div>
+    </div>
+  );
+}
+
+function RoleSelect({
+  id,
+  value,
+  onChange,
+  options,
+}: {
+  id: string;
+  value: UserRole;
+  onChange: (v: UserRole) => void;
+  options: { value: UserRole; label: string }[];
+}) {
+  return (
+    <select
+      id={id}
+      value={value}
+      onChange={(e) => onChange(e.target.value as UserRole)}
+      className="w-full h-10 pl-3 pr-9 text-[13.5px] text-neutral-900 bg-surface border border-neutral-200 rounded-lg outline-none focus:border-neutral-900 focus:ring-[3px] focus:ring-neutral-900/10 transition-colors appearance-none cursor-pointer"
+      style={{
+        backgroundImage:
+          "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23737373' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>\")",
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "right 12px center",
+      }}
+    >
+      {options.map((opt) => (
+        <option key={opt.value} value={opt.value}>
+          {opt.label}
+        </option>
+      ))}
+    </select>
   );
 }

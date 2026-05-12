@@ -10,6 +10,197 @@ const autoResize = (el: HTMLTextAreaElement) => {
   el.style.height = `${el.scrollHeight}px`;
 };
 
+// 모듈 스코프 컴포넌트: 부모 함수 안에 두면 매 렌더마다 새 reference 가 만들어져
+// React 가 다른 component type 으로 간주하고 input 을 unmount/remount 시킨다.
+// 포커스 손실로 "한 글자 입력 후 다음 키 불가" 증상이 생기므로 모듈 스코프로 분리.
+
+function KVRow({
+  itemKey,
+  label,
+  original,
+  full,
+  tall,
+  med,
+  multiline,
+  placeholder,
+  hiddenItems,
+  fieldOverrides,
+  isEditable,
+  onFieldOverrideChange,
+}: {
+  itemKey: string;
+  label: string;
+  original: string | null | undefined;
+  full?: boolean;
+  tall?: boolean;
+  med?: boolean;
+  multiline?: boolean;
+  placeholder?: string;
+  hiddenItems?: Set<string>;
+  fieldOverrides?: Record<string, string>;
+  isEditable: boolean;
+  onFieldOverrideChange?: (key: string, value: string) => void;
+}) {
+  if (hiddenItems?.has(itemKey)) return null;
+  const val =
+    fieldOverrides && itemKey in fieldOverrides
+      ? fieldOverrides[itemKey]
+      : (original ?? "");
+  if (!val && !isEditable) return null;
+  const rowCls = [
+    styles.kvRow,
+    full ? styles.kvRowFull : "",
+    tall ? styles.kvRowTall : "",
+    med ? styles.kvRowMed : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  let content: ReactNode;
+  if (isEditable && onFieldOverrideChange) {
+    if (multiline) {
+      content = (
+        <textarea
+          ref={(el) => {
+            if (el) autoResize(el);
+          }}
+          value={val}
+          onChange={(e) => onFieldOverrideChange(itemKey, e.target.value)}
+          onInput={(e) => autoResize(e.currentTarget)}
+          placeholder={placeholder}
+          className={styles.editCell}
+          style={{ width: "100%" }}
+          rows={1}
+        />
+      );
+    } else {
+      content = (
+        <input
+          type="text"
+          value={val}
+          onChange={(e) => onFieldOverrideChange(itemKey, e.target.value)}
+          placeholder={placeholder}
+          className={styles.editCell}
+          style={{ width: "100%" }}
+        />
+      );
+    }
+  } else {
+    content = val || "";
+  }
+
+  return (
+    <div className={rowCls}>
+      <div className={styles.kvKey}>{label}</div>
+      <div className={styles.kvVal}>{content}</div>
+    </div>
+  );
+}
+
+function CustomRows({
+  section,
+  customItems,
+  onCustomItemsChange,
+}: {
+  section: keyof SheetCustomItemsMap;
+  customItems?: SheetCustomItemsMap;
+  onCustomItemsChange?: (items: SheetCustomItemsMap) => void;
+}) {
+  if (!customItems) return null;
+  const items = customItems[section];
+  if (!onCustomItemsChange) {
+    const filled = items.filter((i) => i.label.trim() && i.value.trim());
+    if (filled.length === 0) return null;
+    return (
+      <>
+        {filled.map((it) => (
+          <div className={styles.kvRow} key={it.id}>
+            <div className={styles.kvKey}>{it.label}</div>
+            <div className={styles.kvVal}>{it.value}</div>
+          </div>
+        ))}
+      </>
+    );
+  }
+  const setItems = (next: SheetCustomItem[]) =>
+    onCustomItemsChange({ ...customItems, [section]: next });
+  return (
+    <>
+      {items.map((it) => (
+        <div className={`${styles.kvRow} ${styles.kvRowFull}`} key={it.id}>
+          <div className={styles.kvKey}>
+            <input
+              type="text"
+              value={it.label}
+              onChange={(e) =>
+                setItems(items.map((ci) => (ci.id === it.id ? { ...ci, label: e.target.value } : ci)))
+              }
+              className={styles.editCell}
+              style={{ width: "100%" }}
+              placeholder="항목명"
+            />
+          </div>
+          <div className={styles.kvVal} style={{ display: "flex", alignItems: "flex-start", gap: 4 }}>
+            <textarea
+              ref={(el) => {
+                if (el) autoResize(el);
+              }}
+              value={it.value}
+              onChange={(e) =>
+                setItems(items.map((ci) => (ci.id === it.id ? { ...ci, value: e.target.value } : ci)))
+              }
+              onInput={(e) => autoResize(e.currentTarget)}
+              rows={1}
+              className={styles.editCell}
+              style={{ flex: 1 }}
+              placeholder="값"
+            />
+            <button
+              type="button"
+              onClick={() => setItems(items.filter((ci) => ci.id !== it.id))}
+              className="print:hidden"
+              style={{
+                background: "transparent",
+                border: 0,
+                color: "#b6bac3",
+                cursor: "pointer",
+                padding: 2,
+                fontSize: 12,
+                flexShrink: 0,
+              }}
+              aria-label="항목 삭제"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      ))}
+      <div className={`${styles.kvRow} ${styles.kvRowFull} print:hidden`} style={{ borderBottom: "0", minHeight: 26 }}>
+        <div />
+        <div>
+          <button
+            type="button"
+            onClick={() =>
+              setItems([...items, { id: crypto.randomUUID(), label: "", value: "" }])
+            }
+            style={{
+              background: "transparent",
+              border: 0,
+              color: "#16a34a",
+              cursor: "pointer",
+              fontSize: 11,
+              fontWeight: 600,
+              padding: 0,
+            }}
+          >
+            + 항목 추가
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 interface MembershipInfoSheetProps {
   detail: ClubDetail;
   selectedMembershipIndex?: number;
@@ -88,141 +279,9 @@ const MembershipInfoSheet = forwardRef<HTMLDivElement, MembershipInfoSheetProps>
       return val || "";
     };
 
-    const KVRow = ({
-      itemKey,
-      label,
-      original,
-      full,
-      tall,
-      med,
-      multiline,
-      placeholder,
-    }: {
-      itemKey: string;
-      label: string;
-      original: string | null | undefined;
-      full?: boolean;
-      tall?: boolean;
-      med?: boolean;
-      multiline?: boolean;
-      placeholder?: string;
-    }) => {
-      if (!isVisible(itemKey)) return null;
-      const val = resolve(itemKey, original);
-      if (!val && !isEditable) return null;
-      const rowCls = [
-        styles.kvRow,
-        full ? styles.kvRowFull : "",
-        tall ? styles.kvRowTall : "",
-        med ? styles.kvRowMed : "",
-      ]
-        .filter(Boolean)
-        .join(" ");
-      return (
-        <div className={rowCls}>
-          <div className={styles.kvKey}>{label}</div>
-          <div className={styles.kvVal}>
-            {renderText(itemKey, original, { placeholder, multiline })}
-          </div>
-        </div>
-      );
-    };
-
-    const CustomRows = ({ section }: { section: keyof SheetCustomItemsMap }) => {
-      if (!customItems) return null;
-      const items = customItems[section];
-      if (!onCustomItemsChange) {
-        const filled = items.filter((i) => i.label.trim() && i.value.trim());
-        if (filled.length === 0) return null;
-        return (
-          <>
-            {filled.map((it) => (
-              <div className={styles.kvRow} key={it.id}>
-                <div className={styles.kvKey}>{it.label}</div>
-                <div className={styles.kvVal}>{it.value}</div>
-              </div>
-            ))}
-          </>
-        );
-      }
-      const setItems = (next: SheetCustomItem[]) =>
-        onCustomItemsChange({ ...customItems, [section]: next });
-      return (
-        <>
-          {items.map((it) => (
-            <div className={`${styles.kvRow} ${styles.kvRowFull}`} key={it.id}>
-              <div className={styles.kvKey}>
-                <input
-                  type="text"
-                  value={it.label}
-                  onChange={(e) =>
-                    setItems(items.map((ci) => (ci.id === it.id ? { ...ci, label: e.target.value } : ci)))
-                  }
-                  className={styles.editCell}
-                  style={{ width: "100%" }}
-                  placeholder="항목명"
-                />
-              </div>
-              <div className={styles.kvVal} style={{ display: "flex", alignItems: "flex-start", gap: 4 }}>
-                <textarea
-                  ref={(el) => {
-                    if (el) autoResize(el);
-                  }}
-                  value={it.value}
-                  onChange={(e) =>
-                    setItems(items.map((ci) => (ci.id === it.id ? { ...ci, value: e.target.value } : ci)))
-                  }
-                  onInput={(e) => autoResize(e.currentTarget)}
-                  rows={1}
-                  className={styles.editCell}
-                  style={{ flex: 1 }}
-                  placeholder="값"
-                />
-                <button
-                  type="button"
-                  onClick={() => setItems(items.filter((ci) => ci.id !== it.id))}
-                  className="print:hidden"
-                  style={{
-                    background: "transparent",
-                    border: 0,
-                    color: "#b6bac3",
-                    cursor: "pointer",
-                    padding: 2,
-                    fontSize: 12,
-                    flexShrink: 0,
-                  }}
-                  aria-label="항목 삭제"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-          ))}
-          <div className={`${styles.kvRow} ${styles.kvRowFull} print:hidden`} style={{ borderBottom: "0", minHeight: 26 }}>
-            <div />
-            <div>
-              <button
-                type="button"
-                onClick={() =>
-                  setItems([...items, { id: crypto.randomUUID(), label: "", value: "" }])
-                }
-                style={{
-                  background: "transparent",
-                  border: 0,
-                  color: "#16a34a",
-                  cursor: "pointer",
-                  fontSize: 11,
-                  fontWeight: 600,
-                  padding: 0,
-                }}
-              >
-                + 항목 추가
-              </button>
-            </div>
-          </div>
-        </>
-      );
-    };
+    // KVRow 가 받을 공통 컨텍스트. 매 렌더마다 새 객체지만 module-scope 컴포넌트의
+    // element type 이 안정적이라 reconciler 가 input 을 remount 시키지 않는다.
+    const kvCtx = { hiddenItems, fieldOverrides, isEditable, onFieldOverrideChange };
 
     // 그린피 데이터
     const weekdayFee = membership?.weekdayGreenFee;
@@ -307,17 +366,17 @@ const MembershipInfoSheet = forwardRef<HTMLDivElement, MembershipInfoSheetProps>
             <div className={styles.sectionTitle}>골프장 정보</div>
           </div>
           <div className={styles.kvGrid}>
-            <KVRow itemKey="clubName" label="골프장명" original={detail.name} />
-            <KVRow itemKey="companyName" label="회사명" original={detail.companyName} />
-            <KVRow itemKey="address" label="위치" original={detail.address || detail.region} full />
-            <KVRow itemKey="openingDate" label="개장일" original={detail.basicInfo.openingDate} />
-            <KVRow itemKey="holes" label="코스규모" original={detail.basicInfo.holes} />
-            <KVRow itemKey="totalLength" label="코스거리" original={detail.basicInfo.totalLength} />
-            <KVRow itemKey="memberCount" label="회원수" original={detail.basicInfo.memberCount != null ? String(detail.basicInfo.memberCount) : null} />
-            <KVRow itemKey="phone" label="전화번호" original={primaryContact?.phoneNumber} />
-            <KVRow itemKey="facilities" label="부대시설" original={detail.basicInfo.facilities} full />
-            <KVRow itemKey="homepage" label="홈페이지" original={detail.website} full />
-            <CustomRows section="clubInfo" />
+            <KVRow {...kvCtx} itemKey="clubName" label="골프장명" original={detail.name} />
+            <KVRow {...kvCtx} itemKey="companyName" label="회사명" original={detail.companyName} />
+            <KVRow {...kvCtx} itemKey="address" label="위치" original={detail.address || detail.region} full />
+            <KVRow {...kvCtx} itemKey="openingDate" label="개장일" original={detail.basicInfo.openingDate} />
+            <KVRow {...kvCtx} itemKey="holes" label="코스규모" original={detail.basicInfo.holes} />
+            <KVRow {...kvCtx} itemKey="totalLength" label="코스거리" original={detail.basicInfo.totalLength} />
+            <KVRow {...kvCtx} itemKey="memberCount" label="회원수" original={detail.basicInfo.memberCount != null ? String(detail.basicInfo.memberCount) : null} />
+            <KVRow {...kvCtx} itemKey="phone" label="전화번호" original={primaryContact?.phoneNumber} />
+            <KVRow {...kvCtx} itemKey="facilities" label="부대시설" original={detail.basicInfo.facilities} full />
+            <KVRow {...kvCtx} itemKey="homepage" label="홈페이지" original={detail.website} full />
+            <CustomRows section="clubInfo" customItems={customItems} onCustomItemsChange={onCustomItemsChange} />
           </div>
         </section>
 
@@ -328,15 +387,17 @@ const MembershipInfoSheet = forwardRef<HTMLDivElement, MembershipInfoSheetProps>
           </div>
           <div className={styles.kvGrid}>
             <KVRow
+              {...kvCtx}
               itemKey="membershipType"
               label="회원권명"
               original={membership?.membershipName || membership?.membershipType}
             />
-            <KVRow itemKey="initialSalePrice" label="분양가" original={membership?.initialSalePrice} />
-            <KVRow itemKey="memberComposition" label="회원구성" original={detail.marketInfo?.membershipInfo} full />
-            <KVRow itemKey="specialNotes" label="특이사항" original={membership?.specialNotes} full multiline />
-            <KVRow itemKey="benefits" label="회원 혜택" original={membership?.memberBenefits} full med multiline />
+            <KVRow {...kvCtx} itemKey="initialSalePrice" label="분양가" original={membership?.initialSalePrice} />
+            <KVRow {...kvCtx} itemKey="memberComposition" label="회원구성" original={detail.marketInfo?.membershipInfo} full />
+            <KVRow {...kvCtx} itemKey="specialNotes" label="특이사항" original={membership?.specialNotes} full multiline />
+            <KVRow {...kvCtx} itemKey="benefits" label="회원 혜택" original={membership?.memberBenefits} full med multiline />
             <KVRow
+              {...kvCtx}
               itemKey="reservation"
               label="예약 안내"
               original={membership?.reservationNotes || detail.registration.reservationNotes}
@@ -344,8 +405,8 @@ const MembershipInfoSheet = forwardRef<HTMLDivElement, MembershipInfoSheetProps>
               tall
               multiline
             />
-            <KVRow itemKey="memo" label="기타정보" original={detail.memo} full med multiline />
-            <CustomRows section="membershipInfo" />
+            <KVRow {...kvCtx} itemKey="memo" label="기타정보" original={detail.memo} full med multiline />
+            <CustomRows section="membershipInfo" customItems={customItems} onCustomItemsChange={onCustomItemsChange} />
           </div>
         </section>
 
@@ -475,7 +536,7 @@ const MembershipInfoSheet = forwardRef<HTMLDivElement, MembershipInfoSheetProps>
                   </div>
                   <div className={styles.etcMemo}>
                     {customItems && onCustomItemsChange ? (
-                      <CustomRows section="memo" />
+                      <CustomRows section="memo" customItems={customItems} onCustomItemsChange={onCustomItemsChange} />
                     ) : (
                       renderText("memoFreeText", detail.memo, {
                         multiline: true,

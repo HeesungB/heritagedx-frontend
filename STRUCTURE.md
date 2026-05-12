@@ -166,9 +166,12 @@ heritage-dx/
 **`korean.ts`** — 한글 처리:
 - `getKoreanInitial(str)` — 초성 추출
 - `normalizeInitial(initial)` — 쌍자음→단자음
-- `getProvince(region)` / `getRegionGroup(region)` — 지역 그룹핑
-- `INITIALS` — 14개 초성 + `"0-9"`
-- `REGION_GROUPS` — `수도권`, `강원도`, `충청도`, `전라도`, `경상도`, `제주도`
+- `getProvince(region)`: 첫 단어 도/시 약칭 정규화
+- `getRegionGroup(region)`: 지역 그룹핑. 2-pass 매칭. (1) 첫 단어 약칭 → REGION_GROUP_MAP, (2) 미매칭이면 region 전체에서 한국 키워드 부분 문자열 매칭(`제주시`/`서귀포시` 처럼 도 prefix 없는 단독 시 표기 정확 분류). 둘 다 미매칭이면 `해외`, 빈 region 은 `null`.
+- `extractRegionFromAddress(address)`: address에서 "도 시" 두 토큰 추출
+- `getEffectiveRegion(region, address)`: region이 비어있으면 address에서 보충
+- `INITIALS`: 14개 초성 + `"0-9"`
+- `REGION_GROUPS`: `수도권`, `강원도`, `충청도`, `전라도`, `경상도`, `제주도`, `해외` (해외 = 한국 시/도 어느 키워드와도 매칭되지 않은 region 의 폴백)
 
 **`phone.ts`** — 한국 휴대폰 번호:
 - `formatPhoneNumber(value)` — 숫자만 추출해 길이별로 `010-1234-5678` 형태 자동 포맷
@@ -551,7 +554,7 @@ ESLint 9 flat config 공유 패키지. `eslint-config-next`의 `core-web-vitals`
 `ClubProfile`, `ClubDirectory`, `GolfClubDetail`, `GolfClubTable`, `GolfClubSearch`, `NaverMap`, `MapSidebar`
 
 **골프장 검색** (`club-search/`):
-`ClubSearchPanel` — `/clubs` 디렉토리 뷰. 검색 입력 + 7지역 칩(전체/수도권/강원/충청/전라/경상/제주) + 한글 초성 박스(`@heritage-dx/utils` `INITIALS` + `0-9` 디바이더) + 카드 그리드. 그리드는 뷰포트 폭에 따라 단계적으로 컬럼 수가 변하는 반응형(`grid-cols-1 sm:2 lg:3 xl:4 2xl:5`). 카드는 지역/운영타입/홀수 배지 + 골프장명 + 주소 + 연락처. 컨테이너 `max-w-[1500px]`. `useClubs(clubStore)` 로 전체 목록을 받고 검색·필터링은 클라이언트에서 메모이즈
+`ClubSearchPanel`: `/clubs` 디렉토리 뷰. 검색 입력 + 지역 칩(`전체` + `@heritage-dx/utils` `REGION_GROUPS` 를 순회해 자동 생성: 수도권/강원도/충청도/전라도/경상도/제주도/해외) + 한글 초성 박스(`INITIALS` + `0-9` 디바이더) + 카드 그리드. 그리드는 뷰포트 폭에 따라 단계적으로 컬럼 수가 변하는 반응형(`grid-cols-1 sm:2 lg:3 xl:4 2xl:5`). 카드는 지역(utils 정본 라벨)/운영타입/홀수 배지 + 골프장명 + 주소 + 연락처. 컨테이너 `max-w-[1500px]`. `useClubs(clubStore)` 로 전체 목록을 받고 검색·필터링은 클라이언트에서 메모이즈. 지역 분류는 `getRegionGroup(getEffectiveRegion(region, address))`. '해외' 그룹은 한국 시/도 키워드 어느 것과도 매칭되지 않는 region(예: `일본`, `베트남`) 을 자동으로 모은다. **로컬 region 유틸 중복 제거 (2026-05)**: 이전엔 `ClubDirectory` 가 자체 `INITIALS`/`REGION_GROUPS`/`PROVINCE_TO_GROUP`/`getRegionGroup`/`extractRegionFromAddress`/`getEffectiveRegion` 을 정의하고 `HomeClient`/`ClubSwitcher` 가 거기서 re-export 를 import 했는데, 모두 `@heritage-dx/utils` 직접 import 로 일원화. back-office Sidebar 와 `/clubs` 페이지의 region 버튼도 동일한 `REGION_GROUPS` 를 참조하므로 '해외' 탭이 자동 노출된다.
 
 **골프장 프로필 섹션** (`club-profile/`):
 `ClubBasicInfoTable`, `MembershipInfoSection`, `EstimateSection`, `CostCalculatorSection`, `GreenFeeField`, `InfoField`, `BenefitsSheetSection`, `DocumentsSection`, `MarketPriceSummary`, `NearbyClubPrices`, `PriceChart`, `SectionCard`, `ClubSwitcher`, `SoldPriceBanner`

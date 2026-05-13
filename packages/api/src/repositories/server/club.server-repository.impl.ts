@@ -4,11 +4,18 @@ import type { ListParams } from "../../types";
 
 interface ServerRepoConfig {
   baseUrl: string;
-  revalidate: number;
+  revalidate?: number;
 }
+
+const DEFAULT_TTL = 300;
+const CACHE_TAG = "clubs";
 
 export class ClubServerRepository implements IClubRepository {
   constructor(private config: ServerRepoConfig) {}
+
+  private get ttl(): number {
+    return this.config.revalidate ?? DEFAULT_TTL;
+  }
 
   async getAll(params?: ListParams): Promise<ApiResponse<ClubsResponse>> {
     const allClubs: Club[] = [];
@@ -18,7 +25,7 @@ export class ClubServerRepository implements IClubRepository {
     while (true) {
       const res = await fetch(
         `${this.config.baseUrl}/clubs?limit=${params?.limit || 100}&page=${page}`,
-        { next: { revalidate: this.config.revalidate } },
+        { next: { revalidate: this.ttl, tags: [CACHE_TAG] } },
       );
 
       if (!res.ok) {
@@ -58,7 +65,7 @@ export class ClubServerRepository implements IClubRepository {
 
   async getOne(code: string): Promise<ApiResponse<ClubDetail>> {
     const res = await fetch(`${this.config.baseUrl}/clubs/${code}`, {
-      next: { revalidate: this.config.revalidate },
+      next: { revalidate: this.ttl, tags: [CACHE_TAG, `clubs:${code}`] },
     });
 
     if (!res.ok) {

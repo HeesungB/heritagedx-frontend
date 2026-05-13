@@ -41,14 +41,19 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
+const CLUBS_TTL_MS = 5 * 60 * 1000;
+let cachedClubs: { data: Club[]; fetchedAt: number } | null = null;
+
 export function DataProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const clubsRepo = useClubRepository();
   const consultationsRepo = useConsultationAdminRepository();
   const membershipTradesRepo = useMembershipTradeAdminRepository();
 
-  const [clubs, setClubs] = useState<Club[]>([]);
-  const [isLoadingClubs, setIsLoadingClubs] = useState(true);
+  const [clubs, setClubs] = useState<Club[]>(cachedClubs?.data ?? []);
+  const [isLoadingClubs, setIsLoadingClubs] = useState(
+    !(cachedClubs && Date.now() - cachedClubs.fetchedAt < CLUBS_TTL_MS),
+  );
 
   const [preloadedMemos, setPreloadedMemos] = useState<PreloadedMemos | null>(
     null,
@@ -58,49 +63,60 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const hasLoadedRef = useRef(false);
 
-  const loadAllClubs = useCallback(async () => {
-    setIsLoadingClubs(true);
-    try {
-      const LIMIT = 100;
-
-      // 1. 첫 페이지 — totalPages 로 남은 페이지 수 계산 (1-6)
-      const first = await clubsRepo.getAll({ page: 1, limit: LIMIT });
-      if (!first.success || !first.data) {
-        setClubs([]);
+  const loadAllClubs = useCallback(
+    async (opts?: { force?: boolean }) => {
+      if (
+        !opts?.force &&
+        cachedClubs &&
+        Date.now() - cachedClubs.fetchedAt < CLUBS_TTL_MS
+      ) {
+        setClubs(cachedClubs.data);
+        setIsLoadingClubs(false);
         return;
       }
+      setIsLoadingClubs(true);
+      try {
+        const LIMIT = 100;
 
-      const firstClubs = first.data.clubs || [];
-      const totalPages = first.data.pagination?.totalPages ?? 1;
+        const first = await clubsRepo.getAll({ page: 1, limit: LIMIT });
+        if (!first.success || !first.data) {
+          setClubs([]);
+          return;
+        }
 
-      if (totalPages <= 1) {
-        setClubs(firstClubs);
-        return;
+        const firstClubs = first.data.clubs || [];
+        const totalPages = first.data.pagination?.totalPages ?? 1;
+
+        let allClubs: Club[];
+        if (totalPages <= 1) {
+          allClubs = firstClubs;
+        } else {
+          const remaining = await Promise.all(
+            Array.from({ length: totalPages - 1 }, (_, i) =>
+              clubsRepo.getAll({ page: i + 2, limit: LIMIT }),
+            ),
+          );
+
+          allClubs = [
+            ...firstClubs,
+            ...remaining.flatMap((res) =>
+              res.success && res.data ? res.data.clubs || [] : [],
+            ),
+          ];
+        }
+
+        cachedClubs = { data: allClubs, fetchedAt: Date.now() };
+        setClubs(allClubs);
+      } catch (error) {
+        console.error("Failed to load clubs:", error);
       }
-
-      // 2. 나머지 페이지를 병렬 fetch — 순차 waterfall 제거
-      const remaining = await Promise.all(
-        Array.from({ length: totalPages - 1 }, (_, i) =>
-          clubsRepo.getAll({ page: i + 2, limit: LIMIT }),
-        ),
-      );
-
-      const allClubs: Club[] = [
-        ...firstClubs,
-        ...remaining.flatMap((res) =>
-          res.success && res.data ? res.data.clubs || [] : [],
-        ),
-      ];
-
-      setClubs(allClubs);
-    } catch (error) {
-      console.error("Failed to load clubs:", error);
-    }
-    setIsLoadingClubs(false);
-  }, [clubsRepo]);
+      setIsLoadingClubs(false);
+    },
+    [clubsRepo],
+  );
 
   const refreshClubs = useCallback(async () => {
-    await loadAllClubs();
+    await loadAllClubs({ force: true });
   }, [loadAllClubs]);
 
   const clearPreloadedMemos = useCallback(() => {

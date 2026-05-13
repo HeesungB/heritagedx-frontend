@@ -4,9 +4,7 @@ import { ClubAdminRepository } from "../repositories/admin/club-admin.repository
 import { ScenarioAdminRepository } from "../repositories/admin/scenario-admin.repository.impl";
 import { DocumentAdminRepository } from "../repositories/admin/document-admin.repository.impl";
 import { ClubDocumentAdminRepository } from "../repositories/admin/club-document-admin.repository.impl";
-import { ScenarioDocumentAdminRepository } from "../repositories/admin/scenario-document-admin.repository.impl";
 import { ClubScenarioDocumentAdminRepository } from "../repositories/admin/club-scenario-document-admin.repository.impl";
-import { ClubScenarioAdminRepository } from "../repositories/admin/club-scenario-admin.repository.impl";
 import { GlobalDocumentAdminRepository } from "../repositories/admin/global-document-admin.repository.impl";
 import { CustomerDocumentAdminRepository } from "../repositories/admin/customer-document-admin.repository.impl";
 import { UserAdminRepository } from "../repositories/admin/user-admin.repository.impl";
@@ -26,9 +24,7 @@ export function createAdminRepositories(
     scenarios: new ScenarioAdminRepository(apiClient),
     documents: new DocumentAdminRepository(apiClient),
     clubDocuments: new ClubDocumentAdminRepository(apiClient),
-    scenarioDocuments: new ScenarioDocumentAdminRepository(apiClient),
     clubScenarioDocuments: new ClubScenarioDocumentAdminRepository(apiClient),
-    clubScenarios: new ClubScenarioAdminRepository(apiClient),
     globalDocuments: new GlobalDocumentAdminRepository(apiClient, baseUrl),
     customerDocuments: new CustomerDocumentAdminRepository(apiClient),
     users: new UserAdminRepository(apiClient),

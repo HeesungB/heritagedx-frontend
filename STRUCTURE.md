@@ -287,12 +287,12 @@ packages/api/
 - **완료 거래 락**: COMPLETED 거래 자체와 그 거래에 연결된 상담은 수정/삭제가 서버에서 거부된다. UI는 가드 노출.
 - **삭제 권한**: `canDeleteConsultation(user, cons)` — `FIRST_APPROVED`/`linkedTradeId` 있는 상담은 대표/백오피스만 삭제. `canDeleteTrade(user)` — 거래내역은 항상 대표/백오피스만 삭제. OS/BO 삭제 버튼 모두 가드 적용.
 
-**Server Repository (ISR):** `IClubRepository`, `IScenarioRepository` — raw `fetch()` + `{ next: { revalidate } }`
+**Server Repository (ISR):** `IClubRepository`, `INoticeRepository`, `IMarketPriceRepository` — raw `fetch()` + `{ next: { revalidate, tags } }`. 도메인별 default TTL: clubs 300s, notices 1800s, market-prices 3600s. 캐시 태그: `clubs`, `clubs:<code>`, `notices`, `market-prices`, `market-prices:<membershipId>`. 시나리오 도메인은 SSR 캐시 미적용 — 클라이언트 hook (`useScenarioOptions`, `useScenarioDocuments`) 의 module cache 로만 처리(§5.3 참조).
 
 **Factory 함수:**
 - `createGeneralRepositories(apiClient)` → `GeneralRepositories`
 - `createAdminRepositories(apiClient, baseUrl)` → `AdminRepositories`
-- `createServerRepositories({ baseUrl, revalidate })` → `ServerRepositories`
+- `createServerRepositories({ baseUrl, revalidate? })` → `ServerRepositories`. `revalidate` 미지정 시 도메인별 default TTL 적용.
 
 **React Context:**
 - `RepositoryProvider` — general/admin 리포지토리 주입
@@ -673,6 +673,7 @@ getInitialData()    // 초기 데이터 프리로드
 ├── api/fcm-tokens/route.ts              # FCM 토큰 CRUD API
 ├── api/notifications/route.ts           # 알림 목록 GET API
 ├── api/notifications/read/route.ts      # 알림 읽음 처리 POST API
+├── api/admin/revalidate/route.ts        # revalidateTag 트리거 (admin write 후 OS 캐시 무효화)
 ├── firebase-messaging-sw.js/route.ts    # Service Worker (동적)
 └── (dashboard)/                          # 대시보드 그룹
     ├── layout.tsx                        # 대시보드 레이아웃 (Header + PageContainer). `/clubs/*` 좌측 골프장 검색 사이드바는 V2 시안 적용 후 제거 — 검색·필터는 `/clubs`·`/clubs/new` 의 `ClubBrowserPanel` 로 통합.
@@ -738,6 +739,78 @@ useNoticeMutations()  // 공지사항 CRUD
 - **RepositoryContext** — `@heritage-dx/api`의 General + Admin Repository 주입
 - **DataContext** — 앱 데이터 프리로드 (clubs, tradeMemos, tradeRecords). Repository hooks 사용.
   - `useData()` → `{ clubs, preloadedMemos, preloadedRecords, ... }`
+
+### 5.3. 시나리오 도메인 (Cross-cutting)
+
+골프장 거래 신청의 **유형 결정 엔진**이자 **서류 포트폴리오 단위**. OS/BO 양쪽에서 사용되며 다른 도메인(상담/거래/회원권)에는 외래키로 직접 참조되지 않는다 — 거래 신청 폼의 단계 2 입력값으로만 흐른다.
+
+#### 4개 고정 시나리오 코드 (`ScenarioBasicCode`)
+
+| 코드 | 의미 | side | ownerType |
+|---|---|---|---|
+| `PS_BASIC` | Personal Seller — 개인 매도 | Seller | Personal |
+| `PB_BASIC` | Personal Buyer — 개인 매수 | Buyer | Personal |
+| `CS_BASIC` | Corporate Seller — 법인 매도 | Seller | Corporate |
+| `CB_BASIC` | Corporate Buyer — 법인 매수 | Buyer | Corporate |
+
+정의 위치: `packages/store/src/entities/scenario.ts` (`SCENARIO_BASIC_LABEL`, `SCENARIO_BASIC_ACCENT`, `getScenarioBasicLabel`, `getScenarioBasicAccent`).
+
+#### OS 흐름 — 거래 신청
+
+```
+[단계 2] TransactionTypeForm
+  사용자: side / ownerType / hasProxy / isCertificateLost 4개 조건 입력
+  useScenarioOptions(clubCode) → scenarioRepo.getOptions(clubCode)
+                               → /api/clubs/{clubCode}/scenario-options
+  findMatchingScenario(filters, scenarios)  ← 클라이언트 매칭
+  → scenarioCode 1개 결정
+
+[단계 3] RequiredDocuments
+  useScenarioDocuments(scenarioCode, clubCode, ownerType)
+    → scenarioRepo.getDocuments()
+    → /api/scenarios/{scenarioCode}/documents?clubCode=...
+  → 필수/조건부 서류 목록 표시
+```
+
+진입점:
+- `apps/os/src/components/TransactionTypeForm.tsx`
+- `apps/os/src/components/RequiredDocuments.tsx`
+- `apps/os/src/components/club-profile/DocumentsSection.tsx` — 골프장 상세에서 4개 시나리오 탭으로 서류 노출
+
+#### BO 흐름 — 시나리오 서류 포트폴리오 관리
+
+`apps/back-office/src/app/(dashboard)/clubs/[code]/page.tsx` 의 시나리오 탭:
+
+| 메서드 | 용도 |
+|---|---|
+| `scenariosAdmin.getAll({ limit: 100 })` | 4개 고정 시나리오 조회 |
+| `clubScenarioDocumentsAdmin.getByClubScenario(clubCode, scenarioCode)` | 골프장×시나리오 의 링크된 서류 |
+| `clubScenarioDocumentsAdmin.link / unlink / update` | 서류 포트폴리오 CRUD |
+
+#### 클라이언트-사이드 매칭 정책
+
+시나리오 매칭은 의도적으로 **클라이언트 측에서 `scenarioMatchesFilters` / `findMatchingScenario`** 로 수행. 서버 `/scenarios/match` POST 엔드포인트는 사용하지 않음 — 매칭 규칙(side × ownerType × hasProxy × isCertificateLost)이 도메인 상수에 정의되어 있어 라운드트립이 불필요.
+
+→ `IScenarioRepository` 는 의도적으로 read-only 2 메서드(`getOptions`, `getDocuments`)만 보유. 과거 존재하던 `getByClub`/`match`/`ScenarioServerRepository` 는 dead code 로 정리됨(미사용).
+
+#### 사용처 매트릭스
+
+| 구성 | 위치 | 사용처 |
+|---|---|---|
+| `IScenarioRepository.getOptions` | `packages/api/src/interfaces/general/scenario.repository.ts` | OS 단계 2 |
+| `IScenarioRepository.getDocuments` | 동상 | OS 단계 3 |
+| `IScenarioAdminRepository.getAll` | `packages/api/src/interfaces/admin/scenario-admin.repository.ts` | BO 골프장 상세 |
+| `IClubScenarioDocumentAdminRepository` | `packages/api/src/interfaces/admin/club-scenario-document-admin.repository.ts` | BO 골프장 상세 (서류 링크 CRUD) |
+| `useScenarioOptions(clubCode)` | `packages/store/src/hooks/useScenarioOptions.ts` | OS 단계 2 hook + module cache(1h) |
+| `useScenarioDocuments` | `packages/store/src/hooks/useScenarioDocuments.ts` | OS 단계 3 hook |
+| `scenarioMatchesFilters` / `findMatchingScenario` | `packages/store/src/entities/scenario.ts` | OS 단계 2 클라이언트 매칭 |
+| `getScenarioBasicLabel` / `getScenarioBasicAccent` | 동상 | OS `DocumentsSection`, BO 상세 |
+| `mapScenarioWithDocsDtoToEntity` | `packages/store/src/mappers/scenario.mapper.ts` | `mapClubDetailDtoToEntity` 가 `ClubDetailEntity.scenarios` 매핑 시 호출 |
+| `ScenarioWithDocsEntity` / `DocumentsSummaryEntity` | `packages/store/src/entities/scenario.ts` | club detail / `useScenarioDocuments` |
+
+#### 캐시 무효화 태그
+
+`apps/back-office/src/app/api/admin/revalidate/route.ts` 의 화이트리스트에 `scenarios`, `scenario:<clubCode>` 태그가 유지됨. 현재 호출처는 없으나 BO 시나리오-서류 링크 mutation 이 server cache 를 도입할 때를 대비한 placeholder.
 
 ---
 
@@ -903,13 +976,19 @@ Back Office `types/index.ts`에서 `@heritage-dx/types` re-export → import 경
 `@heritage-dx/store`의 Mapper 함수에서 API 응답(DTO)을 Entity로 변환. 타입 정규화 (`string|number` → `number`), 서브 객체 그룹핑, 기본값 설정을 담당. API 포맷 변경 시 Mapper만 수정하면 Entity와 컴포넌트에 영향 없음.
 
 ### Stale-While-Revalidate Cache Pattern
-`@heritage-dx/store`의 Zustand 스토어에서 캐시 데이터 즉시 반환 + 백그라운드 refresh. `FetchStatus`(`idle`→`loading`→`success`/`refreshing`)로 UI 상태 관리. SSR 데이터는 `hydrate*()` 메서드로 클라이언트 스토어에 주입.
+`@heritage-dx/store`의 Zustand 스토어에서 캐시 데이터 즉시 반환 + 백그라운드 refresh. `FetchStatus`(`idle`→`loading`→`success`/`refreshing`)로 UI 상태 관리. SSR 데이터는 `hydrate*()` 메서드로 클라이언트 스토어에 주입. `club.store` 는 `listLastFetchedAt`/`detailFetchedAt(Map)` + TTL(5분) 표준화 — TTL 안이면 fetch 자체를 스킵.
+
+### Hook-level Module Cache
+`useNotices`, `useMarketPrices`, `useScenarioOptions`, `useUsers`, `useMyOrganization` 등 변경 빈도 낮은 도메인 훅은 모듈 스코프 `Map<key, { data, fetchedAt }>` 캐시를 보유 (TTL: notices 30분, market-prices 1시간, scenario-options 1시간, users 12시간, organizations 12시간). 페이지 재진입/리마운트 시 같은 키면 API 호출 없이 즉시 반환. `invalidate{Domain}Cache()` 로 수동 무효화 가능.
+
+### Server Cache Invalidation
+BO admin write 성공 시 `useInvalidate(tag)` 호출 → 메모리 캐시 + `POST /api/admin/revalidate { tags }` → `revalidateTag(tag)` 로 OS Server Component 캐시 즉시 무효화. 라우트: `apps/back-office/src/app/api/admin/revalidate/route.ts`. 화이트리스트 검증.
 
 ### Response Normalization
 `@heritage-dx/api`의 `normalizeListResponse`에서 다양한 API 응답 형식 (배열, `{ data, meta }`, spread 객체)을 `{ items, pagination }` 구조로 정규화.
 
 ### ISR Cache Pattern
-OS Server Repository에서 `next: { revalidate: 300 }`으로 5분 단위 ISR 캐싱. 정적 생성 + 주기적 재검증.
+OS Server Repository에서 `next: { revalidate, tags }` 로 도메인별 ISR 캐싱 (clubs 5분, scenarios 1시간, notices 30분, market-prices 1시간). 캐시 태그로 admin write 시 `revalidateTag` 즉시 무효화 가능. 정적 생성 + 주기적 재검증.
 
 ### Token Dedup Pattern
 `tryRefreshToken()` — singleton promise로 동시 다중 401 응답 시 refresh 요청 한 번만 발생.

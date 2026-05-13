@@ -26,31 +26,6 @@ export async function getClubDetail(code: string): Promise<ClubDetailEntity> {
   return mapClubDetailDtoToEntity(response.data);
 }
 
-export async function getInitialData(clubCode?: string) {
-  try {
-    const { clubs, totalCount } = await getClubs();
-
-    if (clubs.length === 0) {
-      return { clubs: [], totalCount: 0, initialClub: null, initialClubDetail: null };
-    }
-
-    if (!clubCode) {
-      return { clubs, totalCount, initialClub: null, initialClubDetail: null };
-    }
-
-    const foundClub = clubs.find((c) => c.code === clubCode);
-    if (!foundClub) {
-      return { clubs, totalCount, initialClub: null, initialClubDetail: null };
-    }
-
-    const initialClubDetail = await getClubDetail(foundClub.code);
-    return { clubs, totalCount, initialClub: foundClub, initialClubDetail };
-  } catch (error) {
-    console.error("초기 데이터 로딩 실패:", error);
-    return { clubs: [], totalCount: 0, initialClub: null, initialClubDetail: null };
-  }
-}
-
 export async function getNotices(params?: {
   page?: number;
   limit?: number;

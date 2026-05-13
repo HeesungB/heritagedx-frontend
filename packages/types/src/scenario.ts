@@ -137,17 +137,3 @@ export interface ScenarioOptions {
   totalScenarios: number;
 }
 
-// 골프장-시나리오 연결
-export interface ClubScenarioLink {
-  id?: string;
-  clubCode: string;
-  scenarioCode: string;
-  scenario?: Scenario;
-  displayOrder?: number;
-}
-
-// 골프장 시나리오 목록 응답
-export interface ClubScenariosResponse {
-  scenarios: ClubScenarioLink[];
-  pagination?: Pagination;
-}

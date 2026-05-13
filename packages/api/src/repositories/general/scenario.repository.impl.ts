@@ -1,8 +1,6 @@
 import type { ApiClient } from "@heritage-dx/api-client";
 import type {
   ApiResponse,
-  Scenario,
-  ScenarioConditions,
   ScenarioDocumentsResponse,
   ScenarioOptions,
 } from "@heritage-dx/types";
@@ -11,18 +9,8 @@ import type { IScenarioRepository } from "../../interfaces/general/scenario.repo
 export class ScenarioRepository implements IScenarioRepository {
   constructor(private api: ApiClient) {}
 
-  async getByClub(clubCode: string): Promise<ApiResponse<Scenario[]>> {
-    return this.api.get<Scenario[]>(`/clubs/${clubCode}`);
-  }
-
   async getOptions(clubCode: string): Promise<ApiResponse<ScenarioOptions>> {
     return this.api.get<ScenarioOptions>(`/clubs/${clubCode}/scenario-options`);
-  }
-
-  async match(
-    conditions: ScenarioConditions,
-  ): Promise<ApiResponse<Scenario[]>> {
-    return this.api.post<Scenario[]>("/scenarios/match", conditions);
   }
 
   async getDocuments(

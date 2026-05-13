@@ -121,12 +121,18 @@ export {
   useNotices,
   useNoticeMutations,
   useMarketPrices,
+  invalidateNoticesCache,
+  invalidateMarketPricesCache,
+  invalidateScenarioOptionsCache,
+  invalidateUsersCache,
+  invalidateMyOrganizationCache,
   useCustomers,
   useFavoriteConsultations,
   useRecentSearches,
   useFavoriteClubs,
   useTopClubs,
   useSettlements,
+  useInvalidate,
 } from "./hooks";
 export type {
   ScenarioOptionsData,
@@ -142,6 +148,7 @@ export type {
   FavoriteClubMeta,
   UseTopClubsResult,
   TopClubLookupItem,
+  CacheTag,
 } from "./hooks";
 
 // Auth domain

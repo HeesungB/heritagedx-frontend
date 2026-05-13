@@ -50,8 +50,6 @@ export type {
   FilterOption,
   AvailableFilters,
   ScenarioOptions,
-  ClubScenarioLink,
-  ClubScenariosResponse,
 } from "./scenario";
 
 export type {

@@ -18,9 +18,7 @@ export type {
   AdminScenarioListParams,
   IDocumentAdminRepository,
   IClubDocumentAdminRepository,
-  IScenarioDocumentAdminRepository,
   IClubScenarioDocumentAdminRepository,
-  IClubScenarioAdminRepository,
   IGlobalDocumentAdminRepository,
   ICustomerDocumentAdminRepository,
   IUserAdminRepository,
@@ -50,9 +48,7 @@ import type {
   IScenarioAdminRepository,
   IDocumentAdminRepository,
   IClubDocumentAdminRepository,
-  IScenarioDocumentAdminRepository,
   IClubScenarioDocumentAdminRepository,
-  IClubScenarioAdminRepository,
   IGlobalDocumentAdminRepository,
   ICustomerDocumentAdminRepository,
   IUserAdminRepository,
@@ -81,9 +77,7 @@ export interface AdminRepositories {
   scenarios: IScenarioAdminRepository;
   documents: IDocumentAdminRepository;
   clubDocuments: IClubDocumentAdminRepository;
-  scenarioDocuments: IScenarioDocumentAdminRepository;
   clubScenarioDocuments: IClubScenarioDocumentAdminRepository;
-  clubScenarios: IClubScenarioAdminRepository;
   globalDocuments: IGlobalDocumentAdminRepository;
   customerDocuments: ICustomerDocumentAdminRepository;
   users: IUserAdminRepository;
@@ -97,4 +91,6 @@ export interface AdminRepositories {
 
 export interface ServerRepositories {
   clubs: IClubRepository;
+  notices: INoticeRepository;
+  marketPrices: IMarketPriceRepository;
 }

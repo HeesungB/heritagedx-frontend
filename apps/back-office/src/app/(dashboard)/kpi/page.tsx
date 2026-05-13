@@ -1,42 +1,36 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import {
   useKpi,
   useKpiSummary,
   useKpiSeries,
   useKpiByEmployee,
+  type EmployeeEntity,
   type KpiFilters,
   type KpiMetric,
-  type EmployeeEntity,
+  type PeriodPreset,
+  getDateRange,
 } from "@heritage-dx/store";
-import { wonToManwon, formatManwon } from "@heritage-dx/utils";
-import {
-  TrendingUp,
-  MessageSquare,
-  FileText,
-  BarChart3,
-  AlertCircle,
-} from "lucide-react";
-import KpiFilterBar from "@/components/kpi/KpiFilterBar";
+import { formatManwon, wonToManwon } from "@heritage-dx/utils";
+import { AlertCircle } from "lucide-react";
 
-// recharts 는 초기 번들 분리 — /kpi 진입 시점에만 로드 (1-2)
+import KpiPageBar from "@/components/kpi/KpiPageBar";
+import KpiRangeChips from "@/components/kpi/KpiRangeChips";
+import KpiSummaryStrip from "@/components/kpi/KpiSummaryStrip";
+import KpiTrendPanel from "@/components/kpi/KpiTrendPanel";
+import KpiEmployeePanel from "@/components/kpi/KpiEmployeePanel";
+
 const KpiTrendChart = dynamic(() => import("@/components/kpi/KpiTrendChart"), {
   ssr: false,
   loading: () => (
-    <div className="h-72 bg-gray-100 rounded animate-pulse" aria-label="추세 차트 로딩 중" />
+    <div
+      className="w-full h-full bg-neutral-50 rounded animate-pulse"
+      aria-label="추세 차트 로딩 중"
+    />
   ),
 });
-const KpiEmployeeComparison = dynamic(
-  () => import("@/components/kpi/KpiEmployeeComparison"),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="h-72 bg-gray-100 rounded animate-pulse" aria-label="담당자 비교 차트 로딩 중" />
-    ),
-  },
-);
 
 export default function KpiPage() {
   const { fetchEmployees } = useKpi();
@@ -47,14 +41,14 @@ export default function KpiPage() {
     employeeId: "",
   });
   const [employees, setEmployees] = useState<EmployeeEntity[]>([]);
-  const [viewMode, setViewMode] = useState<KpiMetric>("all");
+  const [trendMetric, setTrendMetric] = useState<KpiMetric>("all");
+  const [employeeMetric, setEmployeeMetric] = useState<KpiMetric>("all");
 
-  // 직원 목록 1회 로드
   useEffect(() => {
     fetchEmployees().then((res) => {
       if (res?.data) setEmployees(res.data);
     });
-  }, [fetchEmployees]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fetchEmployees]);
 
   const {
     data: summary,
@@ -72,143 +66,96 @@ export default function KpiPage() {
     error: employeeError,
   } = useKpiByEmployee(filters, employees);
 
-  const profitManwon = wonToManwon(summary.profit);
+  const { startDate, endDate } = useMemo(
+    () => getDateRange(filters.preset, filters.customStart, filters.customEnd),
+    [filters.preset, filters.customStart, filters.customEnd],
+  );
+  const rangeText = `${startDate} ~ ${endDate}`;
+
+  const handleRangeChipChange = (preset: PeriodPreset) => {
+    setFilters((prev) => ({
+      ...prev,
+      preset,
+      customStart: undefined,
+      customEnd: undefined,
+    }));
+  };
+
+  const handleApplyCustomRange = (start: string, end: string) => {
+    setFilters((prev) => ({
+      ...prev,
+      preset: "custom",
+      customStart: start,
+      customEnd: end,
+    }));
+  };
+
+  const handleDateFieldChange = (value: KpiFilters["dateField"]) => {
+    setFilters((prev) => ({ ...prev, dateField: value }));
+  };
+
+  const handleEmployeeChange = (employeeId: string) => {
+    setFilters((prev) => ({ ...prev, employeeId }));
+  };
+
   const pageError = summaryError ?? trendError ?? employeeError;
+  const profitText = formatManwon(wonToManwon(summary.profit));
 
   return (
-    <div className="pt-14 min-h-screen">
-      <div className="max-w-5xl mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="flex items-center gap-2 mb-6">
-          <BarChart3 className="w-6 h-6 text-indigo-600" />
-          <h1 className="text-2xl font-bold text-gray-900">통계</h1>
-        </div>
+    <div className="min-h-screen bg-[#F4F4F2] flex flex-col">
+      <KpiPageBar
+        filters={filters}
+        employees={employees}
+        rangeText={rangeText}
+        onApplyCustomRange={handleApplyCustomRange}
+        onDateFieldChange={handleDateFieldChange}
+        onEmployeeChange={handleEmployeeChange}
+      />
 
-        {/* Filter bar */}
-        <div className="mb-6">
-          <KpiFilterBar
-            filters={filters}
-            employees={employees}
-            onChange={setFilters}
-          />
-        </div>
-
-        {/* Error banner */}
+      <main className="flex-1 min-h-0 px-3.5 py-2.5 flex flex-col gap-2.5 overflow-auto">
         {pageError && (
-          <div className="mb-6 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="flex items-start gap-2 rounded-[10px] border border-[#FECACA] bg-[#FEF2F2] px-3.5 py-2.5 text-[12.5px] text-[#B91C1C]">
             <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
-              <p className="font-medium">KPI 데이터를 일부 또는 전부 불러오지 못했습니다.</p>
-              <p className="text-xs mt-0.5 text-red-600">{pageError}</p>
+              <p className="font-semibold">KPI 데이터를 일부 또는 전부 불러오지 못했습니다.</p>
+              <p className="text-[11.5px] mt-0.5 text-[#DC2626]">{pageError}</p>
             </div>
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="text-xs font-medium text-red-700 hover:text-red-800 underline"
+              className="text-[11.5px] font-semibold text-[#B91C1C] hover:text-[#7F1D1D] underline"
             >
               새로고침
             </button>
           </div>
         )}
 
-        {/* Summary cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <SummaryCard
-            icon={<FileText className="w-5 h-5" />}
-            label="거래 건수"
-            value={loadingSummary ? undefined : `${summary.tradeCount}건`}
-            color="indigo"
-          />
-          <SummaryCard
-            icon={<TrendingUp className="w-5 h-5" />}
-            label="총 순이익"
-            value={loadingSummary ? undefined : formatManwon(profitManwon)}
-            color="green"
-          />
-          <SummaryCard
-            icon={<MessageSquare className="w-5 h-5" />}
-            label="상담 건수"
-            value={loadingSummary ? undefined : `${summary.consultationCount}건`}
-            color="blue"
-          />
-        </div>
+        <KpiRangeChips value={filters.preset} onChange={handleRangeChipChange} />
 
-        {/* View mode tabs */}
-        <div className="flex items-center gap-1 mb-6">
-          {([
-            { key: "all", label: "종합" },
-            { key: "tradeCount", label: "거래 건수" },
-            { key: "consultationCount", label: "상담 건수" },
-            { key: "profit", label: "순이익" },
-          ] as const).map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setViewMode(key)}
-              className={`px-3.5 py-1.5 text-sm font-medium rounded-full transition-colors ${
-                viewMode === key
-                  ? "bg-indigo-600 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <KpiSummaryStrip
+          tradeCount={summary.tradeCount}
+          consultationCount={summary.consultationCount}
+          profitText={profitText}
+          isLoading={loadingSummary}
+        />
 
-        {/* Trend chart */}
-        <div className="rounded-xl border border-gray-200 bg-white p-5 mb-8">
-          <h2 className="text-base font-semibold text-gray-900 mb-4">
-            추이
-          </h2>
-          <KpiTrendChart data={trendData} isLoading={loadingTrend} metric={viewMode} />
-        </div>
-
-        {/* Employee comparison */}
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <h2 className="text-base font-semibold text-gray-900 mb-4">
-            직원별 비교
-          </h2>
-          <KpiEmployeeComparison
+        <div className="grid gap-2.5 min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+          <KpiTrendPanel
+            data={trendData}
+            isLoading={loadingTrend}
+            metric={trendMetric}
+            onMetricChange={setTrendMetric}
+            rangeText={rangeText}
+            ChartComponent={KpiTrendChart}
+          />
+          <KpiEmployeePanel
             data={employeeData}
             isLoading={loadingEmployees}
-            metric={viewMode}
+            metric={employeeMetric}
+            onMetricChange={setEmployeeMetric}
           />
         </div>
-      </div>
-    </div>
-  );
-}
-
-function SummaryCard({
-  icon,
-  label,
-  value,
-  color,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string | undefined;
-  color: "indigo" | "green" | "blue";
-}) {
-  const colors = {
-    indigo: "bg-indigo-50 text-indigo-600",
-    green: "bg-green-50 text-green-600",
-    blue: "bg-blue-50 text-blue-600",
-  };
-
-  const isLoading = value === undefined;
-
-  return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 flex items-center gap-4">
-      <div className={`p-2.5 rounded-lg ${colors[color]}`}>{icon}</div>
-      <div className="min-w-0">
-        <p className="text-sm text-gray-500">{label}</p>
-        {isLoading ? (
-          <div className="mt-1.5 h-6 w-24 bg-gray-200 rounded animate-pulse" />
-        ) : (
-          <p className="text-xl font-bold text-gray-900 mt-0.5">{value}</p>
-        )}
-      </div>
+      </main>
     </div>
   );
 }

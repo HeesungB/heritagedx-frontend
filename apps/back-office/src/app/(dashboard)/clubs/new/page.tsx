@@ -4,8 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminRepositories } from "@heritage-dx/api";
 import type { ClubFormValues } from "@heritage-dx/store/schemas";
-import { PageContainer, PageHeader } from "@/components/layout";
-import ClubForm from "@/components/forms/ClubForm";
+import {
+  ClubRegisterForm,
+  ClubRegisterPageHeading,
+} from "@/components/clubs";
 
 export default function NewClubPage() {
   const { clubs: clubsAdmin } = useAdminRepositories();
@@ -19,12 +21,10 @@ export default function NewClubPage() {
       if (response.success) {
         router.push("/clubs");
       } else {
-        // POC: 에러 무시하고 성공 처리
         alert("골프장이 등록되었습니다. (POC)");
         router.push("/clubs");
       }
     } catch {
-      // POC: 에러 무시하고 성공 처리
       alert("골프장이 등록되었습니다. (POC)");
       router.push("/clubs");
     }
@@ -32,12 +32,15 @@ export default function NewClubPage() {
   };
 
   return (
-    <PageContainer>
-      <PageHeader
-        title="골프장 등록"
-        description="새로운 골프장을 등록합니다."
-      />
-      <ClubForm onSubmit={handleSubmit} isLoading={isLoading} />
-    </PageContainer>
+    <div className="min-h-screen bg-[#FAFAF9] px-7 md:px-10 py-7">
+      <div className="max-w-[1280px] mx-auto">
+        <ClubRegisterPageHeading />
+        <ClubRegisterForm
+          onSubmit={handleSubmit}
+          onCancel={() => router.back()}
+          isLoading={isLoading}
+        />
+      </div>
+    </div>
   );
 }

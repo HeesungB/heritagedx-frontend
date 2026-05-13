@@ -9,7 +9,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
 } from "recharts";
 import { wonToManwon } from "@heritage-dx/utils";
 import type { TrendDataPoint, KpiMetric } from "@heritage-dx/store";
@@ -61,16 +60,19 @@ interface CustomTooltipProps {
 function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-md text-sm">
-      <p className="font-medium text-gray-900 mb-1">{label}</p>
+    <div
+      className="rounded-[10px] border border-neutral-200 bg-surface px-3 py-2 text-[12px]"
+      style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.05)" }}
+    >
+      <p className="font-semibold text-neutral-900 mb-1 text-[12.5px]">{label}</p>
       {payload.map((entry) => (
-        <p key={entry.dataKey} className="flex items-center gap-1.5">
+        <p key={entry.dataKey} className="flex items-center gap-1.5 leading-[1.6]">
           <span
-            className="inline-block w-2.5 h-2.5 rounded-sm"
+            className="inline-block w-2.5 h-2.5 rounded-[3px]"
             style={{ backgroundColor: entry.color }}
           />
-          <span className="text-gray-600">{entry.name}:</span>
-          <span className="font-medium text-gray-900">
+          <span className="text-neutral-500">{entry.name}:</span>
+          <span className="font-semibold text-neutral-900 tabular-nums">
             {entry.dataKey === "profit"
               ? formatTooltipProfit(entry.value)
               : `${entry.value}건`}
@@ -88,7 +90,7 @@ export default function KpiTrendChart({
 }: KpiTrendChartProps) {
   if (isLoading) {
     return (
-      <div className="h-[320px] flex items-center justify-center text-gray-400 text-sm">
+      <div className="w-full h-full flex items-center justify-center text-neutral-400 text-[12px]">
         차트 데이터 로딩 중...
       </div>
     );
@@ -96,7 +98,7 @@ export default function KpiTrendChart({
 
   if (!data.length) {
     return (
-      <div className="h-[320px] flex items-center justify-center text-gray-400 text-sm">
+      <div className="w-full h-full flex items-center justify-center text-neutral-400 text-[12px]">
         데이터가 없습니다
       </div>
     );
@@ -108,28 +110,30 @@ export default function KpiTrendChart({
   const showCountAxis = showTrade || showConsult;
   const showProfitAxis = showProfit;
 
+  const axisTick = {
+    fontSize: 11,
+    fill: "#A3A3A3",
+    fontFamily: "'JetBrains Mono', monospace",
+  } as const;
+
   return (
-    <ResponsiveContainer width="100%" height={320}>
-      <ComposedChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+    <ResponsiveContainer width="100%" height="100%">
+      <ComposedChart data={data} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 4" stroke="#F0F0EE" vertical={false} />
         <XAxis
           dataKey="label"
-          tick={{ fontSize: 12, fill: "#6b7280" }}
+          tick={{ fontSize: 12, fill: "#737373" }}
           tickLine={false}
+          axisLine={{ stroke: "#D4D4D2" }}
         />
         {showCountAxis && (
           <YAxis
             yAxisId="count"
             orientation="left"
-            tick={{ fontSize: 12, fill: "#6b7280" }}
+            tick={axisTick}
             tickLine={false}
             axisLine={false}
-            label={{
-              value: "건수",
-              position: "insideTopLeft",
-              offset: -5,
-              style: { fontSize: 11, fill: "#9ca3af" },
-            }}
+            allowDecimals={false}
           />
         )}
         {showProfitAxis && (
@@ -137,29 +141,18 @@ export default function KpiTrendChart({
             yAxisId="profit"
             orientation={showCountAxis ? "right" : "left"}
             tickFormatter={formatProfitTick}
-            tick={{ fontSize: 12, fill: "#6b7280" }}
+            tick={axisTick}
             tickLine={false}
             axisLine={false}
-            label={{
-              value: "순이익",
-              position: showCountAxis ? "insideTopRight" : "insideTopLeft",
-              offset: -5,
-              style: { fontSize: 11, fill: "#9ca3af" },
-            }}
           />
         )}
-        <Tooltip content={<CustomTooltip />} />
-        <Legend
-          wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
-          iconType="square"
-          iconSize={10}
-        />
+        <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(10,10,10,0.04)" }} />
         {showTrade && (
           <Bar
             yAxisId="count"
             dataKey="tradeCount"
             name="거래 건수"
-            fill="#6366f1"
+            fill="#CA8A04"
             radius={[3, 3, 0, 0]}
             barSize={20}
           />
@@ -169,7 +162,7 @@ export default function KpiTrendChart({
             yAxisId="count"
             dataKey="consultationCount"
             name="상담 건수"
-            fill="#3b82f6"
+            fill="#EAB308"
             radius={[3, 3, 0, 0]}
             barSize={20}
           />
@@ -179,10 +172,10 @@ export default function KpiTrendChart({
             yAxisId="profit"
             dataKey="profit"
             name="순이익"
-            stroke="#22c55e"
-            strokeWidth={2}
-            dot={{ r: 3, fill: "#22c55e" }}
-            activeDot={{ r: 5 }}
+            stroke="#854D0E"
+            strokeWidth={2.5}
+            dot={{ r: 4, fill: "#FFFFFF", stroke: "#854D0E", strokeWidth: 2 }}
+            activeDot={{ r: 5, fill: "#FFFFFF", stroke: "#854D0E", strokeWidth: 2 }}
           />
         )}
       </ComposedChart>

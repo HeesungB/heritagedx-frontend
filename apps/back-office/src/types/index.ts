@@ -48,6 +48,8 @@ export interface ClubDetailResponse {
   name: string;
   companyName?: string;
   region?: string;
+  operationType?: string;
+  operationTypes?: string[] | null;
   contact?: string;
   address?: string;
   transferFee?: string;

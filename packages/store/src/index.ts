@@ -261,7 +261,7 @@ export type {
   RequestType,
 } from "@heritage-dx/types";
 
-// Consultation progress helpers (isDone 대체)
+// Consultation progress helpers
 export {
   isConsultationCompleted,
   isInTradeStage,
@@ -289,6 +289,7 @@ export type {
   GroupedTradeRecords,
   TradeRecordCounts,
 } from "./domain/trade-records";
+
 
 // 고객 update 입력 타입 — 뷰의 인라인 편집(`InlineField`) 콜백에서 사용
 export type { CustomerUpdateInput } from "@heritage-dx/types";

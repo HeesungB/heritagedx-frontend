@@ -1,6 +1,6 @@
 import { createStore } from "zustand/vanilla";
 import type { GeneralRepositories, TradeListParams } from "@heritage-dx/api";
-import type { ConsultationInput, ConsultationNoteEntry } from "@heritage-dx/types";
+import type { ConsultationInput, ConsultationNoteEntry, RequestType } from "@heritage-dx/types";
 import { APPROVAL_ACTIONS } from "@heritage-dx/types";
 import type { RequestType } from "@heritage-dx/types";
 import type { FetchStatus, PaginationState } from "../entities/common";

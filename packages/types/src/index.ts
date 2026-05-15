@@ -81,9 +81,9 @@ export {
 } from "./approval";
 export type {
   ApprovalStatus,
+  ProgressStatus,
   WorkflowStatus,
   TradeWorkflowStatus,
-  ProgressStatus,
   ApprovalAction,
   UserApprovalAction,
   UserConsultationAction,

@@ -33,14 +33,18 @@ import {
 } from "@heritage-dx/ui";
 import {
   useConsultationAdminRepository,
+  useAdminRepositories,
   useClubRepository,
   useConsultationRepository,
 } from "@heritage-dx/api";
 import type {
+  AdminConsultationAction,
   Consultation,
   ConsultationNoteEntry,
   Club,
   Pagination,
+  Settlement,
+  SettlementUpdateInput,
 } from "@heritage-dx/types";
 import {
   buildClubMembershipPair,
@@ -88,30 +92,46 @@ const formatPrice = (price: string | number | null) => {
   return `${num.toLocaleString()}원`;
 };
 
-function getStatusInfo(approvalStatus: string) {
-  if (approvalStatus === "PENDING_DEPOSIT") {
-    return { label: "검토중", dotClass: "bg-blue-400" };
+function getProgressStatusInfo(progressStatus: string) {
+  switch (progressStatus) {
+    case "DEPOSIT_REVIEW":
+      return { label: "계약금 검토중", dotClass: "bg-blue-400", pillClass: "bg-amber-50 text-amber-700 border-amber-200" };
+    case "DOCUMENT_AND_BALANCE_IN_PROGRESS":
+      return { label: "서류·잔금 진행", dotClass: "bg-emerald-400", pillClass: "bg-green-50 text-green-700 border-green-200" };
+    case "BALANCE_REVIEW":
+      return { label: "잔금 검토중", dotClass: "bg-blue-400", pillClass: "bg-amber-50 text-amber-700 border-amber-200" };
+    case "TAX_IN_PROGRESS":
+      return { label: "세무신고 진행", dotClass: "bg-sky-400", pillClass: "bg-sky-50 text-sky-700 border-sky-200" };
+    case "TAX_REVIEW":
+      return { label: "세무 검토중", dotClass: "bg-blue-400", pillClass: "bg-amber-50 text-amber-700 border-amber-200" };
+    case "TRADE_COMPLETED":
+    case "COMPLETED":
+      return { label: "거래 완료", dotClass: "bg-emerald-600", pillClass: "bg-emerald-50 text-emerald-700 border-emerald-200" };
+    // backwards compat
+    case "PENDING_DEPOSIT":
+      return { label: "계약금 검토중", dotClass: "bg-blue-400", pillClass: "bg-amber-50 text-amber-700 border-amber-200" };
+    default:
+      return { label: "상담중", dotClass: "bg-amber-400", pillClass: "bg-gray-50 text-gray-600 border-gray-200" };
   }
-  if (approvalStatus === "DEPOSIT_APPROVED") {
-    return { label: "승인", dotClass: "bg-gray-400" };
-  }
-  return { label: "상담중", dotClass: "bg-amber-400" };
 }
 
-function getApprovalPill(approvalStatus: string) {
-  if (approvalStatus === "DEPOSIT_APPROVED") {
-    return { label: "승인완료", className: "bg-green-50 text-green-700 border-green-200" };
-  }
-  if (approvalStatus === "PENDING_DEPOSIT") {
-    return { label: "승인요청", className: "bg-amber-50 text-amber-700 border-amber-200" };
-  }
-  return { label: "요청됨", className: "bg-blue-50 text-blue-700 border-blue-200" };
-}
+const formatSettlementAmount = (v: number | null | undefined) => {
+  if (!v) return "-";
+  return formatPrice(v);
+};
+
+const entityTypeLabel = (v: string | null | undefined) => {
+  if (v === "TAXABLE_CORP") return "법인(과세)";
+  if (v === "NON_TAXABLE_CORP") return "법인(비과세)";
+  if (v === "INDIVIDUAL") return "개인";
+  return v || "-";
+};
 
 const MAX_AI_LENGTH = 2000;
 
 export default function ConsultationsPage() {
   const consultationsRepo = useConsultationAdminRepository();
+  const settlementsRepo = useAdminRepositories().settlements;
   const generalConsultationRepo = useConsultationRepository();
   const clubsRepo = useClubRepository();
   const { user } = useAuth();
@@ -131,7 +151,7 @@ export default function ConsultationsPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [approvalBusyId, setApprovalBusyId] = useState<string | null>(null);
-  const [reasonModal, setReasonModal] = useState<{ memoId: string } | null>(null);
+  const [reasonModal, setReasonModal] = useState<{ memoId: string; action: string } | null>(null);
   const [reasonSubmitting, setReasonSubmitting] = useState(false);
 
   const clubsRef = useRef<Club[]>(clubs);
@@ -152,6 +172,13 @@ export default function ConsultationsPage() {
   const [relatedOppositeTab, setRelatedOppositeTab] = useState<"매수" | "매도">("매수");
   const [noteInput, setNoteInput] = useState("");
   const [isAddingNote, setIsAddingNote] = useState(false);
+
+  // 입출금표
+  const [settlement, setSettlement] = useState<Settlement | null>(null);
+  const [isLoadingSettlement, setIsLoadingSettlement] = useState(false);
+  const [settlementEditMode, setSettlementEditMode] = useState(false);
+  const [settlementDraft, setSettlementDraft] = useState<Partial<SettlementUpdateInput>>({});
+  const [isSavingSettlement, setIsSavingSettlement] = useState(false);
 
   // 추가 Drawer 탭
   const [addDrawerTab, setAddDrawerTab] = useState<"ai" | "manual">("manual");
@@ -484,12 +511,12 @@ export default function ConsultationsPage() {
 
   const runApprovalAction = async (
     memo: Consultation,
-    action: "APPROVE_FIRST" | "REOPEN",
+    action: string,
     reason?: string,
   ) => {
     setApprovalBusyId(memo.id);
     try {
-      const response = await consultationsRepo.approvalAction(memo.id, { action, reason });
+      const response = await consultationsRepo.approvalAction(memo.id, { action: action as AdminConsultationAction, reason });
       if (response.success && response.data) {
         const updated = response.data;
         setRawMemos((prev) => prev.map((m) => (m.id === memo.id ? updated : m)));
@@ -509,6 +536,46 @@ export default function ConsultationsPage() {
   const closeDetailModal = () => {
     setSelectedMemo(null);
     setNoteInput("");
+    setSettlement(null);
+    setSettlementEditMode(false);
+    setSettlementDraft({});
+  };
+
+  const loadSettlement = async (memo: Consultation) => {
+    const sid = memo.settlementId;
+    if (!sid) {
+      setSettlement(null);
+      return;
+    }
+    setIsLoadingSettlement(true);
+    try {
+      const res = await settlementsRepo.getOne(sid);
+      if (res.success && res.data) setSettlement(res.data);
+      else setSettlement(null);
+    } catch {
+      setSettlement(null);
+    } finally {
+      setIsLoadingSettlement(false);
+    }
+  };
+
+  const handleSaveSettlement = async () => {
+    if (!settlement?.id) return;
+    setIsSavingSettlement(true);
+    try {
+      const res = await settlementsRepo.update(settlement.id, settlementDraft as SettlementUpdateInput);
+      if (res.success && res.data) {
+        setSettlement(res.data);
+        setSettlementEditMode(false);
+        setSettlementDraft({});
+      } else {
+        alert("입출금표 저장에 실패했습니다.");
+      }
+    } catch {
+      alert("입출금표 저장 중 오류가 발생했습니다.");
+    } finally {
+      setIsSavingSettlement(false);
+    }
   };
 
   const handleAddNote = async () => {
@@ -536,13 +603,19 @@ export default function ConsultationsPage() {
     setRelatedMemos([]);
     setIsLoadingRelated(true);
     setRelatedSort("date");
+    setSettlement(null);
+    setSettlementEditMode(false);
+    setSettlementDraft({});
     const oppositeType = memo.tradeType === "매수" ? "매도" : "매수";
     setRelatedOppositeTab(oppositeType);
 
-    const related = await consultationsRepo
-      .getAll({ search: memo.clubName, tradeType: oppositeType, limit: 100 })
-      .then((res) => res.data?.trades?.filter((t: Consultation) => t.clubName === memo.clubName) || [])
-      .catch(() => [] as Consultation[]);
+    const [related] = await Promise.all([
+      consultationsRepo
+        .getAll({ search: memo.clubName, tradeType: oppositeType, limit: 100 })
+        .then((res) => res.data?.trades?.filter((t: Consultation) => t.clubName === memo.clubName) || [])
+        .catch(() => [] as Consultation[]),
+      loadSettlement(memo),
+    ]);
 
     setRelatedMemos(related);
     setIsLoadingRelated(false);
@@ -810,8 +883,8 @@ export default function ConsultationsPage() {
                 </thead>
                 <tbody>
                   {displayMemos.map((trade) => {
-                    const statusInfo = getStatusInfo(trade.approvalStatus || "IN_CONSULTATION");
-                    const approvalPill = getApprovalPill(trade.approvalStatus || "IN_CONSULTATION");
+                    const statusInfo = getProgressStatusInfo(trade.progressStatus || trade.approvalStatus || "IN_CONSULTATION");
+                    const approvalPill = statusInfo;
                     const entries = buildMemoEntries(trade);
                     const latestEntry = entries.length > 0 ? entries[entries.length - 1] : null;
                     const isDone = isConsultationCompleted(trade);
@@ -883,9 +956,9 @@ export default function ConsultationsPage() {
                         <td className="hidden md:table-cell py-3.5 px-3 text-gray-500 whitespace-nowrap text-[13px]">
                           {trade.createdByName || "-"}
                         </td>
-                        {/* 승인 요청 pill */}
+                        {/* 진행 상태 pill */}
                         <td className="hidden md:table-cell py-3.5 px-3 text-center whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2 py-[3px] rounded text-[11px] font-semibold border ${approvalPill.className}`}>
+                          <span className={`inline-flex items-center px-2 py-[3px] rounded text-[11px] font-semibold border ${approvalPill.pillClass}`}>
                             {approvalPill.label}
                           </span>
                         </td>
@@ -970,11 +1043,11 @@ export default function ConsultationsPage() {
               {(() => {
                 const entries = buildMemoEntries(selectedMemo);
                 const ordered = [...entries].reverse();
-                const statusInfo = getStatusInfo(selectedMemo.approvalStatus || "IN_CONSULTATION");
-                const approvalPill = getApprovalPill(selectedMemo.approvalStatus || "IN_CONSULTATION");
+                const statusInfo = getProgressStatusInfo(selectedMemo.progressStatus || selectedMemo.approvalStatus || "IN_CONSULTATION");
                 const isDone = isConsultationCompleted(selectedMemo);
                 const hasDeposit = !!selectedMemo.depositAmount && selectedMemo.depositAmount > 0;
                 const docReady = !!selectedMemo.settlementDocumentGenerated;
+                const progressStatus = selectedMemo.progressStatus || selectedMemo.approvalStatus || "IN_CONSULTATION";
                 return (
                   <div className={`bg-white border rounded-2xl overflow-hidden flex-shrink-0 ${isDone ? "border-emerald-200 bg-emerald-50/30" : selectedMemo.tradeType === "매수" ? "border-amber-200 bg-amber-50/30" : "border-red-200 bg-red-50/30"}`}>
                     <div className="px-[18px] py-3.5 border-b border-transparent flex items-center justify-between">
@@ -991,9 +1064,6 @@ export default function ConsultationsPage() {
                       <span className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-gray-600">
                         <span className={`w-[6px] h-[6px] rounded-full ${statusInfo.dotClass}`} />
                         {statusInfo.label}
-                      </span>
-                      <span className={`inline-flex items-center px-2 py-[2px] rounded text-[10.5px] font-bold border ${approvalPill.className}`}>
-                        {approvalPill.label}
                       </span>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 px-[18px] py-4 border-t border-black/5">
@@ -1069,44 +1139,240 @@ export default function ConsultationsPage() {
                     </div>
 
                     {/* 액션 버튼 영역 */}
-                    {(selectedMemo.approvalStatus === "PENDING_DEPOSIT" || selectedMemo.approvalStatus === "DEPOSIT_APPROVED") && (
+                    {progressStatus !== "TRADE_COMPLETED" && progressStatus !== "COMPLETED" && (
                       <div className="px-[18px] pb-[18px] flex items-center gap-2 flex-wrap">
-                        {selectedMemo.approvalStatus === "PENDING_DEPOSIT" && (
+                        {(progressStatus === "IN_CONSULTATION" || progressStatus === "DEPOSIT_REVIEW" || progressStatus === "PENDING_DEPOSIT") && (
                           <button
                             type="button"
                             disabled={approvalBusyId === selectedMemo.id || !hasDeposit || !docReady}
-                            onClick={() => runApprovalAction(selectedMemo, "APPROVE_FIRST")}
-                            title={!hasDeposit ? "계약금 입력 후 확인 가능" : !docReady ? "입출금표 문서 생성 완료가 필요합니다" : "계약금 확인 후 거래 자동 생성"}
+                            onClick={() => void runApprovalAction(selectedMemo, "CONFIRM_DEPOSIT")}
+                            title={!hasDeposit ? "계약금 입력 후 확인 가능" : !docReady ? "입출금표 문서 생성 완료가 필요합니다" : "계약금 확인 완료 - 거래 자동 생성"}
                             className="px-3 py-1.5 text-[12.5px] font-semibold rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                           >
-                            계약금 확인
+                            {approvalBusyId === selectedMemo.id ? "처리 중…" : "계약금 확인 완료"}
                           </button>
                         )}
-                        {selectedMemo.approvalStatus === "DEPOSIT_APPROVED" && (
-                          <>
-                            <button
-                              type="button"
-                              disabled={approvalBusyId === selectedMemo.id}
-                              onClick={() => setReasonModal({ memoId: selectedMemo.id })}
-                              className="px-3 py-1.5 text-[12.5px] font-semibold rounded-lg border border-amber-200 text-amber-700 hover:bg-amber-50 disabled:opacity-50 transition-colors"
-                            >
-                              다시 열기
-                            </button>
-                            {selectedMemo.linkedTradeId && (
-                              <a
-                                href={`/trade-records?highlight=${selectedMemo.linkedTradeId}`}
-                                className="px-3 py-1.5 text-[12.5px] font-semibold rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 transition-colors"
-                              >
-                                거래 보기
-                              </a>
-                            )}
-                          </>
+                        {progressStatus === "DEPOSIT_REVIEW" && (
+                          <button
+                            type="button"
+                            disabled={approvalBusyId === selectedMemo.id}
+                            onClick={() => setReasonModal({ memoId: selectedMemo.id, action: "REOPEN" })}
+                            className="px-3 py-1.5 text-[12.5px] font-semibold rounded-lg border border-amber-200 text-amber-700 hover:bg-amber-50 disabled:opacity-50 transition-colors"
+                          >
+                            다시 열기
+                          </button>
+                        )}
+                        {(progressStatus === "DOCUMENT_AND_BALANCE_IN_PROGRESS" || progressStatus === "BALANCE_REVIEW") && (
+                          <button
+                            type="button"
+                            disabled={approvalBusyId === selectedMemo.id}
+                            onClick={() => void runApprovalAction(selectedMemo, "CONFIRM_DOCUMENT_AND_BALANCE")}
+                            className="px-3 py-1.5 text-[12.5px] font-semibold rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                          >
+                            {approvalBusyId === selectedMemo.id ? "처리 중…" : "잔금·서류 확인 완료"}
+                          </button>
+                        )}
+                        {progressStatus === "BALANCE_REVIEW" && (
+                          <button
+                            type="button"
+                            disabled={approvalBusyId === selectedMemo.id}
+                            onClick={() => setReasonModal({ memoId: selectedMemo.id, action: "REQUEST_REREVIEW" })}
+                            className="px-3 py-1.5 text-[12.5px] font-semibold rounded-lg border border-amber-200 text-amber-700 hover:bg-amber-50 disabled:opacity-50 transition-colors"
+                          >
+                            재확인 요청
+                          </button>
+                        )}
+                        {(progressStatus === "TAX_IN_PROGRESS" || progressStatus === "TAX_REVIEW") && (
+                          <button
+                            type="button"
+                            disabled={approvalBusyId === selectedMemo.id}
+                            onClick={() => void runApprovalAction(selectedMemo, "COMPLETE_TAX_FILING")}
+                            className="px-3 py-1.5 text-[12.5px] font-semibold rounded-lg border border-sky-200 text-sky-700 hover:bg-sky-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                          >
+                            {approvalBusyId === selectedMemo.id ? "처리 중…" : "세무 처리 완료"}
+                          </button>
+                        )}
+                        {progressStatus === "TAX_REVIEW" && (
+                          <button
+                            type="button"
+                            disabled={approvalBusyId === selectedMemo.id}
+                            onClick={() => setReasonModal({ memoId: selectedMemo.id, action: "REQUEST_REREVIEW" })}
+                            className="px-3 py-1.5 text-[12.5px] font-semibold rounded-lg border border-amber-200 text-amber-700 hover:bg-amber-50 disabled:opacity-50 transition-colors"
+                          >
+                            재확인 요청
+                          </button>
+                        )}
+                        {selectedMemo.linkedTradeId && (
+                          <a
+                            href={`/trade-records?highlight=${selectedMemo.linkedTradeId}`}
+                            className="px-3 py-1.5 text-[12.5px] font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+                          >
+                            거래 보기
+                          </a>
                         )}
                       </div>
                     )}
                   </div>
                 );
               })()}
+
+              {/* Card 1-b: 입출금표 */}
+              {(selectedMemo.settlementId || selectedMemo.settlementDocumentGenerated) && (
+                <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden flex-shrink-0">
+                  <div className="px-[18px] py-3.5 border-b border-gray-100 flex items-center justify-between gap-2">
+                    <h4 className="text-sm font-bold text-gray-900">입출금표</h4>
+                    <div className="flex items-center gap-2">
+                      {settlementEditMode ? (
+                        <>
+                          <button
+                            type="button"
+                            disabled={isSavingSettlement}
+                            onClick={() => { setSettlementEditMode(false); setSettlementDraft({}); }}
+                            className="px-3 py-1 text-[12px] font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                          >
+                            취소
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isSavingSettlement}
+                            onClick={() => void handleSaveSettlement()}
+                            className="px-3 py-1 text-[12px] font-semibold rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 transition-colors"
+                          >
+                            {isSavingSettlement ? "저장 중…" : "저장"}
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={!settlement || isLoadingSettlement}
+                          onClick={() => { if (settlement) { setSettlementDraft({}); setSettlementEditMode(true); } }}
+                          className="px-3 py-1 text-[12px] font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+                        >
+                          수정
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {isLoadingSettlement ? (
+                    <div className="flex items-center justify-center px-[18px] py-8 text-[13px] text-gray-400">
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      불러오는 중…
+                    </div>
+                  ) : !settlement ? (
+                    <div className="px-[18px] py-6 text-center text-[12.5px] text-gray-400">입출금표가 없습니다</div>
+                  ) : (
+                    <div className="px-[18px] py-4 flex flex-col gap-4">
+                      {/* 헤더 */}
+                      <div>
+                        <p className="text-[10.5px] font-bold text-gray-400 uppercase tracking-[0.06em] mb-2">헤더</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                          {[
+                            { label: "회원권명", field: "membershipName", value: settlement.membershipName },
+                            { label: "거래일", field: "tradeDate", value: settlement.tradeDate },
+                            { label: "계약금액", field: "salesContractAmount", value: formatSettlementAmount(settlement.salesContractAmount), isNumber: true, rawKey: "salesContractAmount" },
+                            { label: "비고", field: "specialNotes", value: settlement.specialNotes },
+                          ].map(({ label, field, value, isNumber, rawKey }) => (
+                            <div key={field} className="flex flex-col gap-1">
+                              <span className="text-[10.5px] font-semibold text-gray-400 uppercase tracking-[0.04em]">{label}</span>
+                              {settlementEditMode ? (
+                                <input
+                                  type={isNumber ? "number" : "text"}
+                                  defaultValue={isNumber ? (settlement[rawKey as keyof Settlement] as number | null) ?? "" : (value ?? "")}
+                                  onChange={(e) => setSettlementDraft((d) => ({ ...d, [rawKey ?? field]: isNumber ? (e.target.value ? Number(e.target.value) : null) : e.target.value || null }))}
+                                  className="h-7 px-2 text-[12.5px] border border-gray-200 rounded focus:outline-none focus:border-gray-500"
+                                />
+                              ) : (
+                                <span className="text-[13px] font-semibold text-gray-900">{value || "-"}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      {/* 매도자 */}
+                      <div>
+                        <p className="text-[10.5px] font-bold text-gray-400 uppercase tracking-[0.06em] mb-2">매도자</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {[
+                            { label: "성명", field: "sellName", value: settlement.sellName },
+                            { label: "연락처", field: "sellPhone", value: settlement.sellPhone },
+                            { label: "구분", field: "sellEntityType", value: entityTypeLabel(settlement.sellEntityType) },
+                            { label: "회원권 금액", field: "sellMembershipAmount", value: formatSettlementAmount(settlement.sellMembershipAmount), isNumber: true, rawKey: "sellMembershipAmount" },
+                            { label: "계약금", field: "sellDepositAmount", value: formatSettlementAmount(settlement.sellDepositAmount), isNumber: true, rawKey: "sellDepositAmount" },
+                            { label: "잔금", field: "sellBalanceAmount", value: formatSettlementAmount(settlement.sellBalanceAmount), isNumber: true, rawKey: "sellBalanceAmount" },
+                          ].map(({ label, field, value, isNumber, rawKey }) => (
+                            <div key={field} className="flex flex-col gap-1">
+                              <span className="text-[10.5px] font-semibold text-gray-400 uppercase tracking-[0.04em]">{label}</span>
+                              {settlementEditMode && isNumber ? (
+                                <input
+                                  type="number"
+                                  defaultValue={(settlement[rawKey as keyof Settlement] as number | null) ?? ""}
+                                  onChange={(e) => setSettlementDraft((d) => ({ ...d, [rawKey ?? field]: e.target.value ? Number(e.target.value) : null }))}
+                                  className="h-7 px-2 text-[12.5px] border border-gray-200 rounded focus:outline-none focus:border-gray-500"
+                                />
+                              ) : settlementEditMode ? (
+                                <input
+                                  type="text"
+                                  defaultValue={value ?? ""}
+                                  onChange={(e) => setSettlementDraft((d) => ({ ...d, [field]: e.target.value || null }))}
+                                  className="h-7 px-2 text-[12.5px] border border-gray-200 rounded focus:outline-none focus:border-gray-500"
+                                />
+                              ) : (
+                                <span className="text-[13px] font-semibold text-gray-900">{value || "-"}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        {settlement.sellCommissionDeducted != null && (
+                          <p className="mt-1.5 text-[11.5px] text-gray-500">
+                            수수료 공제: <span className="font-semibold">{settlement.sellCommissionDeducted ? "포함" : "미포함"}</span>
+                            {settlement.sellCommissionAmount ? ` (${formatSettlementAmount(settlement.sellCommissionAmount)})` : ""}
+                          </p>
+                        )}
+                      </div>
+                      {/* 매수자 */}
+                      <div>
+                        <p className="text-[10.5px] font-bold text-gray-400 uppercase tracking-[0.06em] mb-2">매수자</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {[
+                            { label: "성명", field: "buyName", value: settlement.buyName },
+                            { label: "연락처", field: "buyPhone", value: settlement.buyPhone },
+                            { label: "구분", field: "buyEntityType", value: entityTypeLabel(settlement.buyEntityType) },
+                            { label: "회원권 금액", field: "buyMembershipAmount", value: formatSettlementAmount(settlement.buyMembershipAmount), isNumber: true, rawKey: "buyMembershipAmount" },
+                            { label: "계약금", field: "buyDepositAmount", value: formatSettlementAmount(settlement.buyDepositAmount), isNumber: true, rawKey: "buyDepositAmount" },
+                            { label: "잔금", field: "buyBalanceAmount", value: formatSettlementAmount(settlement.buyBalanceAmount), isNumber: true, rawKey: "buyBalanceAmount" },
+                          ].map(({ label, field, value, isNumber, rawKey }) => (
+                            <div key={field} className="flex flex-col gap-1">
+                              <span className="text-[10.5px] font-semibold text-gray-400 uppercase tracking-[0.04em]">{label}</span>
+                              {settlementEditMode && isNumber ? (
+                                <input
+                                  type="number"
+                                  defaultValue={(settlement[rawKey as keyof Settlement] as number | null) ?? ""}
+                                  onChange={(e) => setSettlementDraft((d) => ({ ...d, [rawKey ?? field]: e.target.value ? Number(e.target.value) : null }))}
+                                  className="h-7 px-2 text-[12.5px] border border-gray-200 rounded focus:outline-none focus:border-gray-500"
+                                />
+                              ) : settlementEditMode ? (
+                                <input
+                                  type="text"
+                                  defaultValue={value ?? ""}
+                                  onChange={(e) => setSettlementDraft((d) => ({ ...d, [field]: e.target.value || null }))}
+                                  className="h-7 px-2 text-[12.5px] border border-gray-200 rounded focus:outline-none focus:border-gray-500"
+                                />
+                              ) : (
+                                <span className="text-[13px] font-semibold text-gray-900">{value || "-"}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        {settlement.buyStampTaxIncluded != null && (
+                          <p className="mt-1.5 text-[11.5px] text-gray-500">
+                            인지세: <span className="font-semibold">{settlement.buyStampTaxIncluded ? "포함" : "미포함"}</span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Card 2: 고객 프로필 */}
               <MatchedCustomerCard
@@ -1184,7 +1450,7 @@ export default function ConsultationsPage() {
                               <span className="text-[13.5px] font-bold text-gray-900">{related.customerName}</span>
                               <span className="text-[12px] text-gray-500">{related.membershipName}</span>
                               <div className="ml-auto flex items-center gap-1.5">
-                                {(() => { const s = getStatusInfo(related.approvalStatus || "IN_CONSULTATION"); return <span className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-gray-600"><span className={`w-[6px] h-[6px] rounded-full ${s.dotClass}`} />{s.label}</span>; })()}
+                                {(() => { const s = getProgressStatusInfo(related.progressStatus || related.approvalStatus || "IN_CONSULTATION"); return <span className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-gray-600"><span className={`w-[6px] h-[6px] rounded-full ${s.dotClass}`} />{s.label}</span>; })()}
                                 {isDoneRelated && <span className="inline-flex items-center px-2 py-px rounded-full text-[11px] font-semibold text-emerald-700 bg-emerald-50">완료</span>}
                               </div>
                             </div>
@@ -1557,15 +1823,15 @@ export default function ConsultationsPage() {
 
       <ActionReasonModal
         open={!!reasonModal}
-        action={reasonModal ? "REOPEN" : null}
+        action={reasonModal ? (reasonModal.action as "REOPEN") : null}
         submitting={reasonSubmitting}
         onCancel={() => setReasonModal(null)}
         onConfirm={async (reason) => {
           if (!reasonModal) return;
           setReasonSubmitting(true);
-          const target = rawMemos.find((m) => m.id === reasonModal.memoId);
+          const target = rawMemos.find((m) => m.id === reasonModal.memoId) ?? selectedMemo;
           if (target) {
-            const ok = await runApprovalAction(target, "REOPEN", reason);
+            const ok = await runApprovalAction(target, reasonModal.action, reason);
             if (ok) setReasonModal(null);
           }
           setReasonSubmitting(false);

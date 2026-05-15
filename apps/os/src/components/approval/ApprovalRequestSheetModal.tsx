@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { FormProvider } from "react-hook-form";
-import { X, Printer, Download, RotateCcw, Send } from "lucide-react";
+import { X, Printer, Download, RotateCcw, Send, Save } from "lucide-react";
 import type { MembershipTrade } from "@/types";
 import {
   collectMissingConsultationApprovalFields,
   type ConsultationApprovalStructuralField,
+  type RequestType,
 } from "@heritage-dx/store";
 import { useSettlementSheet } from "@/hooks/useSettlementSheet";
 import { captureSheetAsJpeg, printSheetFitToPage } from "@/utils/sheet-print";
@@ -27,6 +28,9 @@ export interface ApprovalRequestSubmitResult {
 interface ApprovalRequestSheetModalProps {
   trade: MembershipTrade | null;
   isOpen: boolean;
+  /** "approval": 승인 요청 흐름 (기본값). "edit": 저장만 (승인 요청 없이 입출금표 수정) */
+  mode?: "approval" | "edit";
+  requestType?: RequestType;
   onClose: () => void;
   onSubmit?: (trade: MembershipTrade, patch: ApprovalRequestPatch) => Promise<ApprovalRequestSubmitResult>;
 }
@@ -51,6 +55,7 @@ const strFromOverride = (raw: string | undefined): string | undefined => {
 export default function ApprovalRequestSheetModal({
   trade,
   isOpen,
+  mode = "approval",
   onClose,
   onSubmit,
 }: ApprovalRequestSheetModalProps) {
@@ -115,6 +120,25 @@ export default function ApprovalRequestSheetModal({
       );
     } finally {
       setResetting(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const committed = await commit();
+      if (!committed.ok) {
+        if (committed.unmappedErrors.length > 0) {
+          setSubmitError(committed.unmappedErrors.join("\n"));
+        } else {
+          setSubmitError("입력값을 확인해 주세요. 빨간 표시된 셀의 메시지를 참고하세요.");
+        }
+        return;
+      }
+      onClose();
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -192,7 +216,9 @@ export default function ApprovalRequestSheetModal({
           {/* toolbar */}
           <div className="sticky top-0 z-10 mb-4 flex items-center justify-between rounded-lg bg-white px-4 py-3 shadow-md print:hidden">
             <div>
-              <h2 className="text-base font-semibold text-gray-900">회원권 거래 승인요청서</h2>
+              <h2 className="text-base font-semibold text-gray-900">
+                {mode === "edit" ? "입출금표 수정" : "회원권 거래 승인요청서"}
+              </h2>
               <p className="text-xs text-gray-500">
                 {trade.clubName ?? ""} {trade.membershipType ?? ""} · {trade.customerName} · {trade.tradeType}
               </p>
@@ -224,7 +250,17 @@ export default function ApprovalRequestSheetModal({
                 <Download className="h-3.5 w-3.5" />
                 {jpegDownloading ? "다운로드 중…" : "JPEG"}
               </button>
-              {onSubmit && (
+              {mode === "edit" ? (
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={submitting}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  {submitting ? "저장 중…" : "저장"}
+                </button>
+              ) : onSubmit && (
                 <button
                   type="button"
                   onClick={handleSubmit}

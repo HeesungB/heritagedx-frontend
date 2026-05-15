@@ -245,6 +245,7 @@ export {
   APPROVAL_ACTIONS,
   TRADE_WORKFLOW_STATUS,
   PROGRESS_STATUS,
+  REQUEST_TYPES,
 } from "@heritage-dx/types";
 export type {
   ApprovalStatus,
@@ -257,12 +258,15 @@ export type {
   AdminConsultationAction,
   AdminTradeAction,
   ApprovalActionInput,
+  RequestType,
 } from "@heritage-dx/types";
 
 // Consultation progress helpers (isDone 대체)
 export {
   isConsultationCompleted,
   isInTradeStage,
+  canRequestApproval,
+  isUnderReview,
 } from "./domain/consultation-progress";
 
 // Trade record display helpers

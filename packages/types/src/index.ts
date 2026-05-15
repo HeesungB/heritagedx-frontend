@@ -77,6 +77,7 @@ export {
   APPROVAL_ACTIONS,
   TRADE_WORKFLOW_STATUS,
   PROGRESS_STATUS,
+  REQUEST_TYPES,
 } from "./approval";
 export type {
   ApprovalStatus,
@@ -89,6 +90,7 @@ export type {
   AdminConsultationAction,
   AdminTradeAction,
   ApprovalActionInput,
+  RequestType,
 } from "./approval";
 
 export type {

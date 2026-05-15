@@ -14,6 +14,12 @@ import { tradeSideStyle } from "./styles";
 const APPROVED_LOCK_STATUSES: ReadonlyArray<string> = [
   APPROVAL_STATUS.DEPOSIT_APPROVED,
   APPROVAL_STATUS.FIRST_APPROVED,
+  // 신규 progressStatus 값
+  "BALANCE_REVIEW",
+  "TAX_IN_PROGRESS",
+  "TAX_REVIEW",
+  "TRADE_COMPLETED",
+  // backwards compat
   "TAX_FILING",
   "COMPLETED",
 ];
@@ -33,10 +39,18 @@ function truncate(text: string, n = 15): string {
   return text.length > n ? `${text.slice(0, n)}…` : text;
 }
 
-function formatTime(iso: string): string {
+function formatRelativeTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  const diffMin = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (diffMin < 1) return "방금 전";
+  if (diffMin < 60) return `${diffMin}분 전`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `${diffH}시간 전`;
+  const diffD = Math.floor(diffH / 24);
+  if (diffD < 30) return `${diffD}일 전`;
+  const diffM = Math.floor(diffD / 30);
+  return diffM < 12 ? `${diffM}달 전` : `${Math.floor(diffM / 12)}년 전`;
 }
 
 function dateLabel(item: ConsultationEntity): string {
@@ -310,7 +324,7 @@ export function ConsultationRow({ item, isLast, defaultOpen, onAddNote }: Props)
                             fontVariantNumeric: "tabular-nums",
                           }}
                         >
-                          {formatTime(m.createdAt)}
+                          {formatRelativeTime(m.createdAt)}
                         </span>
                         {isLatest && (
                           <span

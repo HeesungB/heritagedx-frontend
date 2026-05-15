@@ -36,13 +36,33 @@ export type TradeWorkflowStatus =
 // 하나의 enum 으로 평탄화해 내려준다. REJECTED 단계는 거래쪽에만 존재해 여기엔 포함 안 됨.
 export const PROGRESS_STATUS = {
   IN_CONSULTATION: "IN_CONSULTATION",
+  DEPOSIT_REVIEW: "DEPOSIT_REVIEW",
+  DOCUMENT_AND_BALANCE_IN_PROGRESS: "DOCUMENT_AND_BALANCE_IN_PROGRESS",
+  BALANCE_REVIEW: "BALANCE_REVIEW",
+  TAX_IN_PROGRESS: "TAX_IN_PROGRESS",
+  TAX_REVIEW: "TAX_REVIEW",
+  TRADE_COMPLETED: "TRADE_COMPLETED",
+  /** @deprecated DEPOSIT_REVIEW 로 대체됨. 과거 데이터 호환용. */
   PENDING_DEPOSIT: "PENDING_DEPOSIT",
+  /** @deprecated DOCUMENT_AND_BALANCE_IN_PROGRESS 로 대체됨. 과거 데이터 호환용. */
   DOCUMENT_AND_BALANCE: "DOCUMENT_AND_BALANCE",
+  /** @deprecated TAX_IN_PROGRESS 로 대체됨. 과거 데이터 호환용. */
   TAX_FILING: "TAX_FILING",
+  /** @deprecated TRADE_COMPLETED 로 대체됨. 과거 데이터 호환용. */
   COMPLETED: "COMPLETED",
 } as const;
 
 export type ProgressStatus = (typeof PROGRESS_STATUS)[keyof typeof PROGRESS_STATUS];
+
+// 에디터가 REQUEST_APPROVAL 액션에 명시적으로 지정하는 요청 유형.
+// 생략 시 서버가 현재 progressStatus 기준으로 자동 선택한다.
+export const REQUEST_TYPES = {
+  DEPOSIT: "DEPOSIT",
+  BALANCE: "BALANCE",
+  TAX: "TAX",
+} as const;
+
+export type RequestType = (typeof REQUEST_TYPES)[keyof typeof REQUEST_TYPES];
 
 /** @deprecated TradeWorkflowStatus 로 대체. 다음 PR 에서 제거 예정. */
 export type WorkflowStatus = TradeWorkflowStatus;
@@ -54,6 +74,11 @@ export const APPROVAL_ACTIONS = {
   REJECT: "REJECT",
   ADVANCE_TO_TAX_FILING: "ADVANCE_TO_TAX_FILING",
   ADVANCE_TO_COMPLETED: "ADVANCE_TO_COMPLETED",
+  // 2026-05 백엔드 신규 admin 액션
+  CONFIRM_DEPOSIT: "CONFIRM_DEPOSIT",
+  CONFIRM_DOCUMENT_AND_BALANCE: "CONFIRM_DOCUMENT_AND_BALANCE",
+  COMPLETE_TAX_FILING: "COMPLETE_TAX_FILING",
+  REQUEST_REREVIEW: "REQUEST_REREVIEW",
   /** @deprecated 신규 워크플로우에서 미사용. */
   HOLD: "HOLD",
 } as const;
@@ -63,8 +88,12 @@ export type ApprovalAction = (typeof APPROVAL_ACTIONS)[keyof typeof APPROVAL_ACT
 // 역할/엔드포인트별 허용 액션 (UI 버튼 노출 + 서버 검증과 일치)
 export type UserConsultationAction = typeof APPROVAL_ACTIONS.REQUEST_APPROVAL;
 export type AdminConsultationAction =
-  | typeof APPROVAL_ACTIONS.APPROVE_FIRST
-  | typeof APPROVAL_ACTIONS.REOPEN;
+  | typeof APPROVAL_ACTIONS.CONFIRM_DEPOSIT
+  | typeof APPROVAL_ACTIONS.CONFIRM_DOCUMENT_AND_BALANCE
+  | typeof APPROVAL_ACTIONS.COMPLETE_TAX_FILING
+  | typeof APPROVAL_ACTIONS.REQUEST_REREVIEW
+  | typeof APPROVAL_ACTIONS.REOPEN
+  | typeof APPROVAL_ACTIONS.APPROVE_FIRST;
 export type AdminTradeAction =
   | typeof APPROVAL_ACTIONS.ADVANCE_TO_TAX_FILING
   | typeof APPROVAL_ACTIONS.ADVANCE_TO_COMPLETED
@@ -76,4 +105,5 @@ export type UserApprovalAction = UserConsultationAction;
 export interface ApprovalActionInput<A extends ApprovalAction = ApprovalAction> {
   action: A;
   reason?: string;
+  requestType?: RequestType;
 }

@@ -2,6 +2,7 @@ import { createStore } from "zustand/vanilla";
 import type { GeneralRepositories, TradeListParams } from "@heritage-dx/api";
 import type { ConsultationInput, ConsultationNoteEntry } from "@heritage-dx/types";
 import { APPROVAL_ACTIONS } from "@heritage-dx/types";
+import type { RequestType } from "@heritage-dx/types";
 import type { FetchStatus, PaginationState } from "../entities/common";
 import type {
   ConsultationEntity,
@@ -54,6 +55,7 @@ export interface ConsultationStoreState {
       customerName?: string;
       contact?: string;
       reason?: string;
+      requestType?: RequestType;
     },
   ) => Promise<RequestApprovalResult>;
   hydrate: (items: ConsultationEntity[], pagination: PaginationState) => void;
@@ -207,6 +209,7 @@ export function createConsultationStore(repos: GeneralRepositories) {
         customerName?: string;
         contact?: string;
         reason?: string;
+        requestType?: RequestType;
       },
     ): Promise<RequestApprovalResult> => {
       try {
@@ -250,6 +253,7 @@ export function createConsultationStore(repos: GeneralRepositories) {
         const response = await repos.consultations.approvalAction(id, {
           action: APPROVAL_ACTIONS.REQUEST_APPROVAL,
           reason: input?.reason,
+          requestType: input?.requestType,
         });
         if (response.success && response.data) {
           const entity = mapConsultationDtoToEntity(response.data);

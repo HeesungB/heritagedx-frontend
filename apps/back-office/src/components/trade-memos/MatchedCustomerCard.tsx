@@ -11,6 +11,7 @@ import {
   mapCustomerHistorySummaryDtoToEntity,
   type CustomerEntity,
   type CustomerHistoryRecentConsultationEntity,
+  type CustomerHistoryRecentMembershipTradeEntity,
   type CustomerHistorySummaryEntity,
 } from "@heritage-dx/store";
 
@@ -20,7 +21,7 @@ interface Props {
   fallbackContact?: string | null;
 }
 
-type TabKey = "info" | "memberships" | "history";
+type TabKey = "info" | "memberships" | "history" | "trades";
 
 // 시안 ~/Desktop/add customer.html 의 매칭 고객 카드와 동일한 시각.
 // OS 의 apps/os/src/components/trade-memo/MatchedCustomerCard 와 디자인은 1:1 이지만,
@@ -76,17 +77,22 @@ export default function MatchedCustomerCard({
           }
         }
 
-        if (
-          historyResult.status === "fulfilled" &&
-          historyResult.value.success &&
-          historyResult.value.data
-        ) {
-          setHistory(mapCustomerHistorySummaryDtoToEntity(historyResult.value.data));
-        } else {
-          setHistory(null);
-          if (historyResult.status === "rejected") {
-            console.error("Failed to load customer history:", historyResult.reason);
+        try {
+          if (
+            historyResult.status === "fulfilled" &&
+            historyResult.value.success &&
+            historyResult.value.data
+          ) {
+            setHistory(mapCustomerHistorySummaryDtoToEntity(historyResult.value.data));
+          } else {
+            setHistory(null);
+            if (historyResult.status === "rejected") {
+              console.error("Failed to load customer history:", historyResult.reason);
+            }
           }
+        } catch (historyError) {
+          console.error("Failed to map customer history:", historyError);
+          setHistory(null);
         }
       } catch (error) {
         if (cancelled) return;
@@ -132,7 +138,7 @@ export default function MatchedCustomerCard({
   const region = customer.residenceArea ?? customer.address ?? null;
 
   return (
-    <div className="mt-1 overflow-hidden rounded-lg border border-[#e5e7eb] bg-[#fafafa]">
+    <div className="mt-1 flex-shrink-0 overflow-hidden rounded-lg border border-[#e5e7eb] bg-[#fafafa]">
       <button
         type="button"
         onClick={(e) => {
@@ -195,6 +201,12 @@ export default function MatchedCustomerCard({
               onClick={() => setTab("history")}
               count={history?.summary.consultationCount ?? null}
             />
+            <TabButton
+              label="거래 내역"
+              active={tab === "trades"}
+              onClick={() => setTab("trades")}
+              count={history?.summary.membershipTradeCount ?? null}
+            />
           </div>
 
           <div className="px-3.5 py-3">
@@ -207,6 +219,13 @@ export default function MatchedCustomerCard({
                 customerId={customerId}
                 items={history?.recentConsultations ?? []}
                 total={history?.summary.consultationCount ?? 0}
+              />
+            )}
+            {tab === "trades" && (
+              <TradesTab
+                customerId={customerId}
+                items={history?.recentMembershipTrades ?? []}
+                total={history?.summary.membershipTradeCount ?? 0}
               />
             )}
           </div>
@@ -231,7 +250,7 @@ function CustomerPlaceholderCard({
   const displayContact = contact?.trim() || "";
 
   return (
-    <div className="mt-1 overflow-hidden rounded-lg border border-[#e5e7eb] bg-[#fafafa]">
+    <div className="mt-1 flex-shrink-0 overflow-hidden rounded-lg border border-[#e5e7eb] bg-[#fafafa]">
       <div className="flex items-center gap-2.5 px-3.5 py-3">
         <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0a0a0a] text-[12px] font-bold text-white">
           {displayName.slice(0, 1) || "?"}
@@ -491,6 +510,66 @@ function HistoryTab({
           className="mt-3 inline-flex w-full items-center justify-center rounded-md border border-[#e5e7eb] bg-white px-3 py-2 text-[11.5px] font-medium text-[#374151] hover:bg-[#fafafa]"
         >
           전체 상담 메모 보기 →
+        </Link>
+      )}
+    </div>
+  );
+}
+
+function TradesTab({
+  customerId,
+  items,
+  total,
+}: {
+  customerId: string;
+  items: CustomerHistoryRecentMembershipTradeEntity[];
+  total: number;
+}) {
+  if (items.length === 0) {
+    return (
+      <div className="rounded-md border border-dashed border-[#d4d4d8] bg-white px-3 py-4 text-center text-[11.5px] text-[#9ca3af]">
+        최근 거래 이력이 없습니다.
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <div className="absolute left-1.5 top-2 bottom-2 w-px bg-[#e5e7eb]" />
+      <ul className="space-y-3">
+        {items.slice(0, 3).map((t, i) => (
+          <li key={t.id} className="relative pl-5">
+            <span
+              className={`absolute left-[2px] top-1 h-2.5 w-2.5 rounded-full border-2 ${
+                i === 0
+                  ? "border-[#0a0a0a] bg-[#0a0a0a]"
+                  : "border-[#d4d4d8] bg-white"
+              }`}
+            />
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-[12.5px] font-bold text-[#0a0a0a]">
+                {t.tradeType} · {t.clubName}
+              </span>
+              {t.contractDate && (
+                <span className="shrink-0 font-mono text-[10.5px] text-[#9ca3af]">
+                  {formatYmd(t.contractDate)}
+                </span>
+              )}
+            </div>
+            <p className="m-0 text-[11.5px] leading-[1.55] text-[#52525b]">
+              {t.membershipName}
+              <span className="mx-1.5 text-[#d4d4d8]">·</span>
+              {t.workflowStatus}
+            </p>
+          </li>
+        ))}
+      </ul>
+      {total > items.length && (
+        <Link
+          href={`/customers/${customerId}`}
+          className="mt-3 inline-flex w-full items-center justify-center rounded-md border border-[#e5e7eb] bg-white px-3 py-2 text-[11.5px] font-medium text-[#374151] hover:bg-[#fafafa]"
+        >
+          전체 거래 내역 보기 →
         </Link>
       )}
     </div>

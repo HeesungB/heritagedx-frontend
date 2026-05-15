@@ -1,78 +1,65 @@
 "use client";
 
-import type { ApprovalStatus } from "@heritage-dx/store";
+import { useRef } from "react";
+import type { RequestType } from "@heritage-dx/store";
 
 interface ApprovalPillButtonProps {
-  status: ApprovalStatus | string;
+  progressStatus: string;
   pending?: boolean;
-  onRequest?: () => void;
+  onRequest: (requestType: RequestType) => void;
 }
 
-interface Variant {
-  label: string;
-  cls: string;
-  /** clickable = triggers REQUEST_APPROVAL */
-  clickable: boolean;
-}
+const COMPLETED_STATES = new Set(["TRADE_COMPLETED", "COMPLETED"]);
+const REVIEW_STATES = new Set(["DEPOSIT_REVIEW", "BALANCE_REVIEW", "TAX_REVIEW", "PENDING_DEPOSIT"]);
+const REQUESTABLE_STATES = new Set(["IN_CONSULTATION", "DOCUMENT_AND_BALANCE_IN_PROGRESS", "TAX_IN_PROGRESS"]);
 
-function resolveVariant(status: ApprovalStatus | string): Variant {
-  switch (status) {
-    case "IN_CONSULTATION":
-    case "DRAFT":
-      return {
-        label: "승인 요청",
-        cls: "bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100",
-        clickable: true,
-      };
-    case "PENDING_DEPOSIT":
-    case "PENDING_APPROVAL":
-      return {
-        label: "요청됨",
-        cls: "bg-amber-50 text-amber-700 border-amber-200 cursor-default",
-        clickable: false,
-      };
-    case "DEPOSIT_APPROVED":
-    case "FIRST_APPROVED":
-      return {
-        label: "승인 완료",
-        cls: "bg-emerald-50 text-emerald-700 border-emerald-200 cursor-default",
-        clickable: false,
-      };
-    case "ON_HOLD":
-      return {
-        label: "보류",
-        cls: "bg-gray-50 text-gray-600 border-gray-200 cursor-default",
-        clickable: false,
-      };
-    case "REJECTED":
-      return {
-        label: "반려",
-        cls: "bg-red-50 text-red-700 border-red-200 cursor-default",
-        clickable: false,
-      };
-    default:
-      return {
-        label: "승인 요청",
-        cls: "bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100",
-        clickable: true,
-      };
+export default function ApprovalPillButton({
+  progressStatus,
+  pending,
+  onRequest,
+}: ApprovalPillButtonProps) {
+  const selectRef = useRef<HTMLSelectElement>(null);
+
+  if (COMPLETED_STATES.has(progressStatus)) {
+    return (
+      <span className="inline-flex h-[26px] items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 text-[11.5px] font-semibold text-emerald-700">
+        완료
+      </span>
+    );
   }
-}
 
-export default function ApprovalPillButton({ status, pending, onRequest }: ApprovalPillButtonProps) {
-  const variant = resolveVariant(status);
-  const disabled = pending || !variant.clickable;
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={(e) => {
-        e.stopPropagation();
-        if (variant.clickable && !pending) onRequest?.();
-      }}
-      className={`inline-flex h-[26px] items-center rounded-full border px-3 text-[11.5px] font-semibold transition-colors disabled:opacity-80 ${variant.cls}`}
-    >
-      {pending ? "처리 중…" : variant.label}
-    </button>
-  );
+  if (REVIEW_STATES.has(progressStatus)) {
+    return (
+      <span className="inline-flex h-[26px] items-center rounded-full border border-amber-200 bg-amber-50 px-3 text-[11.5px] font-semibold text-amber-700">
+        검토중
+      </span>
+    );
+  }
+
+  if (REQUESTABLE_STATES.has(progressStatus)) {
+    return (
+      <select
+        ref={selectRef}
+        disabled={pending}
+        defaultValue=""
+        onChange={(e) => {
+          const type = e.target.value as RequestType;
+          if (type) {
+            onRequest(type);
+            if (selectRef.current) selectRef.current.value = "";
+          }
+        }}
+        className="h-[26px] cursor-pointer rounded-full border border-orange-200 bg-orange-50 px-2 text-[11.5px] font-semibold text-orange-700 outline-none transition-colors hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-70"
+      >
+        <option value="" disabled>
+          {pending ? "처리 중…" : "승인 요청 ▾"}
+        </option>
+        <option value="DEPOSIT">계약금 확인 요청</option>
+        <option value="BALANCE">잔금 확인 요청</option>
+        <option value="TAX">세무 확인 요청</option>
+      </select>
+    );
+  }
+
+  return null;
 }

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, Fragment } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from "react";
 import { useSearchParams } from "next/navigation";
-import { Calendar, ChevronRight, Clock, Edit3, History, Plus, Search, X } from "lucide-react";
+import { Calendar, ChevronRight, Clock, Edit3, FileSpreadsheet, History, Plus, Search, X } from "lucide-react";
 import { Loading } from "@heritage-dx/ui";
 import type { MembershipTrade } from "@/types";
 import { useAppStores } from "@/stores";
@@ -15,6 +15,7 @@ import {
   type ConsultationNoteEntry,
   type ApprovalStatus,
   type RecentSearchItem,
+  type RequestType,
 } from "@heritage-dx/store";
 import ApprovalRequestSheetModal from "@/components/approval/ApprovalRequestSheetModal";
 import Pill from "@/components/trades/Pill";
@@ -47,6 +48,20 @@ function formatEntryTimestamp(iso: string) {
   } catch {
     return iso;
   }
+}
+
+function formatRelativeTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const diffMin = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (diffMin < 1) return "방금 전";
+  if (diffMin < 60) return `${diffMin}분 전`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `${diffH}시간 전`;
+  const diffD = Math.floor(diffH / 24);
+  if (diffD < 30) return `${diffD}일 전`;
+  const diffM = Math.floor(diffD / 30);
+  return diffM < 12 ? `${diffM}달 전` : `${Math.floor(diffM / 12)}년 전`;
 }
 
 function buildPageItems(current: number, total: number): (number | "…")[] {
@@ -96,6 +111,11 @@ export default function TradesPageClient() {
   const [filterApproval, setFilterApproval] = useState<ApprovalFilter>("");
   const [approvalPendingId, setApprovalPendingId] = useState<string | null>(null);
   const [approvalSheetTrade, setApprovalSheetTrade] = useState<MembershipTrade | null>(null);
+  const [approvalSheetMode, setApprovalSheetMode] = useState<"approval" | "edit">("approval");
+  const [approvalSheetRequestType, setApprovalSheetRequestType] = useState<RequestType | undefined>(undefined);
+  const tableWrapRef = useRef<HTMLDivElement>(null);
+  const [hasTableOverflow, setHasTableOverflow] = useState(false);
+  const [isTableEnd, setIsTableEnd] = useState(false);
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -167,6 +187,23 @@ export default function TradesPageClient() {
     return filtered;
   }, [rawTrades, dateFrom, dateTo, filter]);
 
+  useEffect(() => {
+    const el = tableWrapRef.current;
+    if (!el) return;
+    const update = () => {
+      const overflow = el.scrollWidth - el.clientWidth > 4;
+      setHasTableOverflow(overflow);
+      setIsTableEnd(!overflow || el.scrollLeft + el.clientWidth >= el.scrollWidth - 4);
+    };
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    return () => {
+      el.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, [trades]);
+
   // 새 notes JSONB 응답은 mapper 단계에서 entries 배열로 평탄화되므로, 뷰는 trade.notes 를
   // 그대로 사용한다. legacy `__MEMO_V1__` 인코딩/디코딩 경로는 더 이상 필요하지 않다.
   const buildMemoEntries = useCallback((trade: MembershipTrade): ConsultationNoteEntry[] => {
@@ -217,9 +254,18 @@ export default function TradesPageClient() {
     }
   };
 
-  // 승인 요청 pill 클릭 → 승인요청서 양식 모달 진입. 실제 API 호출은 모달 안에서 처리.
-  const handleOpenApprovalSheet = (trade: MembershipTrade) => {
+  // 승인 요청 select 선택 → requestType 명시해서 승인요청서 모달 진입.
+  const handleOpenApprovalSheet = (trade: MembershipTrade, requestType: RequestType) => {
     setApprovalSheetTrade(trade);
+    setApprovalSheetMode("approval");
+    setApprovalSheetRequestType(requestType);
+  };
+
+  // 입출금표 아이콘 클릭 → 승인 요청 없이 입출금표 수정 모드로 열기.
+  const handleOpenSettlementSheet = (trade: MembershipTrade) => {
+    setApprovalSheetTrade(trade);
+    setApprovalSheetMode("edit");
+    setApprovalSheetRequestType(undefined);
   };
 
   const filters: TradeFilter[] = ["전체", "매수", "매도", "미정"];
@@ -556,18 +602,38 @@ export default function TradesPageClient() {
                   </button>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="relative">
+                  {/* 우측 페이드 그라디언트 */}
+                  <div
+                    aria-hidden
+                    className={`pointer-events-none absolute inset-y-0 right-0 z-[2] w-14 bg-gradient-to-l from-white/95 via-white/70 to-transparent transition-opacity duration-200 ${
+                      hasTableOverflow && !isTableEnd ? "opacity-100" : "opacity-0"
+                    }`}
+                  />
+                  {/* "옆으로 이동" 힌트 칩 */}
+                  <div
+                    aria-hidden
+                    className={`pointer-events-none absolute right-3 top-1/2 z-[3] -translate-y-1/2 inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-gray-200 bg-white/95 px-2.5 py-1.5 text-[10.5px] font-semibold text-gray-500 shadow-sm transition-all duration-200 ${
+                      hasTableOverflow && !isTableEnd
+                        ? "opacity-100 translate-x-0"
+                        : "opacity-0 translate-x-1.5"
+                    }`}
+                  >
+                    <ChevronRight className="h-2.5 w-2.5" strokeWidth={2.2} />
+                    옆으로 이동
+                  </div>
+                  <div ref={tableWrapRef} className="overflow-x-auto">
                   <table className="w-full min-w-[1280px] border-collapse">
                     <thead>
                       <tr className="border-b border-gray-200 bg-gray-50">
                         <th className="w-11 px-2 py-2.5 text-center text-[11.5px] font-semibold text-gray-500">즐겨찾기</th>
                         <th className="w-[70px] px-2.5 py-2.5 text-left text-[11.5px] font-semibold text-gray-500">유형</th>
                         <th className="w-[90px] px-2.5 py-2.5 text-left text-[11.5px] font-semibold text-gray-500">상태</th>
-                        <th className="w-[170px] px-2.5 py-2.5 text-left text-[11.5px] font-semibold text-gray-500">골프장</th>
+                        <th className="w-[130px] px-2.5 py-2.5 text-left text-[11.5px] font-semibold text-gray-500">골프장</th>
                         <th className="w-[130px] px-2.5 py-2.5 text-left text-[11.5px] font-semibold text-gray-500">회원권</th>
                         <th className="w-[90px] px-2.5 py-2.5 text-left text-[11.5px] font-semibold text-gray-500">고객명</th>
                         <th className="w-[130px] px-2.5 py-2.5 text-left text-[11.5px] font-semibold text-gray-500">연락처</th>
-                        <th className="px-2.5 py-2.5 text-left text-[11.5px] font-semibold text-gray-500">메모</th>
+                        <th className="w-[160px] px-2.5 py-2.5 text-left text-[11.5px] font-semibold text-gray-500">메모</th>
                         <th className="w-[110px] px-2.5 py-2.5 text-right text-[11.5px] font-semibold text-gray-500">제시가</th>
                         <th className="w-[110px] px-2.5 py-2.5 text-right text-[11.5px] font-semibold text-gray-500">희망가</th>
                         <th className="w-[110px] px-2.5 py-2.5 text-left text-[11.5px] font-semibold text-gray-500">등록일</th>
@@ -612,7 +678,7 @@ export default function TradesPageClient() {
                                 <TypeBadge tradeType={trade.tradeType} isUndecided={undecided} isCompleted={isConsultationCompleted(trade)} />
                               </td>
                               <td className="px-2.5 py-2 align-middle whitespace-nowrap">
-                                <StatusBadge status={trade.approvalStatus} isCompleted={isConsultationCompleted(trade)} />
+                                <StatusBadge status={trade.progressStatus} isCompleted={isConsultationCompleted(trade)} />
                               </td>
                               <td
                                 className={`px-2.5 py-2 align-middle text-[13px] font-semibold whitespace-nowrap ${
@@ -708,13 +774,22 @@ export default function TradesPageClient() {
                               </td>
                               <td className="px-2.5 py-2 align-middle text-center">
                                 <ApprovalPillButton
-                                  status={trade.approvalStatus}
+                                  progressStatus={trade.progressStatus}
                                   pending={approvalPendingId === trade.id}
-                                  onRequest={() => handleOpenApprovalSheet(trade)}
+                                  onRequest={(requestType) => handleOpenApprovalSheet(trade, requestType)}
                                 />
                               </td>
                               <td className="px-2 py-2 align-middle">
                                 <div className="flex items-center justify-center gap-3.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenSettlementSheet(trade)}
+                                    title="입출금표 열기/수정"
+                                    className="inline-flex items-center text-gray-400 hover:text-gray-700"
+                                  >
+                                    <FileSpreadsheet className="h-3.5 w-3.5" />
+                                  </button>
+                                  <span className="h-3 w-px bg-gray-200" aria-hidden />
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -780,6 +855,7 @@ export default function TradesPageClient() {
                       })}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               )}
 
@@ -827,11 +903,16 @@ export default function TradesPageClient() {
       <ApprovalRequestSheetModal
         trade={approvalSheetTrade}
         isOpen={!!approvalSheetTrade}
+        mode={approvalSheetMode}
+        requestType={approvalSheetRequestType}
         onClose={() => setApprovalSheetTrade(null)}
-        onSubmit={async (trade, patch) => {
+        onSubmit={approvalSheetMode === "approval" ? async (trade, patch) => {
           setApprovalPendingId(trade.id);
           try {
-            const result = await requestApproval(trade.id, patch);
+            const result = await requestApproval(trade.id, {
+              ...patch,
+              requestType: approvalSheetRequestType,
+            });
             if (result.entity) {
               setApprovalSheetTrade(null);
               return { success: true };
@@ -846,7 +927,7 @@ export default function TradesPageClient() {
           } finally {
             setApprovalPendingId(null);
           }
-        }}
+        } : undefined}
       />
     </div>
   );
@@ -889,7 +970,7 @@ function MemoCell({ latestEntry, totalCount, expanded, onToggle }: MemoCellProps
             </span>
           )}
           <span className="shrink-0 text-[11px] text-gray-400">
-            {latestEntry.createdAt.slice(5, 16).replace("T", " · ")}
+            {formatRelativeTime(latestEntry.createdAt)}
           </span>
         </>
       ) : (
@@ -987,10 +1068,16 @@ function MemoHistoryRow({ trade, entries, draft, onDraftChange, onSubmit, submit
 
 // ─── Status badge (legacy color-dot) ───────────────────────────────
 
-// progressStatus 5값 (IN_CONSULTATION / PENDING_DEPOSIT / DOCUMENT_AND_BALANCE / TAX_FILING / COMPLETED) +
-// approvalStatus 3값 (IN_CONSULTATION / PENDING_DEPOSIT / DEPOSIT_APPROVED) 의 합집합.
 const APPROVAL_DOT: Record<string, string> = {
+  // 신규 progressStatus 값
   IN_CONSULTATION: "bg-gray-400",
+  DEPOSIT_REVIEW: "bg-amber-500",
+  DOCUMENT_AND_BALANCE_IN_PROGRESS: "bg-emerald-400",
+  BALANCE_REVIEW: "bg-amber-500",
+  TAX_IN_PROGRESS: "bg-sky-400",
+  TAX_REVIEW: "bg-amber-500",
+  TRADE_COMPLETED: "bg-emerald-600",
+  // backwards compat
   PENDING_DEPOSIT: "bg-amber-500",
   DEPOSIT_APPROVED: "bg-emerald-500",
   DOCUMENT_AND_BALANCE: "bg-emerald-500",
@@ -998,7 +1085,15 @@ const APPROVAL_DOT: Record<string, string> = {
   COMPLETED: "bg-emerald-600",
 };
 const APPROVAL_LABEL: Record<string, string> = {
+  // 신규 progressStatus 값
   IN_CONSULTATION: "상담중",
+  DEPOSIT_REVIEW: "계약금 검토중",
+  DOCUMENT_AND_BALANCE_IN_PROGRESS: "서류/잔금",
+  BALANCE_REVIEW: "잔금 검토중",
+  TAX_IN_PROGRESS: "세무신고",
+  TAX_REVIEW: "세무 검토중",
+  TRADE_COMPLETED: "완료",
+  // backwards compat
   PENDING_DEPOSIT: "검토중",
   DEPOSIT_APPROVED: "승인",
   DOCUMENT_AND_BALANCE: "잔금/문서",

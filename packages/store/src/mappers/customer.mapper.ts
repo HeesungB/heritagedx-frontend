@@ -100,7 +100,7 @@ export function mapCustomerHistorySummaryDtoToEntity(
       consultationCount: dto.summary.consultationCount,
       membershipTradeCount: dto.summary.membershipTradeCount,
     },
-    recentConsultations: dto.recentConsultations.map((c) => ({
+    recentConsultations: (dto.recentConsultations ?? []).map((c) => ({
       id: c.id,
       clubName: c.clubName,
       membershipName: c.membershipName,
@@ -109,7 +109,7 @@ export function mapCustomerHistorySummaryDtoToEntity(
       approvalStatus: c.approvalStatus,
       accountNumber: c.accountNumber ?? null,
     })),
-    recentMembershipTrades: dto.recentMembershipTrades.map((t) => ({
+    recentMembershipTrades: (dto.recentMembershipTrades ?? []).map((t) => ({
       id: t.id,
       clubName: t.clubName,
       membershipName: t.membershipName,

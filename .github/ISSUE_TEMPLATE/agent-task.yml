@@ -1,0 +1,40 @@
+name: 🤖 Agent task (Claude + Codex)
+description: Claude 와 Codex 가 함께 플랜→토론→구현→상호리뷰 하는 워크플로우 트리거
+title: "[Agent] "
+labels: ["state:new"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: 목표
+      description: 무엇을 달성하고 싶은지 한 단락으로
+      placeholder: 예) BO 거래 내역 V2 상세 페이지에서 X 동작이 깨져있어요
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: 컨텍스트·제약
+      description: 관련된 화면 / 라우트 / 패키지, 건드리지 말아야 할 영역, 알려진 의존 PR 등
+    validations:
+      required: false
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 완료 기준
+      description: 어떤 상태가 되면 "끝났다" 라고 판단할지 (체크리스트 권장)
+      placeholder: |
+        - [ ] /clubs/[id] 상세에서 ClubCardV2 hover 시 색이 변한다
+        - [ ] type-check 통과
+    validations:
+      required: false
+  - type: dropdown
+    id: ui
+    attributes:
+      label: UI 변경 예상?
+      description: "스크린샷 워커 활성화 여부 결정"
+      options:
+        - "예 — before/after 캡처 자동 첨부 원함"
+        - "아니오"
+    validations:
+      required: true

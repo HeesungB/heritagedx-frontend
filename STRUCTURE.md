@@ -74,10 +74,27 @@ heritage-dx/
 │   └── eslint-config/               # @heritage-dx/eslint-config — 공유 ESLint flat config
 ├── scripts/
 │   └── data-sync.mjs                 # Data Sync CLI (fetch/validate/seed/warm)
+├── tools/
+│   └── gh-agent-bridge/              # GitHub × Claude/Codex 협업 데몬 (워크스페이스 외부, pnpm 독립)
+│                                     # — Fastify webhook 수신 → 양 에이전트 병렬 호출 → 합의/구현/상호리뷰/스크린샷
+│                                     # 자세한 동작은 docs/workflows/github-agent-bridge.md
+├── .github/
+│   ├── workflows/
+│   │   ├── ci.yml                    # lint/type-check/build (PR + push)
+│   │   ├── deploy.yml                # GCP Cloud Run 배포 (main push)
+│   │   └── agent-route.yml           # 이슈/PR opened 시 state:* 라벨 부여 → 로컬 데몬 트리거
+│   ├── ISSUE_TEMPLATE/
+│   │   └── agent-task.yml            # Claude+Codex 협업 트리거 이슈 템플릿
+│   └── PULL_REQUEST_TEMPLATE.md      # 작성자 에이전트·검증·상호리뷰 체크리스트
+├── docs/
+│   └── workflows/
+│       └── github-agent-bridge.md    # 데몬 셋업·운영 매뉴얼 (Cloudflare/가비아/GitHub App)
 ├── turbo.json
 ├── pnpm-workspace.yaml
 └── package.json
 ```
+
+> `tools/gh-agent-bridge` 는 `pnpm-workspace.yaml` 의 packages 패턴(`apps/*`, `packages/*`)에 포함되지 **않는다**. 모노레포 빌드와 분리해 별도 pnpm 프로젝트로 운영한다 (의존성·런타임 격리).
 
 ---
 

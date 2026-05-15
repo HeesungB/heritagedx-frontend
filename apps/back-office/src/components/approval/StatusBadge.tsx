@@ -6,9 +6,10 @@ const LABEL: Record<string, string> = {
   IN_CONSULTATION: "상담중",
   PENDING_DEPOSIT: "승인 대기",
   DEPOSIT_APPROVED: "계약 완료",
+  DOCUMENT_AND_BALANCE: "잔금/문서 진행",
   TAX_FILING: "세무신고",
   COMPLETED: "완료",
-  // deprecated — 과거 데이터 호환
+  // deprecated: 과거 데이터 호환
   DRAFT: "상담중",
   PENDING_APPROVAL: "승인 대기",
   FIRST_APPROVED: "계약 완료",
@@ -20,6 +21,7 @@ const STYLE: Record<string, string> = {
   IN_CONSULTATION: "bg-gray-100 text-gray-700",
   PENDING_DEPOSIT: "bg-amber-100 text-amber-800",
   DEPOSIT_APPROVED: "bg-emerald-100 text-emerald-800",
+  DOCUMENT_AND_BALANCE: "bg-neutral-100 text-neutral-700",
   TAX_FILING: "bg-sky-100 text-sky-800",
   COMPLETED: "bg-emerald-200 text-emerald-900",
   DRAFT: "bg-gray-100 text-gray-700",

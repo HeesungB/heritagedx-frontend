@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+  useLayoutEffect,
+} from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Plus,
@@ -9,6 +16,9 @@ import {
   Loader2,
   MessageSquare,
   Edit3,
+  Sparkles,
+  X,
+  ArrowRight,
 } from "lucide-react";
 import {
   PageLoading,
@@ -16,25 +26,21 @@ import {
   Input,
   Textarea,
   Card,
-  CardHeader,
-  CardTitle,
   CardContent,
   ConfirmModal,
-  Drawer,
   Badge,
   ClubSearchSelect,
 } from "@heritage-dx/ui";
 import {
   useConsultationAdminRepository,
   useClubRepository,
-  useCustomerRepository,
+  useConsultationRepository,
 } from "@heritage-dx/api";
 import type {
   Consultation,
   ConsultationNoteEntry,
   Club,
   Pagination,
-  CustomerHistorySummary,
 } from "@heritage-dx/types";
 import {
   buildClubMembershipPair,
@@ -43,13 +49,12 @@ import {
   useTopClubs,
   type ApprovalStatus,
 } from "@heritage-dx/store";
+import type { ConsultationAiResponse } from "@heritage-dx/store";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import { ActionReasonModal } from "@/components/approval/ActionReasonModal";
 import MatchedCustomerCard from "@/components/trade-memos/MatchedCustomerCard";
 
-// 신규 notes JSONB 응답({entries:[...]}) 의 entries 만 추출. 과거 응답이 일시적으로
-// 섞여 들어와도 [] 로 흡수해 화면 크래시를 막는다.
 function buildMemoEntries(memo: Consultation): ConsultationNoteEntry[] {
   return Array.isArray(memo.notes?.entries) ? memo.notes.entries : [];
 }
@@ -58,7 +63,11 @@ function formatMemoTimestamp(iso: string) {
   try {
     const d = new Date(iso);
     const pad = (n: number) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const mo = pad(d.getMonth() + 1);
+    const da = pad(d.getDate());
+    const hr = pad(d.getHours());
+    const mi = pad(d.getMinutes());
+    return `${mo}-${da} ${hr}:${mi}`;
   } catch {
     return iso;
   }
@@ -79,10 +88,32 @@ const formatPrice = (price: string | number | null) => {
   return `${num.toLocaleString()}원`;
 };
 
+function getStatusInfo(approvalStatus: string) {
+  if (approvalStatus === "PENDING_DEPOSIT") {
+    return { label: "검토중", dotClass: "bg-blue-400" };
+  }
+  if (approvalStatus === "DEPOSIT_APPROVED") {
+    return { label: "승인", dotClass: "bg-gray-400" };
+  }
+  return { label: "상담중", dotClass: "bg-amber-400" };
+}
+
+function getApprovalPill(approvalStatus: string) {
+  if (approvalStatus === "DEPOSIT_APPROVED") {
+    return { label: "승인완료", className: "bg-green-50 text-green-700 border-green-200" };
+  }
+  if (approvalStatus === "PENDING_DEPOSIT") {
+    return { label: "승인요청", className: "bg-amber-50 text-amber-700 border-amber-200" };
+  }
+  return { label: "요청됨", className: "bg-blue-50 text-blue-700 border-blue-200" };
+}
+
+const MAX_AI_LENGTH = 2000;
+
 export default function ConsultationsPage() {
   const consultationsRepo = useConsultationAdminRepository();
+  const generalConsultationRepo = useConsultationRepository();
   const clubsRepo = useClubRepository();
-  const customerRepo = useCustomerRepository();
   const { user } = useAuth();
   const { preloadedMemos, clearPreloadedMemos, clubs } = useData();
   const searchParams = useSearchParams();
@@ -95,20 +126,14 @@ export default function ConsultationsPage() {
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"" | "매수" | "매도">("");
-  const [filterDone, setFilterDone] = useState<"" | "done" | "notDone">("notDone");
   const [filterApproval, setFilterApproval] = useState<"" | ApprovalStatus>("");
-  const [showConverted, setShowConverted] = useState(false);
+  const [sortOrder, setSortOrder] = useState<"latest" | "oldest">("latest");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [approvalBusyId, setApprovalBusyId] = useState<string | null>(null);
-  // 상담일지의 사유 입력 모달은 REOPEN 액션 전용 (FIRST_APPROVED 상태에서 거래내역 이관 전 무산 시 호출)
   const [reasonModal, setReasonModal] = useState<{ memoId: string } | null>(null);
   const [reasonSubmitting, setReasonSubmitting] = useState(false);
 
-  // 골프장/회원권/기간 필터
-  const [selectedClubCode, setSelectedClubCode] = useState("");
-  const [selectedMembership, setSelectedMembership] = useState("");
-  const [memberships, setMemberships] = useState<string[]>([]);
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
   const clubsRef = useRef<Club[]>(clubs);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState<Pagination | null>(null);
@@ -119,100 +144,22 @@ export default function ConsultationsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // 반대매매 사이드바 상태
+  // 거래 현황 모달
   const [selectedMemo, setSelectedMemo] = useState<Consultation | null>(null);
   const [relatedMemos, setRelatedMemos] = useState<Consultation[]>([]);
   const [isLoadingRelated, setIsLoadingRelated] = useState(false);
   const [relatedSort, setRelatedSort] = useState<"date" | "price">("date");
-  const [relatedFilterDone, setRelatedFilterDone] = useState<"" | "done" | "notDone">("notDone");
+  const [relatedOppositeTab, setRelatedOppositeTab] = useState<"매수" | "매도">("매수");
+  const [noteInput, setNoteInput] = useState("");
+  const [isAddingNote, setIsAddingNote] = useState(false);
 
-  // 고객 히스토리
-  const [customerHistory, setCustomerHistory] = useState<CustomerHistorySummary | null>(null);
-  const [isLoadingCustomerHistory, setIsLoadingCustomerHistory] = useState(false);
-
-  // 디바운스: searchInput → searchQuery (300ms)
-  useEffect(() => {
-    const timer = setTimeout(() => setSearchQuery(searchInput), 300);
-    return () => clearTimeout(timer);
-  }, [searchInput]);
-
-  // clubsRef 동기화
-  useEffect(() => {
-    clubsRef.current = clubs;
-  }, [clubs]);
-
-  // 골프장별 가용 필터 (rawMemos의 clubName에 해당하는 골프장만)
-  const availableClubs = useMemo(() => {
-    const clubNames = new Set(rawMemos.map((m) => m.clubName).filter(Boolean));
-    return clubs.filter((c) => clubNames.has(c.name));
-  }, [clubs, rawMemos]);
-
-  // 골프장 즐겨찾기·최근 본 — 필터 / 폼 양쪽 picker 에 동일하게 노출
-  const {
-    topClubCodes: topClubCodesFilter,
-    isFavorite: isClubFavorite,
-    toggleFavorite: toggleClubFavorite,
-    trackSelection: trackClubSelection,
-  } = useTopClubs(availableClubs, 5);
-  const { topClubCodes: topClubCodesForm } = useTopClubs(clubs, 5);
-
-  // 골프장 선택 변경 시 회원권 목록 로드
-  useEffect(() => {
-    setSelectedMembership("");
-    if (!selectedClubCode) {
-      setMemberships([]);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await clubsRepo.getOne(selectedClubCode);
-        if (!cancelled && res.success && res.data?.memberships) {
-          const names = res.data.memberships
-            .map((m) => m.membershipType)
-            .filter(Boolean);
-          setMemberships([...new Set(names)]);
-        }
-      } catch {
-        if (!cancelled) setMemberships([]);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [selectedClubCode]);
-
-  // 클라이언트 필터링 (골프장 + 회원권 + 기간 + 완료여부 + 거래 전환 완료 포함)
-  // isConverted 쿼리 파라미터는 백엔드가 거부하므로 클라이언트 사이드에서 적용한다.
-  // "완료" 기준은 progressStatus === "COMPLETED" (isDone 필드는 스웨거에서 제거됨).
-  const displayMemos = useMemo(() => {
-    let result = rawMemos;
-    if (selectedClubCode) {
-      const club = clubsRef.current.find((c) => c.code === selectedClubCode);
-      if (club) {
-        result = result.filter((m) => m.clubName === club.name);
-      }
-    }
-    if (selectedMembership) {
-      result = result.filter((m) => m.membershipName === selectedMembership);
-    }
-    if (dateFrom) {
-      result = result.filter((m) => m.registrationDate && m.registrationDate >= dateFrom);
-    }
-    if (dateTo) {
-      result = result.filter((m) => m.registrationDate && m.registrationDate <= dateTo);
-    }
-    if (filterDone === "done") {
-      result = result.filter((m) => isConsultationCompleted(m));
-    } else if (filterDone === "notDone") {
-      result = result.filter((m) => !isConsultationCompleted(m));
-    }
-    // showConverted=false 면 거래로 전환된 상담(linkedTradeId 있음 또는 DEPOSIT_APPROVED) 제외
-    if (!showConverted) {
-      result = result.filter(
-        (m) => !m.linkedTradeId && m.approvalStatus !== "DEPOSIT_APPROVED",
-      );
-    }
-    return result;
-  }, [rawMemos, selectedClubCode, selectedMembership, dateFrom, dateTo, filterDone, showConverted]);
+  // 추가 Drawer 탭
+  const [addDrawerTab, setAddDrawerTab] = useState<"ai" | "manual">("manual");
+  // AI 입력 상태
+  const [aiText, setAiText] = useState("");
+  const [aiSubmitting, setAiSubmitting] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const aiTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // 폼용 골프장/회원권 상태
   const [formClubCode, setFormClubCode] = useState("");
@@ -243,6 +190,36 @@ export default function ConsultationsPage() {
   const formRef = useRef(form);
   formRef.current = form;
 
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const { topClubCodes: topClubCodesForm, isFavorite: isClubFavorite, toggleFavorite: toggleClubFavorite, trackSelection: trackClubSelection } = useTopClubs(clubs, 5);
+
+  useEffect(() => {
+    clubsRef.current = clubs;
+  }, [clubs]);
+
+  // "/" 단축키로 검색창 포커스
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (e.key === "/") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
+
+  // AI textarea 자동 높이
+  useLayoutEffect(() => {
+    const el = aiTextareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 288)}px`;
+  }, [aiText]);
+
   const resetForm = () => {
     setForm({
       clubId: "",
@@ -268,9 +245,18 @@ export default function ConsultationsPage() {
     setFormMemberships([]);
     setManualClubInput(false);
     setManualMembershipInput(false);
+    setAiText("");
+    setAiError(null);
+    setAddDrawerTab("manual");
   };
 
-  // 폼: 골프장 선택 시 clubId/clubName 자동입력 + 회원권 목록 로드
+  // 검색 디바운스
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchQuery(searchInput), 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  // 폼: 골프장 선택 시 회원권 목록 로드
   useEffect(() => {
     if (!formClubCode || formClubCode === "__manual__") {
       setFormMemberships([]);
@@ -278,27 +264,14 @@ export default function ConsultationsPage() {
     }
     clubsRepo.getOne(formClubCode).then((res) => {
       if (res.success && res.data) {
-        setForm((f) => ({
-          ...f,
-          clubId: res.data!.id || "",
-          clubName: res.data!.name,
-        }));
-        const mems = (res.data.memberships ?? []).map((m) => ({
-          id: m.id,
-          type: m.membershipType,
-          name: m.membershipName || m.membershipType,
-        }));
+        setForm((f) => ({ ...f, clubId: res.data!.id || "", clubName: res.data!.name }));
+        const mems = (res.data.memberships ?? []).map((m) => ({ id: m.id, type: m.membershipType, name: m.membershipName || m.membershipType }));
         setFormMemberships(mems);
-        // 수정 모드에서 기존 회원권이 목록에 없으면 직접입력 모드 유지
         const currentType = formRef.current.membershipType;
-        if (currentType && !mems.some((m) => m.name === currentType && m.type === currentType)) {
-          // 정확한 매칭 시도: id 또는 name으로
+        if (currentType) {
           const matched = mems.find((m) => m.id === formRef.current.membershipId || m.name === currentType || m.type === currentType);
-          if (!matched) {
-            setManualMembershipInput(true);
-          } else {
-            setManualMembershipInput(false);
-          }
+          if (!matched) setManualMembershipInput(true);
+          else setManualMembershipInput(false);
         } else {
           setManualMembershipInput(false);
         }
@@ -306,8 +279,15 @@ export default function ConsultationsPage() {
     }).catch(console.error);
   }, [formClubCode]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 클라이언트 필터: 날짜 범위
+  const displayMemos = useMemo(() => {
+    let result = rawMemos;
+    if (dateFrom) result = result.filter((m) => m.registrationDate && m.registrationDate >= dateFrom);
+    if (dateTo) result = result.filter((m) => m.registrationDate && m.registrationDate <= dateTo);
+    return result;
+  }, [rawMemos, dateFrom, dateTo]);
+
   const loadMemos = useCallback(async () => {
-    // 초기 로드 시 프리로드 데이터 사용 (page 1, 필터 없음)
     if (
       !usedPreloadRef.current &&
       preloadedMemos &&
@@ -325,15 +305,13 @@ export default function ConsultationsPage() {
 
     setIsLoading(true);
     try {
-      // 백엔드가 isConverted 쿼리 파라미터를 거부하므로 서버 필터에서 제외.
-      // 완료(progressStatus === "COMPLETED")·거래전환 필터는 클라이언트 사이드(displayMemos)에서 적용한다.
       const response = await consultationsRepo.getAll({
         page,
         limit: 20,
         search: searchQuery || undefined,
         tradeType: filterType || undefined,
         sort: "registrationDate",
-        order: "DESC",
+        order: sortOrder === "latest" ? "DESC" : "ASC",
         approvalStatus: filterApproval || undefined,
       });
       if (response.success && response.data) {
@@ -341,7 +319,6 @@ export default function ConsultationsPage() {
         if (page === 1) {
           setRawMemos(fresh);
         } else {
-          // 인피니트 스크롤: dedupe 후 누적
           setRawMemos((prev) => {
             const ids = new Set(prev.map((m) => m.id));
             const newOnes = fresh.filter((m) => !ids.has(m.id));
@@ -358,22 +335,20 @@ export default function ConsultationsPage() {
       if (page === 1) setRawMemos([]);
     }
     setIsLoading(false);
-  }, [page, searchQuery, filterType, filterApproval, preloadedMemos, clearPreloadedMemos]);
+  }, [page, searchQuery, filterType, filterApproval, sortOrder, preloadedMemos, clearPreloadedMemos]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     loadMemos();
   }, [loadMemos]);
 
-  // IntersectionObserver: sentinel 진입 시 다음 페이지 로드
+  // IntersectionObserver 인피니트 스크롤
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const node = sentinelRef.current;
     if (!node) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting && pagination?.hasNext && !isLoading) {
-          setPage((p) => p + 1);
-        }
+        if (entries[0]?.isIntersecting && pagination?.hasNext && !isLoading) setPage((p) => p + 1);
       },
       { rootMargin: "200px" },
     );
@@ -390,12 +365,7 @@ export default function ConsultationsPage() {
     try {
       const trimmedNote = form.notes.trim();
       const response = await consultationsRepo.create({
-        ...buildClubMembershipPair({
-          clubId: form.clubId,
-          clubName: form.clubName,
-          membershipId: form.membershipId,
-          membershipType: form.membershipType,
-        }),
+        ...buildClubMembershipPair({ clubId: form.clubId, clubName: form.clubName, membershipId: form.membershipId, membershipType: form.membershipType }),
         tradeType: form.tradeType,
         customerName: form.customerName,
         contact: form.contact,
@@ -405,7 +375,6 @@ export default function ConsultationsPage() {
         desiredPriceNote: form.desiredPriceNote || null,
         depositAmount: form.depositAmount ? Number(form.depositAmount) : null,
         accountNumber: form.accountNumber || null,
-        // 신규 API: notes 문자열은 백엔드가 첫 entry 로 자동 변환. 비어있으면 omit.
         ...(trimmedNote ? { notes: trimmedNote } : {}),
         registrationDate: form.registrationDate || null,
         tradeDate: form.tradeDate || null,
@@ -433,15 +402,8 @@ export default function ConsultationsPage() {
     }
     setIsSaving(true);
     try {
-      // PUT 으로는 notes 직접 수정 금지. 메모는 별도 엔드포인트(POST/PATCH/DELETE
-      // /admin/consultations/:id/notes[/:noteId]) 사용 — update 페이로드에서 omit.
       const response = await consultationsRepo.update(editingMemo.id, {
-        ...buildClubMembershipPair({
-          clubId: form.clubId,
-          clubName: form.clubName,
-          membershipId: form.membershipId,
-          membershipType: form.membershipType,
-        }),
+        ...buildClubMembershipPair({ clubId: form.clubId, clubName: form.clubName, membershipId: form.membershipId, membershipType: form.membershipType }),
         tradeType: form.tradeType,
         customerName: form.customerName,
         contact: form.contact,
@@ -503,13 +465,11 @@ export default function ConsultationsPage() {
       desiredPriceNote: trade.desiredPriceNote || "",
       depositAmount: trade.depositAmount ? String(trade.depositAmount) : "",
       accountNumber: trade.accountNumber || "",
-      // 편집 모드에서 notes 직접 수정은 PUT 으로 금지됨. 폼은 비워두고 메모는 별도 CRUD 사용.
       notes: "",
       registrationDate: trade.registrationDate || new Date().toISOString().split("T")[0],
       tradeDate: trade.tradeDate || "",
       remarks: trade.remarks || "",
     });
-    // 골프장 매칭
     const matched = clubs.find((c) => c.name === trade.clubName);
     if (matched) {
       setFormClubCode(matched.code);
@@ -519,6 +479,7 @@ export default function ConsultationsPage() {
       setManualClubInput(true);
     }
     setManualMembershipInput(false);
+    setAddDrawerTab("manual");
   };
 
   const runApprovalAction = async (
@@ -545,69 +506,53 @@ export default function ConsultationsPage() {
     }
   };
 
+  const closeDetailModal = () => {
+    setSelectedMemo(null);
+    setNoteInput("");
+  };
+
+  const handleAddNote = async () => {
+    if (!selectedMemo?.id || !noteInput.trim()) return;
+    setIsAddingNote(true);
+    try {
+      const response = await consultationsRepo.addNote(selectedMemo.id, { content: noteInput.trim() });
+      if (response.success && response.data) {
+        const updated = response.data;
+        setSelectedMemo(updated);
+        setRawMemos((prev) => prev.map((m) => m.id === updated.id ? updated : m));
+        setNoteInput("");
+      } else {
+        alert(response.error ?? "메모 추가에 실패했습니다.");
+      }
+    } catch {
+      alert("메모 추가 중 오류가 발생했습니다.");
+    } finally {
+      setIsAddingNote(false);
+    }
+  };
+
   const handleRowClick = async (memo: Consultation) => {
     setSelectedMemo(memo);
     setRelatedMemos([]);
     setIsLoadingRelated(true);
     setRelatedSort("date");
-    setRelatedFilterDone("");
-    setCustomerHistory(null);
-
     const oppositeType = memo.tradeType === "매수" ? "매도" : "매수";
+    setRelatedOppositeTab(oppositeType);
 
-    // 반대매매 + 고객 히스토리 병렬 로드
-    const relatedPromise = consultationsRepo
+    const related = await consultationsRepo
       .getAll({ search: memo.clubName, tradeType: oppositeType, limit: 100 })
-      .then((res) =>
-        res.data?.trades?.filter((t: Consultation) => t.clubName === memo.clubName) || [],
-      )
-      .catch((error) => {
-        console.error("Failed to load related memos:", error);
-        return [] as Consultation[];
-      });
+      .then((res) => res.data?.trades?.filter((t: Consultation) => t.clubName === memo.clubName) || [])
+      .catch(() => [] as Consultation[]);
 
-    let historyPromise: Promise<CustomerHistorySummary | null> = Promise.resolve(null);
-    if (memo.customerId) {
-      setIsLoadingCustomerHistory(true);
-      historyPromise = customerRepo
-        .getHistorySummary(memo.customerId)
-        .then((res) => (res.success && res.data ? res.data : null))
-        .catch((error) => {
-          console.error("Failed to load customer history:", error);
-          return null;
-        });
-    }
-
-    const [related, history] = await Promise.all([relatedPromise, historyPromise]);
     setRelatedMemos(related);
     setIsLoadingRelated(false);
-    setCustomerHistory(history);
-    setIsLoadingCustomerHistory(false);
   };
 
-  const sortedRelatedMemos = useMemo(() => {
-    let filtered = [...relatedMemos];
-    if (relatedFilterDone === "done") filtered = filtered.filter(m => isConsultationCompleted(m));
-    if (relatedFilterDone === "notDone") filtered = filtered.filter(m => !isConsultationCompleted(m));
-    if (relatedSort === "price") {
-      filtered.sort(
-        (a, b) => (Number(b.offerPrice) || 0) - (Number(a.offerPrice) || 0)
-      );
-    } else {
-      filtered.sort((a, b) =>
-        (b.registrationDate || "").localeCompare(a.registrationDate || "")
-      );
-    }
-    return filtered;
-  }, [relatedMemos, relatedSort, relatedFilterDone]);
-
-  // URL 쿼리 파라미터로 사이드바 자동 열기
   const handleRowClickRef = useRef(handleRowClick);
   handleRowClickRef.current = handleRowClick;
 
   useEffect(() => {
     if (!memoIdParam || autoOpenedRef.current || isLoading || rawMemos.length === 0) return;
-
     const targetMemo = rawMemos.find((m) => m.id === memoIdParam);
     if (targetMemo) {
       autoOpenedRef.current = true;
@@ -616,825 +561,988 @@ export default function ConsultationsPage() {
     }
   }, [memoIdParam, rawMemos, isLoading]);
 
-  if (isLoading && rawMemos.length === 0) {
-    return <PageLoading />;
-  }
+  const sortedRelatedMemos = useMemo(() => {
+    const filtered = relatedMemos.filter((m) => m.tradeType === relatedOppositeTab);
+    if (relatedSort === "price") {
+      return [...filtered].sort((a, b) => (Number(b.offerPrice) || 0) - (Number(a.offerPrice) || 0));
+    }
+    return [...filtered].sort((a, b) => (b.registrationDate || "").localeCompare(a.registrationDate || ""));
+  }, [relatedMemos, relatedSort, relatedOppositeTab]);
+
+  const buyCount = useMemo(() => relatedMemos.filter((m) => m.tradeType === "매수").length, [relatedMemos]);
+  const sellCount = useMemo(() => relatedMemos.filter((m) => m.tradeType === "매도").length, [relatedMemos]);
+
+  // AI 폼 채우기
+  const handleAiSubmit = async () => {
+    const trimmed = aiText.trim();
+    if (!trimmed || aiSubmitting) return;
+    setAiError(null);
+    setAiSubmitting(true);
+    try {
+      const response = await generalConsultationRepo.createDraftFromText({ text: trimmed });
+      if (response.success && response.data) {
+        const draft = response.data.draft;
+        const clubMatch = response.data.matches?.club;
+        const memMatch = response.data.matches?.membership;
+        // form 채우기
+        setForm((f) => ({
+          ...f,
+          clubName: draft.club || f.clubName,
+          membershipType: draft.membership || f.membershipType,
+          membershipName: draft.membership || f.membershipName,
+          tradeType: (draft.tradeType as "매도" | "매수") || f.tradeType,
+          customerName: draft.customerName || f.customerName,
+          contact: draft.contact || f.contact,
+          desiredPrice: draft.desiredPrice != null ? String(draft.desiredPrice) : f.desiredPrice,
+        }));
+        // 골프장 ID 매칭
+        if (clubMatch?.matched && clubMatch.id) {
+          const matchedClub = clubs.find((c) => c.id === clubMatch.id || c.name === clubMatch.name);
+          if (matchedClub) {
+            setFormClubCode(matchedClub.code);
+            setManualClubInput(false);
+          } else {
+            setFormClubCode("__manual__");
+            setManualClubInput(true);
+          }
+        } else if (draft.club) {
+          setFormClubCode("__manual__");
+          setManualClubInput(true);
+        }
+        setAiText("");
+        setAddDrawerTab("manual");
+      } else {
+        setAiError(response.error ?? "AI 추출에 실패했습니다.");
+      }
+    } catch {
+      setAiError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setAiSubmitting(false);
+    }
+  };
+
+  // URL 파라미터 자동 오픈 처리는 위에서 이미 처리됨
+
+  if (isLoading && rawMemos.length === 0) return <PageLoading />;
+
+  const typeCounts = {
+    all: pagination?.total ?? displayMemos.length,
+    buy: displayMemos.filter((m) => m.tradeType === "매수").length,
+    sell: displayMemos.filter((m) => m.tradeType === "매도").length,
+  };
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-1">
-          <MessageSquare className="w-6 h-6 text-primary" />
-          <h1 className="text-xl font-bold text-gray-900">상담일지</h1>
-          {pagination && (
-            <Badge variant="default">총 {pagination.total}건</Badge>
-          )}
+    <div className="p-6 pb-12 max-w-[1480px] mx-auto">
+      {/* 페이지 헤더 */}
+      <div className="mb-6 flex items-flex-start gap-3">
+        <div className="w-9 h-9 rounded-[10px] bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+          <MessageSquare className="w-[18px] h-[18px] text-gray-900" />
         </div>
-        <p className="text-sm text-gray-500">모든 상담일지를 관리합니다.</p>
+        <div className="flex flex-col gap-1">
+          <span className="text-[10.5px] font-semibold tracking-[0.14em] text-gray-400 uppercase">
+            Consultation Log
+          </span>
+          <div className="flex items-baseline gap-2.5">
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900">상담일지</h1>
+            {pagination && (
+              <span className="text-[12.5px] font-medium text-gray-500 font-mono">
+                총 {pagination.total}건
+              </span>
+            )}
+          </div>
+          <span className="text-[12.5px] text-gray-500">모든 상담일지를 관리합니다</span>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>메모 목록</CardTitle>
-            <Button
-              size="sm"
-              onClick={() => {
-                resetForm();
-                setEditingMemo(null);
-                setShowAddDrawer(true);
-              }}
-            >
-              <Plus className="w-4 h-4 mr-1" />
-              추가
-            </Button>
+      {/* 메인 패널 */}
+      <div className="border border-gray-200 rounded-xl bg-white overflow-hidden">
+        {/* 패널 헤더 */}
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-4">
+          <h2 className="text-[13.5px] font-semibold text-gray-900">상담 목록</h2>
+          <Button
+            size="sm"
+            onClick={() => { resetForm(); setEditingMemo(null); setShowAddDrawer(true); }}
+          >
+            <Plus className="w-3.5 h-3.5 mr-1.5" />
+            새 상담일지 작성
+          </Button>
+        </div>
+
+        {/* 검색 행 */}
+        <div className="px-5 py-[18px] border-b border-gray-100">
+          <div className="relative w-full">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="이 페이지에서 검색 - 고객명, 연락처, 골프장, 회원권 이름..."
+              value={searchInput}
+              onChange={(e) => { setSearchInput(e.target.value); setPage(1); }}
+              className="w-full h-11 pl-11 pr-14 text-[13.5px] text-gray-900 bg-gray-50 border border-gray-200 rounded-[10px] outline-none transition-all focus:bg-white focus:border-gray-900 focus:shadow-[0_0_0_3px_rgba(10,10,10,0.05)] placeholder:text-gray-400"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 text-[11px] font-semibold text-gray-400 bg-white border border-gray-200 rounded-[5px] shadow-[0_1px_0_#F3F4F6] font-mono">
+              /
+            </span>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <div className="flex gap-1">
-              {(["", "매수", "매도"] as const).map((type) => (
-                <button
-                  key={type || "all"}
-                  onClick={() => { setFilterType(type); setPage(1); }}
-                  className={`px-4 py-1.5 text-sm rounded-lg transition-colors ${
-                    filterType === type
-                      ? type === "매도"
-                        ? "bg-red-100 text-red-700 border border-red-300"
-                        : type === "매수"
-                          ? "bg-blue-100 text-blue-700 border border-blue-300"
-                          : "bg-green-100 text-green-700 border border-green-300"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200 border border-transparent"
-                  }`}
-                >
-                  {type || "전체"}
-                </button>
-              ))}
-            </div>
-            <select
-              value={filterDone}
-              onChange={(e) => setFilterDone(e.target.value as "" | "done" | "notDone")}
-              className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 bg-white w-[100px] h-[34px]"
-            >
-              <option value="">전체</option>
-              <option value="notDone">진행중</option>
-              <option value="done">완료</option>
-            </select>
+        </div>
+
+        {/* 필터 행 */}
+        <div className="px-5 py-3.5 border-b border-gray-100 flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {/* 유형 pill */}
+            {([["", "전체"], ["매수", "매수"], ["매도", "매도"]] as const).map(([val, label]) => (
+              <button
+                key={val || "all"}
+                onClick={() => { setFilterType(val); setPage(1); }}
+                className={`inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] font-semibold rounded-full border transition-all cursor-pointer ${
+                  filterType === val
+                    ? "bg-gray-900 text-white border-gray-900"
+                    : "bg-white text-gray-600 border-gray-200 hover:border-gray-400 hover:text-gray-900"
+                }`}
+              >
+                <span>{label}</span>
+                {val === "" && (
+                  <span className={`text-[11.5px] font-bold px-2 py-px rounded-full font-mono min-w-[24px] text-center ${filterType === "" ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"}`}>
+                    {pagination?.total ?? rawMemos.length}
+                  </span>
+                )}
+                {val === "매수" && (
+                  <span className={`text-[11.5px] font-bold px-2 py-px rounded-full font-mono min-w-[24px] text-center ${filterType === "매수" ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"}`}>
+                    {rawMemos.filter((m) => m.tradeType === "매수").length}
+                  </span>
+                )}
+                {val === "매도" && (
+                  <span className={`text-[11.5px] font-bold px-2 py-px rounded-full font-mono min-w-[24px] text-center ${filterType === "매도" ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"}`}>
+                    {rawMemos.filter((m) => m.tradeType === "매도").length}
+                  </span>
+                )}
+              </button>
+            ))}
+
+            <span className="w-px h-5 bg-gray-200 mx-1" />
+
+            {/* 승인 상태 */}
             <select
               value={filterApproval}
               onChange={(e) => { setFilterApproval(e.target.value as "" | ApprovalStatus); setPage(1); }}
-              className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 bg-white w-[140px] h-[34px]"
+              className="h-8 pl-3 pr-7 text-[12.5px] text-gray-900 bg-white border border-gray-200 rounded-lg outline-none cursor-pointer hover:border-gray-400 transition-colors appearance-none"
+              style={{ backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23737373' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 8px center" }}
             >
               <option value="">승인 상태 전체</option>
-              <option value="IN_CONSULTATION">상담중</option>
-              <option value="PENDING_DEPOSIT">계약금 대기</option>
-              {showConverted && <option value="DEPOSIT_APPROVED">계약금 승인</option>}
+              <option value="DEPOSIT_APPROVED">승인완료</option>
+              <option value="PENDING_DEPOSIT">승인요청</option>
+              <option value="IN_CONSULTATION">요청됨</option>
             </select>
-            <label className="flex items-center gap-1.5 text-xs text-gray-600 select-none cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showConverted}
-                onChange={(e) => { setShowConverted(e.target.checked); setPage(1); }}
-                className="w-3.5 h-3.5 rounded border-gray-300"
-              />
-              거래 전환 완료 포함
-            </label>
-            <ClubSearchSelect
-              clubs={availableClubs}
-              selectedClubCode={selectedClubCode}
-              onChange={(code) => { setSelectedClubCode(code); setSelectedMembership(""); }}
-              topClubCodes={topClubCodesFilter}
-              isFavorite={isClubFavorite}
-              onToggleFavorite={(code, item) =>
-                toggleClubFavorite(code, { name: item.name, region: item.region, holes: item.holes })
-              }
-              onClubSelect={(item) => trackClubSelection({ code: item.code, name: item.name })}
-            />
-            <select
-              value={selectedMembership}
-              onChange={(e) => setSelectedMembership(e.target.value)}
-              disabled={!selectedClubCode}
-              className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 bg-white disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-[160px] h-[34px]"
-            >
-              <option value="">전체 회원권</option>
-              {memberships.map((m) => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
-            <div className="flex items-center gap-1">
-              <Input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full sm:w-[130px] text-sm"
-              />
-              <span className="text-gray-400 text-sm">~</span>
-              <Input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="w-full sm:w-[130px] text-sm"
-              />
-            </div>
-            <div className="relative w-full sm:w-56">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <Input
-                placeholder="고객명, 골프장명으로 검색..."
-                value={searchInput}
-                onChange={(e) => { setSearchInput(e.target.value); setPage(1); }}
-                className="pl-10"
-              />
+
+            {/* 날짜 범위 */}
+            <div className="flex items-center gap-1.5">
+              <div className="inline-flex items-center gap-1.5 h-8 px-2.5 bg-white border border-gray-200 rounded-lg hover:border-gray-400 transition-colors">
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="text-[12.5px] text-gray-900 bg-transparent border-none outline-none w-[110px]"
+                />
+              </div>
+              <ArrowRight className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+              <div className="inline-flex items-center gap-1.5 h-8 px-2.5 bg-white border border-gray-200 rounded-lg hover:border-gray-400 transition-colors">
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="text-[12.5px] text-gray-900 bg-transparent border-none outline-none w-[110px]"
+                />
+              </div>
             </div>
           </div>
 
-          {isLoading ? (
+          <div className="flex items-center gap-3 ml-auto">
+            <span className="text-[13px] text-gray-500 whitespace-nowrap">
+              총 <span className="font-bold text-gray-900 font-mono">{pagination?.total ?? displayMemos.length}</span>건
+            </span>
+            <span className="w-px h-5 bg-gray-200" />
+            <select
+              value={sortOrder}
+              onChange={(e) => { setSortOrder(e.target.value as "latest" | "oldest"); setPage(1); setRawMemos([]); }}
+              className="h-8 pl-3 pr-7 text-[12.5px] text-gray-900 bg-white border border-gray-200 rounded-lg outline-none cursor-pointer hover:border-gray-400 transition-colors appearance-none"
+              style={{ backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23737373' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 8px center" }}
+            >
+              <option value="latest">최신순</option>
+              <option value="oldest">오래된순</option>
+            </select>
+          </div>
+        </div>
+
+        {/* 테이블 */}
+        <div className="overflow-x-auto">
+          {isLoading && rawMemos.length === 0 ? (
             <div className="flex items-center justify-center py-16">
               <Loader2 className="w-6 h-6 animate-spin text-gray-400 mr-2" />
               <span className="text-gray-500">불러오는 중...</span>
             </div>
           ) : displayMemos.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <MessageSquare className="w-8 h-8 text-gray-400" />
+            <div className="py-16 text-center">
+              <div className="w-11 h-11 rounded-xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                <Search className="w-[18px] h-[18px] text-gray-400" />
               </div>
-              <p className="text-gray-500 mb-2">
-                {searchInput || filterType || selectedClubCode || filterDone ? "검색 결과가 없습니다" : "등록된 상담일지가 없습니다"}
-              </p>
+              <p className="text-[13.5px] font-semibold text-gray-500 mb-1">검색 결과가 없습니다</p>
+              <p className="text-[12.5px] text-gray-400">다른 검색어나 필터를 시도해 보세요</p>
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto">
-              <table className="min-w-[400px] w-full text-sm">
+              <table className="w-full text-sm" style={{ minWidth: 1100 }}>
                 <thead>
-                  <tr className="border-b text-left text-xs text-gray-500">
-                    <th className="py-2 pr-3 font-medium w-20">액션</th>
-                    <th className="py-2 pr-3 font-medium">유형</th>
-                    <th className="py-2 pr-3 font-medium">골프장</th>
-                    <th className="hidden md:table-cell py-2 pr-3 font-medium">회원권</th>
-                    <th className="py-2 pr-3 font-medium">고객명</th>
-                    <th className="hidden md:table-cell py-2 pr-3 font-medium">연락처</th>
-                    <th className="py-2 pr-3 font-medium">제시가</th>
-                    <th className="hidden md:table-cell py-2 pr-3 font-medium">희망가</th>
-                    <th className="hidden md:table-cell py-2 pr-3 font-medium">메모</th>
-                    <th className="hidden md:table-cell py-2 pr-3 font-medium">등록일</th>
-                    <th className="hidden md:table-cell py-2 pr-3 font-medium">작성자</th>
-                    <th className="hidden md:table-cell py-2 font-medium w-16"></th>
+                  <tr className="border-b border-gray-100">
+                    <th className="py-3 px-3 text-left text-[11.5px] font-medium text-gray-500 text-center whitespace-nowrap">유형</th>
+                    <th className="py-3 px-3 text-left text-[11.5px] font-medium text-gray-500 whitespace-nowrap">상태</th>
+                    <th className="py-3 px-3 text-left text-[11.5px] font-medium text-gray-500 whitespace-nowrap">골프장</th>
+                    <th className="hidden md:table-cell py-3 px-3 text-left text-[11.5px] font-medium text-gray-500 whitespace-nowrap">회원권</th>
+                    <th className="py-3 px-3 text-left text-[11.5px] font-medium text-gray-500 whitespace-nowrap">고객명</th>
+                    <th className="hidden md:table-cell py-3 px-3 text-left text-[11.5px] font-medium text-gray-500 whitespace-nowrap">연락처</th>
+                    <th className="hidden md:table-cell py-3 px-3 text-left text-[11.5px] font-medium text-gray-500 whitespace-nowrap" style={{ maxWidth: 220 }}>메모</th>
+                    <th className="py-3 px-3 text-right text-[11.5px] font-medium text-gray-500 whitespace-nowrap">매시가</th>
+                    <th className="hidden md:table-cell py-3 px-3 text-right text-[11.5px] font-medium text-gray-500 whitespace-nowrap">희망가</th>
+                    <th className="hidden md:table-cell py-3 px-3 text-left text-[11.5px] font-medium text-gray-500 whitespace-nowrap">등록일</th>
+                    <th className="hidden md:table-cell py-3 px-3 text-left text-[11.5px] font-medium text-gray-500 whitespace-nowrap">작성자</th>
+                    <th className="hidden md:table-cell py-3 px-3 text-center text-[11.5px] font-medium text-gray-500 whitespace-nowrap">승인 요청</th>
+                    <th className="py-3 px-3 text-center text-[11.5px] font-medium text-gray-500 whitespace-nowrap">관리</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {displayMemos.map((trade) => (
-                    <tr key={trade.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors group cursor-pointer ${isConsultationCompleted(trade) ? "opacity-50" : ""}`} onClick={() => handleRowClick(trade)}>
-                      <td className="py-2.5 pr-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center gap-1.5">
-                          {trade.approvalStatus === "IN_CONSULTATION" && (
-                            <span
-                              className="text-xs text-gray-400"
-                              title="OS 에서 승인 요청 시 처리 가능"
-                            >
-                              상담중
-                            </span>
-                          )}
-                          {trade.approvalStatus === "PENDING_DEPOSIT" && (() => {
-                            const hasDeposit = !!trade.depositAmount && trade.depositAmount > 0;
-                            const docReady = !!trade.settlementDocumentGenerated;
-                            const blockedReason = !hasDeposit
-                              ? "계약금 입력 후 확인 가능"
-                              : !docReady
-                                ? "입출금표 문서 생성 완료가 필요합니다 (OS 의 승인 요청 단계)"
-                                : "계약금 확인 후 거래 자동 생성";
-                            return (
-                              <button
-                                type="button"
-                                disabled={
-                                  approvalBusyId === trade.id || !hasDeposit || !docReady
-                                }
-                                onClick={() => runApprovalAction(trade, "APPROVE_FIRST")}
-                                className="px-2 py-0.5 text-xs font-medium rounded border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-30 disabled:cursor-not-allowed"
-                                title={blockedReason}
-                              >
-                                계약금 확인
-                              </button>
-                            );
-                          })()}
-                          {trade.approvalStatus === "DEPOSIT_APPROVED" && (
-                            <>
-                              <button
-                                type="button"
-                                disabled={approvalBusyId === trade.id}
-                                onClick={() => setReasonModal({ memoId: trade.id })}
-                                className="px-2 py-0.5 text-xs font-medium rounded border border-amber-200 text-amber-700 hover:bg-amber-50 disabled:opacity-50"
-                                title="계약금 입/송금 무산 시"
-                              >
-                                다시 열기
-                              </button>
-                              {trade.linkedTradeId && (
-                                <a
-                                  href={`/trade-records?highlight=${trade.linkedTradeId}`}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="px-2 py-0.5 text-xs font-medium rounded border border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                                  title="연결된 거래 페이지로 이동"
-                                >
-                                  거래 보기
-                                </a>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-2.5 pr-3 whitespace-nowrap">
-                        <Badge variant={trade.tradeType === "매수" ? "info" : "error"}>{trade.tradeType}</Badge>
-                      </td>
-                      <td className="py-2.5 pr-3 font-medium text-gray-800 whitespace-nowrap">{trade.clubName}</td>
-                      <td className="hidden md:table-cell py-2.5 pr-3 text-gray-600 whitespace-nowrap">{trade.membershipName}</td>
-                      <td className="py-2.5 pr-3 font-medium text-gray-900 whitespace-nowrap">{trade.customerName}</td>
-                      <td className="hidden md:table-cell py-2.5 pr-3 text-gray-500 whitespace-nowrap">{trade.contact}</td>
-                      <td className="py-2.5 pr-3 text-gray-800 whitespace-nowrap">{formatPrice(trade.offerPrice)}</td>
-                      <td className="hidden md:table-cell py-2.5 pr-3 text-gray-800 whitespace-nowrap">{formatPrice(trade.desiredPrice)}</td>
-                      <td className="hidden md:table-cell py-2.5 pr-3 text-gray-500 max-w-[220px]">
-                        {(() => {
-                          const entries = buildMemoEntries(trade);
-                          const latest = entries.length > 0 ? entries[entries.length - 1] : null;
-                          if (!latest) return <span className="text-gray-300">메모 없음</span>;
-                          return (
-                            <div className="flex items-center gap-1.5 min-w-0" title={latest.content}>
-                              <span className="truncate">{latest.content}</span>
-                              {entries.length > 1 && (
-                                <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500">
-                                  +{entries.length - 1}
-                                </span>
-                              )}
+                  {displayMemos.map((trade) => {
+                    const statusInfo = getStatusInfo(trade.approvalStatus || "IN_CONSULTATION");
+                    const approvalPill = getApprovalPill(trade.approvalStatus || "IN_CONSULTATION");
+                    const entries = buildMemoEntries(trade);
+                    const latestEntry = entries.length > 0 ? entries[entries.length - 1] : null;
+                    const isDone = isConsultationCompleted(trade);
+                    return (
+                      <tr
+                        key={trade.id}
+                        className={`border-t border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer ${isDone ? "opacity-50" : ""}`}
+                        onClick={() => handleRowClick(trade)}
+                      >
+                        {/* 유형 */}
+                        <td className="py-3.5 px-3 text-center whitespace-nowrap">
+                          <span className={`inline-flex items-center justify-center min-w-[44px] h-[22px] px-2 rounded text-[11.5px] font-semibold ${trade.tradeType === "매수" ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>
+                            {trade.tradeType || "-"}
+                          </span>
+                        </td>
+                        {/* 상태 */}
+                        <td className="py-3.5 px-3 whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-gray-600">
+                            <span className={`w-[7px] h-[7px] rounded-full flex-shrink-0 ${statusInfo.dotClass}`} />
+                            {statusInfo.label}
+                          </span>
+                        </td>
+                        {/* 골프장 */}
+                        <td className="py-3.5 px-3 font-medium text-gray-800 whitespace-nowrap text-[13px]">
+                          {trade.clubName}
+                        </td>
+                        {/* 회원권 */}
+                        <td className="hidden md:table-cell py-3.5 px-3 text-gray-600 whitespace-nowrap text-[13px]">
+                          {trade.membershipName}
+                        </td>
+                        {/* 고객명 */}
+                        <td className="py-3.5 px-3 font-medium text-gray-900 whitespace-nowrap text-[13px]">
+                          {trade.customerName}
+                        </td>
+                        {/* 연락처 */}
+                        <td className="hidden md:table-cell py-3.5 px-3 text-gray-500 whitespace-nowrap font-mono text-[12.5px]">
+                          {trade.contact}
+                        </td>
+                        {/* 메모 */}
+                        <td className="hidden md:table-cell py-3.5 px-3 text-gray-600" style={{ maxWidth: 220 }}>
+                          {latestEntry ? (
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="truncate text-[12.5px]">{latestEntry.content}</span>
+                              <span className="flex-shrink-0 text-[11.5px] text-gray-400 font-mono">
+                                {formatMemoTimestamp(latestEntry.createdAt)}
+                              </span>
                             </div>
-                          );
-                        })()}
-                      </td>
-                      <td className="hidden md:table-cell py-2.5 pr-3 text-gray-400 whitespace-nowrap">{trade.registrationDate || "-"}</td>
-                      <td className="hidden md:table-cell py-2.5 pr-3 text-gray-500 whitespace-nowrap">{trade.createdByName || "-"}</td>
-                      <td className="hidden md:table-cell py-2.5">
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={(e) => { e.stopPropagation(); handleEdit(trade); }} className="p-1 hover:bg-gray-200 rounded" title="수정">
-                            <Edit3 className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
-                          </button>
-                          {canDeleteConsultation(user, trade) && (
-                            <button onClick={(e) => { e.stopPropagation(); setDeleteTarget(trade); }} className="p-1 hover:bg-gray-200 rounded" title="삭제">
-                              <Trash2 className="w-3.5 h-3.5 text-gray-400 hover:text-error" />
-                            </button>
+                          ) : (
+                            <span className="text-gray-300 text-[12.5px]">-</span>
                           )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        {/* 매시가 */}
+                        <td className="py-3.5 px-3 text-right whitespace-nowrap">
+                          <span className="font-mono text-[13px] font-medium text-gray-900">
+                            {formatPrice(trade.offerPrice)}
+                          </span>
+                        </td>
+                        {/* 희망가 */}
+                        <td className="hidden md:table-cell py-3.5 px-3 text-right whitespace-nowrap">
+                          <span className="font-mono text-[13px] font-medium text-gray-900">
+                            {formatPrice(trade.desiredPrice)}
+                          </span>
+                        </td>
+                        {/* 등록일 */}
+                        <td className="hidden md:table-cell py-3.5 px-3 text-gray-400 whitespace-nowrap font-mono text-[12.5px]">
+                          {trade.registrationDate || "-"}
+                        </td>
+                        {/* 작성자 */}
+                        <td className="hidden md:table-cell py-3.5 px-3 text-gray-500 whitespace-nowrap text-[13px]">
+                          {trade.createdByName || "-"}
+                        </td>
+                        {/* 승인 요청 pill */}
+                        <td className="hidden md:table-cell py-3.5 px-3 text-center whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2 py-[3px] rounded text-[11px] font-semibold border ${approvalPill.className}`}>
+                            {approvalPill.label}
+                          </span>
+                        </td>
+                        {/* 관리 */}
+                        <td className="py-3.5 px-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                          <div className="inline-flex items-center gap-2.5">
+                            <button
+                              type="button"
+                              onClick={() => handleEdit(trade)}
+                              className="text-[12.5px] font-medium text-gray-500 hover:text-gray-900 hover:underline underline-offset-2 transition-colors"
+                            >
+                              수정
+                            </button>
+                            {canDeleteConsultation(user, trade) && (
+                              <button
+                                type="button"
+                                onClick={() => setDeleteTarget(trade)}
+                                className="text-[12.5px] font-medium text-red-500 hover:text-red-700 hover:underline underline-offset-2 transition-colors"
+                              >
+                                삭제
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
-              </div>
-              {/* 인피니트 스크롤 sentinel */}
               <div ref={sentinelRef} className="h-1" />
               {pagination?.hasNext && isLoading && (
                 <div className="py-4 text-center text-xs text-gray-400">불러오는 중...</div>
               )}
-              {!pagination?.hasNext && rawMemos.length > 0 && (
-                <div className="py-4 text-center text-xs text-gray-400">모든 항목을 불러왔습니다 ({rawMemos.length}건)</div>
-              )}
             </>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Drawer */}
-      <Drawer
-        isOpen={showAddDrawer || !!editingMemo}
-        onClose={() => { setShowAddDrawer(false); setEditingMemo(null); resetForm(); }}
-        title={editingMemo ? "상담일지 수정" : "상담일지 추가"}
-        width="lg"
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">골프장명 <span className="text-red-500">*</span></label>
-            {manualClubInput ? (
-              <div className="flex gap-1.5">
-                <Input
-                  value={form.clubName}
-                  onChange={(e) => setForm((f) => ({ ...f, clubName: e.target.value, clubId: "" }))}
-                  placeholder="골프장명 직접 입력"
-                  className="flex-1"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setManualClubInput(false);
-                    setFormClubCode("");
-                    setForm((f) => ({ ...f, clubName: "", clubId: "", membershipType: "", membershipId: "", membershipName: "" }));
-                    setFormMemberships([]);
-                    setManualMembershipInput(false);
-                  }}
-                  className="px-2.5 py-2 border border-gray-300 rounded-lg text-xs text-gray-500 hover:bg-gray-50 whitespace-nowrap"
-                >
-                  목록선택
-                </button>
-              </div>
-            ) : (
-              <div className="flex gap-1.5">
-                <ClubSearchSelect
-                  clubs={clubs}
-                  selectedClubCode={formClubCode}
-                  onChange={(code) => {
-                    setFormClubCode(code);
-                    if (!code) {
-                      setForm((f) => ({ ...f, clubName: "", clubId: "", membershipType: "", membershipId: "", membershipName: "" }));
-                      setFormMemberships([]);
-                      setManualMembershipInput(false);
-                    }
-                  }}
-                  topClubCodes={topClubCodesForm}
-                  isFavorite={isClubFavorite}
-                  onToggleFavorite={(code, item) =>
-                    toggleClubFavorite(code, { name: item.name, region: item.region, holes: item.holes })
-                  }
-                  onClubSelect={(item) => trackClubSelection({ code: item.code, name: item.name })}
-                  placeholder="골프장 선택"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setManualClubInput(true);
-                    setFormClubCode("__manual__");
-                    setForm((f) => ({ ...f, clubName: "", clubId: "", membershipType: "", membershipId: "", membershipName: "" }));
-                    setFormMemberships([]);
-                    setManualMembershipInput(true);
-                  }}
-                  className="px-2.5 py-2 border border-gray-300 rounded-lg text-xs text-gray-500 hover:bg-gray-50 whitespace-nowrap"
-                >
-                  직접입력
-                </button>
-              </div>
-            )}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">거래유형 <span className="text-red-500">*</span></label>
-            <div className="flex gap-2">
-              {(["매수", "매도"] as const).map((type) => (
-                <button key={type} type="button" onClick={() => setForm((f) => ({ ...f, tradeType: type }))}
-                  className={`flex-1 py-2 text-sm rounded-lg border transition-colors ${
-                    form.tradeType === type
-                      ? type === "매수" ? "bg-blue-600 text-white border-blue-600" : "bg-red-600 text-white border-red-600"
-                      : "border-gray-300 text-gray-600 hover:bg-gray-50"
-                  }`}>{type}</button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">회원권 종류</label>
-            {formMemberships.length > 0 && !manualMembershipInput ? (
-              <select
-                value={form.membershipId || form.membershipType}
-                onChange={(e) => {
-                  if (e.target.value === "__manual__") {
-                    setManualMembershipInput(true);
-                    setForm((f) => ({ ...f, membershipType: "", membershipId: "", membershipName: "" }));
-                  } else {
-                    const selected = formMemberships.find((m) => m.id === e.target.value);
-                    if (selected) {
-                      setForm((f) => ({
-                        ...f,
-                        membershipId: selected.id,
-                        membershipType: selected.type,
-                        membershipName: selected.name,
-                      }));
-                    } else {
-                      setForm((f) => ({ ...f, membershipType: "", membershipId: "", membershipName: "" }));
-                    }
-                  }
-                }}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 bg-white focus:outline-none focus:border-gray-500"
-              >
-                <option value="">선택</option>
-                {formMemberships.map((m) => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
-                ))}
-                <option value="__manual__">직접 입력</option>
-              </select>
-            ) : (
-              <div className="flex gap-1.5">
-                <Input
-                  value={form.membershipType}
-                  onChange={(e) => setForm((f) => ({ ...f, membershipType: e.target.value, membershipId: "", membershipName: "" }))}
-                  placeholder="예: 개인정회원"
-                  className="flex-1"
-                />
-                {formMemberships.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setManualMembershipInput(false);
-                      setForm((f) => ({ ...f, membershipType: "", membershipId: "", membershipName: "" }));
-                    }}
-                    className="px-2.5 py-2 border border-gray-300 rounded-lg text-xs text-gray-500 hover:bg-gray-50 whitespace-nowrap"
-                  >
-                    목록선택
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">고객명 <span className="text-red-500">*</span></label>
-              <Input value={form.customerName} onChange={(e) => setForm((f) => ({ ...f, customerName: e.target.value }))} placeholder="홍길동" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">연락처</label>
-              <Input value={form.contact} onChange={(e) => setForm((f) => ({ ...f, contact: e.target.value }))} placeholder="010-1234-5678" />
-            </div>
-          </div>
-          {/* 매칭된 고객 카드 — 수정 모드에서 editingMemo.customerId 가 있을 때만 노출.
-              추가 모드(editingMemo === null)에는 customerId 가 없어 자동으로 숨겨진다. */}
-          <MatchedCustomerCard customerId={editingMemo?.customerId ?? null} />
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">제시가 (원)</label>
-            <div className="flex gap-2">
-              <Input type="number" value={form.offerPrice} onChange={(e) => setForm((f) => ({ ...f, offerPrice: e.target.value }))} placeholder="150000000" className="flex-1" />
-              <Input value={form.offerPriceNote} onChange={(e) => setForm((f) => ({ ...f, offerPriceNote: e.target.value }))} placeholder="비고" className="w-24" />
-            </div>
-            {form.offerPrice && <p className="mt-1 text-xs text-gray-500">{formatPrice(form.offerPrice)}</p>}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">희망가 (원)</label>
-            <div className="flex gap-2">
-              <Input type="number" value={form.desiredPrice} onChange={(e) => setForm((f) => ({ ...f, desiredPrice: e.target.value }))} placeholder="180000000" className="flex-1" />
-              <Input value={form.desiredPriceNote} onChange={(e) => setForm((f) => ({ ...f, desiredPriceNote: e.target.value }))} placeholder="비고" className="w-24" />
-            </div>
-            {form.desiredPrice && <p className="mt-1 text-xs text-gray-500">{formatPrice(form.desiredPrice)}</p>}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              계약금 (원)
-              <span className="ml-1 text-xs text-gray-400">— 입금 확인 후 승인 가능</span>
-            </label>
-            <Input
-              type="number"
-              value={form.depositAmount}
-              onChange={(e) => setForm((f) => ({ ...f, depositAmount: e.target.value }))}
-              placeholder="10000000"
-            />
-            {form.depositAmount && <p className="mt-1 text-xs text-gray-500">{formatPrice(form.depositAmount)}</p>}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">계좌번호</label>
-            <Input
-              value={form.accountNumber}
-              onChange={(e) => setForm((f) => ({ ...f, accountNumber: e.target.value }))}
-              placeholder="110-123-456789"
-            />
-          </div>
-          <div>
-            <Textarea
-              label="메모"
-              value={form.notes}
-              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-              minRows={2}
-              placeholder="타회원권 교환 희망 등"
-            />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">등록일</label><Input type="date" value={form.registrationDate} onChange={(e) => setForm((f) => ({ ...f, registrationDate: e.target.value }))} /></div>
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">거래일</label><Input type="date" value={form.tradeDate} onChange={(e) => setForm((f) => ({ ...f, tradeDate: e.target.value }))} /></div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">특이사항</label>
-            <Input value={form.remarks} onChange={(e) => setForm((f) => ({ ...f, remarks: e.target.value }))} placeholder="계약금 입금 완료 등" />
-          </div>
-          <div className="flex justify-end gap-3 pt-4 border-t">
-            <Button variant="outline" onClick={() => { setShowAddDrawer(false); setEditingMemo(null); resetForm(); }}>취소</Button>
-            <Button onClick={editingMemo ? handleUpdate : handleAdd} disabled={isSaving}>
-              {isSaving ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" />저장 중...</> : editingMemo ? "수정" : "등록"}
-            </Button>
-          </div>
         </div>
-      </Drawer>
 
-      {/* 반대매매 사이드바 */}
-      <Drawer
-        isOpen={!!selectedMemo}
-        onClose={() => setSelectedMemo(null)}
-        title={`${selectedMemo?.clubName || ""} 거래 현황`}
-        width="lg"
-      >
-        {selectedMemo && (
-          <div className="space-y-5">
-            {/* 선택한 메모 하이라이트 카드 */}
-            <div
-              className={`rounded-lg p-4 border ${
-                isConsultationCompleted(selectedMemo)
-                  ? "bg-emerald-50 border-emerald-200"
-                  : selectedMemo.tradeType === "매수"
-                    ? "bg-blue-50 border-blue-200"
-                    : "bg-red-50 border-red-200"
-              }`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <Badge
-                    variant={
-                      selectedMemo.tradeType === "매수" ? "info" : "error"
-                    }
-                  >
+        {/* 패널 푸터 */}
+        {!pagination?.hasNext && rawMemos.length > 0 && (
+          <div className="py-3.5 px-5 border-t border-gray-100 text-center bg-gray-50/60">
+            <span className="text-[12px] text-gray-400">
+              모든 항목을 불러왔습니다 <span className="font-semibold text-gray-500 font-mono">({rawMemos.length}건)</span>
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* ─── 거래 현황 중앙 모달 ─── */}
+      {!!selectedMemo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/40 backdrop-blur-[2px]" onClick={(e) => { if (e.target === e.currentTarget) closeDetailModal(); }}>
+          <div
+            className="relative bg-gray-50 rounded-2xl w-full max-h-[calc(100vh-48px)] flex flex-col overflow-hidden shadow-[0_24px_60px_rgba(0,0,0,0.22)]"
+            style={{ maxWidth: 880 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 모달 헤더 */}
+            <div className="px-6 py-[18px] border-b border-gray-200 bg-white flex items-start justify-between gap-3 flex-shrink-0">
+              <div className="min-w-0">
+                <h3 className="text-[19px] font-extrabold text-gray-900 tracking-tight">{selectedMemo.clubName} 거래 현황</h3>
+                <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[12.5px] text-gray-500">
+                  <span>{selectedMemo.membershipName}</span>
+                  <span className="text-gray-300">·</span>
+                  <span className={`inline-flex items-center justify-center px-2 h-[22px] rounded text-[11.5px] font-semibold ${selectedMemo.tradeType === "매수" ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>
                     {selectedMemo.tradeType}
-                  </Badge>
-                  <span className="font-medium text-gray-900">
-                    {selectedMemo.customerName}
                   </span>
-                  {selectedMemo.membershipName && (
-                    <span className="text-sm text-gray-500">
-                      {selectedMemo.membershipName}
-                    </span>
-                  )}
-                </div>
-                {isConsultationCompleted(selectedMemo) && (
-                  <Badge variant="success">완료</Badge>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <span className="text-gray-500">제시가: </span>
-                  <span className="text-gray-800 font-medium">
-                    {formatPrice(selectedMemo.offerPrice)}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-gray-500">희망가: </span>
-                  <span className="text-gray-800 font-medium">
-                    {formatPrice(selectedMemo.desiredPrice)}
-                  </span>
+                  <span className="text-gray-300">·</span>
+                  <span>{selectedMemo.customerName}</span>
                 </div>
               </div>
-              {selectedMemo.registrationDate && (
-                <div className="mt-2 text-xs text-gray-400">
-                  {selectedMemo.registrationDate}
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={closeDetailModal}
+                className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors flex-shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* 모달 바디 */}
+            <div className="flex-1 overflow-y-auto min-h-0 px-5 py-[18px] flex flex-col gap-3.5">
+              {/* Card 1: 현재 상담일지 */}
               {(() => {
                 const entries = buildMemoEntries(selectedMemo);
-                if (entries.length === 0) return null;
                 const ordered = [...entries].reverse();
+                const statusInfo = getStatusInfo(selectedMemo.approvalStatus || "IN_CONSULTATION");
+                const approvalPill = getApprovalPill(selectedMemo.approvalStatus || "IN_CONSULTATION");
+                const isDone = isConsultationCompleted(selectedMemo);
+                const hasDeposit = !!selectedMemo.depositAmount && selectedMemo.depositAmount > 0;
+                const docReady = !!selectedMemo.settlementDocumentGenerated;
                 return (
-                  <div className="mt-3 rounded-md border border-gray-200 bg-gray-50/60 p-3">
-                    <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase text-gray-500">
-                      <MessageSquare className="h-3 w-3" />
-                      메모 히스토리 · {entries.length}건
+                  <div className={`bg-white border rounded-2xl overflow-hidden flex-shrink-0 ${isDone ? "border-emerald-200 bg-emerald-50/30" : selectedMemo.tradeType === "매수" ? "border-amber-200 bg-amber-50/30" : "border-red-200 bg-red-50/30"}`}>
+                    <div className="px-[18px] py-3.5 border-b border-transparent flex items-center justify-between">
+                      <h4 className="text-sm font-bold text-gray-900">현재 상담일지</h4>
+                      <span className={`inline-flex items-center justify-center min-w-[40px] h-[22px] px-2 rounded text-[11.5px] font-bold ${selectedMemo.tradeType === "매수" ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>
+                        {selectedMemo.tradeType}
+                      </span>
                     </div>
-                    <div className="relative pl-4">
-                      <div className="absolute left-[7px] top-2 bottom-2 w-px bg-gray-200" />
-                      {ordered.map((entry, idx) => (
-                        <div
-                          key={entry.id}
-                          className={`relative py-2 ${
-                            idx < ordered.length - 1 ? "border-b border-dashed border-gray-200" : ""
-                          }`}
-                        >
-                          <span
-                            className="absolute -left-[10.5px] top-1/2 h-[9px] w-[9px] -translate-y-1/2 rounded-full border-[1.5px] border-gray-900 box-border"
-                            style={{ background: idx === 0 ? "#0A0A0A" : "#fff" }}
-                          />
-                          <div className="flex items-baseline gap-2 text-[11px] text-gray-500">
-                            <span className="font-semibold text-gray-700">{entry.author}</span>
-                            <span className="font-mono text-gray-400">{formatMemoTimestamp(entry.createdAt)}</span>
-                            {idx === 0 && (
-                              <span className="rounded bg-gray-900 px-1.5 py-px text-[10px] font-bold text-white">
-                                최신
-                              </span>
-                            )}
-                          </div>
-                          <p className="mt-0.5 whitespace-pre-wrap break-words text-[13px] leading-relaxed text-gray-800">
-                            {entry.content}
-                          </p>
+                    <div className="px-[18px] pt-1 pb-1 flex flex-wrap items-center gap-2">
+                      <h3 className="text-[19px] font-extrabold text-gray-900 tracking-tight">{selectedMemo.customerName}</h3>
+                      <span className="text-[13px] text-gray-500 font-medium">{selectedMemo.membershipName}</span>
+                    </div>
+                    <div className="px-[18px] pb-3.5 flex items-center gap-2 flex-wrap">
+                      <span className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-gray-600">
+                        <span className={`w-[6px] h-[6px] rounded-full ${statusInfo.dotClass}`} />
+                        {statusInfo.label}
+                      </span>
+                      <span className={`inline-flex items-center px-2 py-[2px] rounded text-[10.5px] font-bold border ${approvalPill.className}`}>
+                        {approvalPill.label}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 px-[18px] py-4 border-t border-black/5">
+                      {[
+                        { label: "골프장", value: selectedMemo.clubName },
+                        { label: "연락처", value: selectedMemo.contact, mono: true },
+                        { label: "작성자", value: selectedMemo.createdByName },
+                        { label: "매시가", value: formatPrice(selectedMemo.offerPrice), price: true },
+                        { label: "희망가", value: formatPrice(selectedMemo.desiredPrice), price: true },
+                        { label: "등록일", value: selectedMemo.registrationDate, mono: true },
+                      ].map(({ label, value, mono, price }) => (
+                        <div key={label} className="flex flex-col gap-1">
+                          <span className="text-[10.5px] font-semibold text-gray-400 uppercase tracking-[0.04em]">{label}</span>
+                          <span className={`text-[13.5px] font-semibold text-gray-900 break-all ${mono ? "font-mono text-[13px] font-medium" : ""} ${price ? "text-[15px] font-bold font-mono" : ""} ${!value || value === "-" ? "text-gray-300 font-normal" : ""}`}>
+                            {value || "-"}
+                          </span>
                         </div>
                       ))}
                     </div>
+
+                    {/* 메모 히스토리 */}
+                    <div className="mx-[18px] mb-[18px] mt-1 p-4 bg-white/85 border border-gray-200 rounded-[10px]">
+                      <div className="flex items-center justify-between mb-2.5">
+                        <div className="inline-flex items-center gap-1.5 text-[12.5px] font-bold text-gray-900">
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          메모 히스토리
+                        </div>
+                        <span className="text-[11.5px] text-gray-500 font-mono">총 {entries.length}건</span>
+                      </div>
+                      {/* 메모 추가 입력 */}
+                      <div className="mb-3">
+                        <textarea
+                          value={noteInput}
+                          onChange={(e) => setNoteInput(e.target.value)}
+                          placeholder="메모를 입력하세요..."
+                          rows={2}
+                          className="w-full resize-none rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-[12.5px] leading-[1.55] text-gray-800 outline-none focus:border-gray-900 focus:bg-white"
+                        />
+                        <div className="mt-1.5 flex justify-end">
+                          <button
+                            type="button"
+                            disabled={!noteInput.trim() || isAddingNote}
+                            onClick={() => void handleAddNote()}
+                            className="inline-flex h-7 items-center gap-1 rounded-md bg-gray-900 px-3 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-gray-300"
+                          >
+                            {isAddingNote ? "추가 중..." : "메모 추가"}
+                          </button>
+                        </div>
+                      </div>
+                      {ordered.length === 0 ? (
+                        <p className="text-[12.5px] text-gray-400 text-center py-2">작성된 메모가 없습니다</p>
+                      ) : (
+                        <div className="relative pl-4">
+                          <div className="absolute left-[7px] top-2 bottom-2 w-px bg-gray-200" />
+                          {ordered.map((entry, idx) => (
+                            <div key={entry.id} className={`relative py-2 ${idx < ordered.length - 1 ? "border-b border-dashed border-gray-200" : ""}`}>
+                              <span
+                                className="absolute -left-[10.5px] top-1/2 h-[9px] w-[9px] -translate-y-1/2 rounded-full border-[1.5px] box-border"
+                                style={{ background: idx === 0 ? "#111827" : "#fff", borderColor: idx === 0 ? "#111827" : "#9CA3AF" }}
+                              />
+                              <div className="flex items-baseline gap-2 text-[11px] text-gray-500 mb-0.5">
+                                <span className="font-semibold text-gray-700">{entry.author}</span>
+                                <span className="font-mono text-gray-400">{formatMemoTimestamp(entry.createdAt)}</span>
+                                {idx === 0 && (
+                                  <span className="rounded bg-gray-900 px-1.5 py-px text-[9.5px] font-bold text-white tracking-[0.02em]">최신</span>
+                                )}
+                              </div>
+                              <p className="text-[13px] text-gray-800 leading-[1.55] whitespace-pre-wrap break-words mt-0.5">{entry.content}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 액션 버튼 영역 */}
+                    {(selectedMemo.approvalStatus === "PENDING_DEPOSIT" || selectedMemo.approvalStatus === "DEPOSIT_APPROVED") && (
+                      <div className="px-[18px] pb-[18px] flex items-center gap-2 flex-wrap">
+                        {selectedMemo.approvalStatus === "PENDING_DEPOSIT" && (
+                          <button
+                            type="button"
+                            disabled={approvalBusyId === selectedMemo.id || !hasDeposit || !docReady}
+                            onClick={() => runApprovalAction(selectedMemo, "APPROVE_FIRST")}
+                            title={!hasDeposit ? "계약금 입력 후 확인 가능" : !docReady ? "입출금표 문서 생성 완료가 필요합니다" : "계약금 확인 후 거래 자동 생성"}
+                            className="px-3 py-1.5 text-[12.5px] font-semibold rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                          >
+                            계약금 확인
+                          </button>
+                        )}
+                        {selectedMemo.approvalStatus === "DEPOSIT_APPROVED" && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={approvalBusyId === selectedMemo.id}
+                              onClick={() => setReasonModal({ memoId: selectedMemo.id })}
+                              className="px-3 py-1.5 text-[12.5px] font-semibold rounded-lg border border-amber-200 text-amber-700 hover:bg-amber-50 disabled:opacity-50 transition-colors"
+                            >
+                              다시 열기
+                            </button>
+                            {selectedMemo.linkedTradeId && (
+                              <a
+                                href={`/trade-records?highlight=${selectedMemo.linkedTradeId}`}
+                                className="px-3 py-1.5 text-[12.5px] font-semibold rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 transition-colors"
+                              >
+                                거래 보기
+                              </a>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })()}
-            </div>
 
-            {/* 고객 이력 섹션 */}
-            <div className="rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-gray-700">
-                  {selectedMemo.customerName} 이력
-                </h3>
-                {customerHistory && (
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <Badge variant="default">
-                      상담 {customerHistory.summary.consultationCount}건
-                    </Badge>
-                    <Badge variant="default">
-                      거래 {customerHistory.summary.membershipTradeCount}건
-                    </Badge>
-                  </div>
-                )}
-              </div>
+              {/* Card 2: 고객 프로필 */}
+              <MatchedCustomerCard
+                customerId={selectedMemo.customerId ?? null}
+                fallbackName={selectedMemo.customerName}
+                fallbackContact={selectedMemo.contact}
+              />
 
-              {!selectedMemo.customerId ? (
-                <p className="text-xs text-gray-400">
-                  연결된 고객 프로필이 없어 이력을 조회할 수 없습니다.
-                </p>
-              ) : isLoadingCustomerHistory ? (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-                </div>
-              ) : customerHistory ? (
-                <div className="space-y-3 text-sm">
-                  {customerHistory.recentConsultations.length > 0 && (
-                    <div>
-                      <h4 className="text-[11px] font-semibold text-gray-500 mb-1 uppercase">
-                        최근 상담
-                      </h4>
-                      <ul className="space-y-1">
-                        {customerHistory.recentConsultations.map((c) => (
-                          <li
-                            key={c.id}
-                            className="flex items-center justify-between text-gray-700 gap-3"
-                          >
-                            <span className="truncate">
-                              <Badge variant={c.tradeType === "매수" ? "info" : "error"}>
-                                {c.tradeType}
-                              </Badge>
-                              <span className="ml-1.5">
-                                {c.clubName} · {c.membershipName}
-                              </span>
-                            </span>
-                            <span className="text-xs text-gray-400 shrink-0">
-                              {c.registrationDate ?? "-"}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {customerHistory.recentMembershipTrades.length > 0 && (
-                    <div>
-                      <h4 className="text-[11px] font-semibold text-gray-500 mb-1 uppercase">
-                        최근 거래
-                      </h4>
-                      <ul className="space-y-1">
-                        {customerHistory.recentMembershipTrades.map((t) => (
-                          <li
-                            key={t.id}
-                            className="flex items-center justify-between text-gray-700 gap-3"
-                          >
-                            <span className="truncate">
-                              <Badge variant={t.tradeType === "매수" ? "info" : "error"}>
-                                {t.tradeType}
-                              </Badge>
-                              <span className="ml-1.5">
-                                {t.clubName} · {t.membershipName}
-                              </span>
-                            </span>
-                            <span className="text-xs text-gray-400 shrink-0">
-                              {t.contractDate ?? "-"}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {customerHistory.recentConsultations.length === 0 &&
-                    customerHistory.recentMembershipTrades.length === 0 && (
-                      <p className="text-xs text-gray-400">이력이 없습니다.</p>
-                    )}
-                </div>
-              ) : (
-                <p className="text-xs text-gray-400">이력을 불러오지 못했습니다.</p>
-              )}
-            </div>
-
-            {/* 반대 매매 섹션 */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-gray-700">
-                  반대 매매 (
-                  {selectedMemo.tradeType === "매수" ? "매도" : "매수"}){" "}
-                  {!isLoadingRelated && (
-                    <span className="text-gray-400 font-normal">
-                      {relatedMemos.length}건
-                    </span>
-                  )}
-                </h3>
-                <div className="flex items-center gap-2">
-                  <select
-                    value={relatedFilterDone}
-                    onChange={(e) => setRelatedFilterDone(e.target.value as "" | "done" | "notDone")}
-                    className="px-2 py-1 text-xs rounded-md border border-gray-300 bg-white"
-                  >
-                    <option value="">전체</option>
-                    <option value="notDone">진행중</option>
-                    <option value="done">완료</option>
-                  </select>
-                  <div className="flex gap-1">
-                    {(["date", "price"] as const).map((sort) => (
+              {/* Card 3: 같은 골프장 매물 (반대 포함 전체) */}
+              <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden flex-shrink-0">
+                <div className="px-[18px] py-3.5 border-b border-gray-100 flex items-center justify-between gap-2 flex-wrap">
+                  <h4 className="text-sm font-bold text-gray-900">
+                    {selectedMemo.clubName} 매물
+                    <span className="ml-1.5 text-[12.5px] text-gray-400 font-normal font-mono">{relatedMemos.length}건</span>
+                  </h4>
+                  {/* 탭: 매수/매도 */}
+                  <div className="inline-flex gap-0.5 p-[3px] bg-gray-100 rounded-lg">
+                    {(["매수", "매도"] as const).map((tab) => (
                       <button
-                        key={sort}
-                        onClick={() => setRelatedSort(sort)}
-                        className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                          relatedSort === sort
-                            ? "bg-gray-900 text-white"
-                            : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                        key={tab}
+                        type="button"
+                        onClick={() => setRelatedOppositeTab(tab)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] font-semibold rounded-md transition-all ${
+                          relatedOppositeTab === tab
+                            ? "bg-white text-gray-900 shadow-sm"
+                            : "text-gray-500 hover:text-gray-700"
                         }`}
                       >
-                        {sort === "date" ? "날짜순" : "가격순"}
+                        <span>{tab}</span>
+                        <span className={`text-[10.5px] font-bold px-1.5 py-px rounded-full font-mono min-w-[20px] text-center ${
+                          relatedOppositeTab === tab ? "bg-gray-900 text-white" : "bg-gray-200 text-gray-500"
+                        } ${relatedOppositeTab === tab && tab === "매수" ? "bg-amber-600" : ""} ${relatedOppositeTab === tab && tab === "매도" ? "bg-red-600" : ""}`}>
+                          {tab === "매수" ? buyCount : sellCount}
+                        </span>
                       </button>
                     ))}
                   </div>
                 </div>
-              </div>
-
-              {isLoadingRelated ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-5 h-5 animate-spin text-gray-400 mr-2" />
-                  <span className="text-sm text-gray-500">조회 중...</span>
+                <div className="px-[18px] py-3.5">
+                  {/* 정렬 */}
+                  <div className="flex justify-end mb-2.5">
+                    <div className="inline-flex p-[2px] bg-gray-100 rounded-lg">
+                      {(["date", "price"] as const).map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setRelatedSort(s)}
+                          className={`px-2.5 py-[4px] text-[11.5px] font-semibold rounded-md transition-colors ${relatedSort === s ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-700"}`}
+                        >
+                          {s === "date" ? "날짜순" : "가격순"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {isLoadingRelated ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-5 h-5 animate-spin text-gray-400 mr-2" />
+                      <span className="text-sm text-gray-500">조회 중...</span>
+                    </div>
+                  ) : sortedRelatedMemos.length === 0 ? (
+                    <div className="py-8 text-center border border-dashed border-gray-200 rounded-[10px]">
+                      <p className="text-[12.5px] text-gray-400">{relatedOppositeTab} 거래가 없습니다</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {sortedRelatedMemos.map((related) => {
+                        const isDoneRelated = isConsultationCompleted(related);
+                        const latestRelated = related.notes?.entries?.[related.notes.entries.length - 1];
+                        return (
+                          <div key={related.id} className={`border border-gray-200 rounded-[10px] p-3.5 bg-white transition-colors hover:border-gray-300 ${isDoneRelated ? "opacity-70" : ""}`}>
+                            <div className="flex items-center flex-wrap gap-1.5 mb-2.5">
+                              <span className={`inline-flex items-center justify-center min-w-[40px] h-[22px] px-2 rounded text-[11.5px] font-bold ${related.tradeType === "매수" ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"} ${isDoneRelated ? "opacity-55" : ""}`}>
+                                {related.tradeType}
+                              </span>
+                              <span className="text-[13.5px] font-bold text-gray-900">{related.customerName}</span>
+                              <span className="text-[12px] text-gray-500">{related.membershipName}</span>
+                              <div className="ml-auto flex items-center gap-1.5">
+                                {(() => { const s = getStatusInfo(related.approvalStatus || "IN_CONSULTATION"); return <span className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-gray-600"><span className={`w-[6px] h-[6px] rounded-full ${s.dotClass}`} />{s.label}</span>; })()}
+                                {isDoneRelated && <span className="inline-flex items-center px-2 py-px rounded-full text-[11px] font-semibold text-emerald-700 bg-emerald-50">완료</span>}
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 text-[12px]">
+                              {[
+                                { lab: "매시가", v: formatPrice(related.offerPrice) },
+                                { lab: "희망가", v: formatPrice(related.desiredPrice) },
+                                { lab: "연락처", v: related.contact || "-" },
+                              ].map(({ lab, v }) => (
+                                <div key={lab} className="flex flex-col gap-0.5">
+                                  <span className="text-[10.5px] font-medium text-gray-400 uppercase tracking-wider">{lab}</span>
+                                  <span className="text-[12.5px] font-semibold text-gray-900 font-mono">{v}</span>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="flex items-center gap-2 mt-2.5 pt-2 border-t border-dashed border-gray-100 text-[11.5px] text-gray-400">
+                              <span className="font-mono">{related.registrationDate || ""}</span>
+                              {latestRelated?.content && (
+                                <>
+                                  <span className="text-gray-200">·</span>
+                                  <span className="text-gray-500 truncate flex-1">{latestRelated.content}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              ) : sortedRelatedMemos.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-sm text-gray-400">
-                    반대 매매 데이터가 없습니다
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── 새 상담일지 중앙 모달 (AI 탭 + 일반 입력 탭) ─── */}
+      {(showAddDrawer || !!editingMemo) && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowAddDrawer(false); setEditingMemo(null); resetForm(); } }}
+        >
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative w-full max-w-[640px] max-h-[90vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+            {/* 모달 헤더 */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+              <h3 className="text-[16px] font-bold text-gray-900">
+                {editingMemo ? "상담일지 수정" : "상담일지 작성"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => { setShowAddDrawer(false); setEditingMemo(null); resetForm(); }}
+                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* 탭 헤더 */}
+            {!editingMemo && (
+              <div className="flex items-center border-b border-gray-100 px-6 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setAddDrawerTab("ai")}
+                  className={`inline-flex items-center gap-1.5 px-0 mr-6 py-3 text-[13.5px] font-medium border-b-2 -mb-px transition-colors ${addDrawerTab === "ai" ? "text-gray-900 font-bold border-gray-900" : "text-gray-400 border-transparent hover:text-gray-600"}`}
+                >
+                  <Sparkles className={`w-3.5 h-3.5 ${addDrawerTab === "ai" ? "text-violet-600" : "text-gray-400"}`} />
+                  AI 입력
+                  <span className="inline-flex items-center gap-1 px-2 py-px bg-violet-50 text-violet-700 text-[9.5px] font-bold rounded-full uppercase tracking-wide">BETA</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAddDrawerTab("manual")}
+                  className={`inline-flex items-center gap-1.5 px-0 py-3 text-[13.5px] font-medium border-b-2 -mb-px transition-colors ${addDrawerTab === "manual" ? "text-gray-900 font-bold border-gray-900" : "text-gray-400 border-transparent hover:text-gray-600"}`}
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  일반 입력
+                </button>
+              </div>
+            )}
+
+            {/* 스크롤 가능한 폼 영역 */}
+            <div className="flex-1 overflow-y-auto px-6 py-5">
+              {/* AI 탭 */}
+              {!editingMemo && addDrawerTab === "ai" && (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-6 items-center gap-1 rounded-full bg-violet-50 px-2 text-[11px] font-bold uppercase tracking-wide text-violet-700">
+                      <Sparkles className="h-3 w-3" />
+                      beta
+                    </span>
+                    <h4 className="text-[14px] font-bold text-gray-900">AI 자연어 입력</h4>
+                  </div>
+                  <p className="text-[12px] leading-relaxed text-gray-500">
+                    한 줄로 적어주세요. AI 가 골프장·회원권·거래유형·고객정보를 추출해 폼을 채워줍니다.
+                  </p>
+                  <div className="rounded border border-gray-200 bg-gray-50 px-2.5 py-2 text-[11px] leading-relaxed text-gray-500">
+                    <p>· 개인/법인 미언급 시 <span className="font-medium text-gray-700">개인</span> 기본.</p>
+                    <p>· 매수/매도 미언급 시 <span className="font-medium text-gray-700">매수</span> 기본.</p>
+                    <p>· 최대 {MAX_AI_LENGTH.toLocaleString()}자.</p>
+                  </div>
+                  <textarea
+                    ref={aiTextareaRef}
+                    value={aiText}
+                    onChange={(e) => setAiText(e.target.value.slice(0, MAX_AI_LENGTH))}
+                    onKeyDown={(e) => {
+                      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                        e.preventDefault();
+                        void handleAiSubmit();
+                      }
+                    }}
+                    placeholder="예: 남서울 정회원 매수 홍길동 010-1234-5678 희망가 5억"
+                    maxLength={MAX_AI_LENGTH}
+                    className="block min-h-[6rem] w-full resize-none rounded-md border border-gray-300 bg-white px-3 py-2.5 text-[13px] leading-[1.55] text-gray-800 outline-none focus:border-gray-900 focus:shadow-[0_0_0_3px_rgba(10,10,10,0.06)]"
+                    style={{ maxHeight: "288px" }}
+                  />
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-mono text-gray-500">{aiText.length.toLocaleString()} / {MAX_AI_LENGTH.toLocaleString()}</span>
+                    <button
+                      type="button"
+                      disabled={!aiText.trim() || aiSubmitting}
+                      onClick={() => void handleAiSubmit()}
+                      className="inline-flex h-9 items-center gap-1.5 rounded-md bg-gray-900 px-4 text-[13px] font-semibold text-white hover:bg-black disabled:cursor-not-allowed disabled:bg-gray-300 transition-colors"
+                    >
+                      {aiSubmitting ? (
+                        <><span className="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />분석 중…</>
+                      ) : (
+                        <><Sparkles className="h-3.5 w-3.5" />AI 로 폼 채우기</>
+                      )}
+                    </button>
+                  </div>
+                  {aiError && (
+                    <div className="rounded border border-red-200 bg-red-50 px-2.5 py-2 text-[12px] text-red-700">{aiError}</div>
+                  )}
+                  <p className="mt-1 text-[11px] text-gray-400">
+                    Tip: <kbd className="rounded border border-gray-300 bg-gray-50 px-1.5 py-px text-[10px]">⌘/Ctrl</kbd> + <kbd className="rounded border border-gray-300 bg-gray-50 px-1.5 py-px text-[10px]">Enter</kbd> 로도 제출할 수 있습니다.
                   </p>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {sortedRelatedMemos.map((related) => (
-                    <div
-                      key={related.id}
-                      className={`rounded-lg border p-3 ${
-                        isConsultationCompleted(related) ? "opacity-60" : ""
-                      } ${
-                        related.tradeType === "매수"
-                          ? "border-blue-100"
-                          : "border-red-100"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant={
-                              related.tradeType === "매수" ? "info" : "error"
-                            }
-                          >
-                            {related.tradeType}
-                          </Badge>
-                          <span className="font-medium text-sm text-gray-900">
-                            {related.customerName}
-                          </span>
-                          {related.membershipName && (
-                            <span className="text-xs text-gray-500">
-                              {related.membershipName}
-                            </span>
-                          )}
-                          {isConsultationCompleted(related) && (
-                            <Badge variant="success">완료</Badge>
-                          )}
+              )}
+
+              {/* 일반 입력 탭 */}
+              {(addDrawerTab === "manual" || editingMemo) && (
+                <div className="space-y-5">
+                  {/* Section 1: 거래 정보 */}
+                  <div>
+                    <div className="inline-flex items-center gap-2 mb-3.5">
+                      <span className="inline-grid place-items-center w-[22px] h-[22px] bg-gray-900 text-white rounded-[5px] text-[11.5px] font-bold font-mono">1</span>
+                      <h4 className="text-sm font-bold text-gray-900">거래 정보</h4>
+                    </div>
+                    <div className="space-y-3.5">
+                      <div>
+                        <label className="block text-[12.5px] font-semibold text-gray-900 mb-1.5">거래유형 <span className="text-red-500">*</span></label>
+                        <div className="grid grid-cols-2 gap-0 bg-gray-100 rounded-[10px] p-1">
+                          {(["매수", "매도"] as const).map((type) => (
+                            <button
+                              key={type}
+                              type="button"
+                              onClick={() => setForm((f) => ({ ...f, tradeType: type }))}
+                              className={`flex-1 py-2.5 text-sm font-semibold rounded-[7px] border-none transition-all ${
+                                form.tradeType === type ? "bg-blue-700 text-white shadow-sm" : "text-gray-500 bg-transparent hover:text-gray-800"
+                              }`}
+                            >
+                              {type}
+                            </button>
+                          ))}
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-1 text-sm">
+                      <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <span className="text-gray-500">제시가: </span>
-                          <span className="text-gray-800">
-                            {formatPrice(related.offerPrice)}
-                          </span>
+                          <label className="block text-[12.5px] font-semibold text-gray-900 mb-1.5">골프장명 <span className="text-red-500">*</span></label>
+                          {manualClubInput ? (
+                            <div className="flex gap-1.5">
+                              <Input
+                                value={form.clubName}
+                                onChange={(e) => setForm((f) => ({ ...f, clubName: e.target.value, clubId: "" }))}
+                                placeholder="골프장명 직접 입력"
+                                className="flex-1"
+                              />
+                              <button type="button" onClick={() => { setManualClubInput(false); setFormClubCode(""); setForm((f) => ({ ...f, clubName: "", clubId: "", membershipType: "", membershipId: "", membershipName: "" })); setFormMemberships([]); setManualMembershipInput(false); }} className="px-2.5 py-2 border border-gray-300 rounded-lg text-xs text-gray-500 hover:bg-gray-50 whitespace-nowrap">목록선택</button>
+                            </div>
+                          ) : (
+                            <div className="flex gap-1.5">
+                              <ClubSearchSelect
+                                clubs={clubs}
+                                selectedClubCode={formClubCode}
+                                onChange={(code) => { setFormClubCode(code); if (!code) { setForm((f) => ({ ...f, clubName: "", clubId: "", membershipType: "", membershipId: "", membershipName: "" })); setFormMemberships([]); setManualMembershipInput(false); } }}
+                                topClubCodes={topClubCodesForm}
+                                isFavorite={isClubFavorite}
+                                onToggleFavorite={(code, item) => toggleClubFavorite(code, { name: item.name, region: item.region, holes: item.holes })}
+                                onClubSelect={(item) => trackClubSelection({ code: item.code, name: item.name })}
+                                placeholder="골프장 선택"
+                              />
+                              <button type="button" onClick={() => { setManualClubInput(true); setFormClubCode("__manual__"); setForm((f) => ({ ...f, clubName: "", clubId: "", membershipType: "", membershipId: "", membershipName: "" })); setFormMemberships([]); setManualMembershipInput(true); }} className="px-2.5 py-2 border border-gray-300 rounded-lg text-xs text-gray-500 hover:bg-gray-50 whitespace-nowrap">직접입력</button>
+                            </div>
+                          )}
                         </div>
                         <div>
-                          <span className="text-gray-500">희망가: </span>
-                          <span className="text-gray-800">
-                            {formatPrice(related.desiredPrice)}
-                          </span>
+                          <label className="block text-[12.5px] font-semibold text-gray-900 mb-1.5">회원권 종류 <span className="text-red-500">*</span></label>
+                          {formMemberships.length > 0 && !manualMembershipInput ? (
+                            <select
+                              value={form.membershipId || form.membershipType}
+                              onChange={(e) => {
+                                if (e.target.value === "__manual__") { setManualMembershipInput(true); setForm((f) => ({ ...f, membershipType: "", membershipId: "", membershipName: "" })); }
+                                else {
+                                  const selected = formMemberships.find((m) => m.id === e.target.value);
+                                  if (selected) setForm((f) => ({ ...f, membershipId: selected.id, membershipType: selected.type, membershipName: selected.name }));
+                                  else setForm((f) => ({ ...f, membershipType: "", membershipId: "", membershipName: "" }));
+                                }
+                              }}
+                              className="w-full h-10 px-3 text-[13.5px] rounded-lg border border-gray-200 bg-white focus:outline-none focus:border-gray-500"
+                            >
+                              <option value="">선택</option>
+                              {formMemberships.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                              <option value="__manual__">직접 입력</option>
+                            </select>
+                          ) : (
+                            <div className="flex gap-1.5">
+                              <Input value={form.membershipType} onChange={(e) => setForm((f) => ({ ...f, membershipType: e.target.value, membershipId: "", membershipName: "" }))} placeholder="예: 개인정회원" className="flex-1" />
+                              {formMemberships.length > 0 && (
+                                <button type="button" onClick={() => { setManualMembershipInput(false); setForm((f) => ({ ...f, membershipType: "", membershipId: "", membershipName: "" })); }} className="px-2.5 py-2 border border-gray-300 rounded-lg text-xs text-gray-500 hover:bg-gray-50 whitespace-nowrap">목록선택</button>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2 mt-1.5 text-xs text-gray-400">
-                        {related.registrationDate && (
-                          <span>{related.registrationDate}</span>
-                        )}
-                        {(() => {
-                          const latest = related.notes?.entries?.[
-                            related.notes.entries.length - 1
-                          ];
-                          if (!latest?.content) return null;
-                          return (
-                            <>
-                              <span>·</span>
-                              <span className="text-gray-500 truncate max-w-[200px]">
-                                {latest.content}
-                              </span>
-                            </>
-                          );
-                        })()}
                       </div>
                     </div>
-                  ))}
+                  </div>
+
+                  {/* Section 2: 고객 정보 */}
+                  <div>
+                    <div className="inline-flex items-center gap-2 mb-3.5">
+                      <span className="inline-grid place-items-center w-[22px] h-[22px] bg-gray-900 text-white rounded-[5px] text-[11.5px] font-bold font-mono">2</span>
+                      <h4 className="text-sm font-bold text-gray-900">고객 정보</h4>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[12.5px] font-semibold text-gray-900 mb-1.5">고객명 <span className="text-red-500">*</span></label>
+                        <Input value={form.customerName} onChange={(e) => setForm((f) => ({ ...f, customerName: e.target.value }))} placeholder="홍길동" />
+                      </div>
+                      <div>
+                        <label className="block text-[12.5px] font-semibold text-gray-900 mb-1.5">연락처 <span className="text-red-500">*</span></label>
+                        <Input value={form.contact} onChange={(e) => setForm((f) => ({ ...f, contact: e.target.value }))} placeholder="010-1234-5678" type="tel" />
+                      </div>
+                    </div>
+                    <MatchedCustomerCard
+                      customerId={editingMemo?.customerId ?? null}
+                      fallbackName={editingMemo?.customerName ?? null}
+                      fallbackContact={editingMemo?.contact ?? null}
+                    />
+                  </div>
+
+                  {/* Section 3: 금액 정보 */}
+                  <div>
+                    <div className="inline-flex items-center gap-2 mb-3.5">
+                      <span className="inline-grid place-items-center w-[22px] h-[22px] bg-gray-900 text-white rounded-[5px] text-[11.5px] font-bold font-mono">3</span>
+                      <h4 className="text-sm font-bold text-gray-900">금액 정보</h4>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[12.5px] font-semibold text-gray-900 mb-1.5">제시가 <span className="text-[11.5px] font-normal text-gray-400">만원</span></label>
+                          <Input type="number" value={form.offerPrice} onChange={(e) => setForm((f) => ({ ...f, offerPrice: e.target.value }))} placeholder="0" className="text-right" />
+                          {form.offerPrice && <p className="mt-1 text-[11px] text-gray-500">{formatPrice(form.offerPrice)}</p>}
+                        </div>
+                        <div>
+                          <label className="block text-[12.5px] font-semibold text-gray-900 mb-1.5">제시가 비고</label>
+                          <Input value={form.offerPriceNote} onChange={(e) => setForm((f) => ({ ...f, offerPriceNote: e.target.value }))} placeholder="비고 (예: 매도 의향가)" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[12.5px] font-semibold text-gray-900 mb-1.5">희망가 <span className="text-[11.5px] font-normal text-gray-400">만원</span></label>
+                          <Input type="number" value={form.desiredPrice} onChange={(e) => setForm((f) => ({ ...f, desiredPrice: e.target.value }))} placeholder="0" className="text-right" />
+                          {form.desiredPrice && <p className="mt-1 text-[11px] text-gray-500">{formatPrice(form.desiredPrice)}</p>}
+                        </div>
+                        <div>
+                          <label className="block text-[12.5px] font-semibold text-gray-900 mb-1.5">희망가 비고</label>
+                          <Input value={form.desiredPriceNote} onChange={(e) => setForm((f) => ({ ...f, desiredPriceNote: e.target.value }))} placeholder="비고" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[12.5px] font-semibold text-gray-900 mb-1.5">계약금 <span className="text-[11.5px] font-normal text-gray-400">만원</span></label>
+                          <Input type="number" value={form.depositAmount} onChange={(e) => setForm((f) => ({ ...f, depositAmount: e.target.value }))} placeholder="0" className="text-right" />
+                          {form.depositAmount && <p className="mt-1 text-[11px] text-gray-500">{formatPrice(form.depositAmount)}</p>}
+                        </div>
+                        <div>
+                          <label className="block text-[12.5px] font-semibold text-gray-900 mb-1.5">계좌번호</label>
+                          <Input value={form.accountNumber} onChange={(e) => setForm((f) => ({ ...f, accountNumber: e.target.value }))} placeholder="110-123-456789" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section 4: 메모 / 특이사항 */}
+                  <div>
+                    <div className="inline-flex items-center gap-2 mb-3.5">
+                      <span className="inline-grid place-items-center w-[22px] h-[22px] bg-gray-900 text-white rounded-[5px] text-[11.5px] font-bold font-mono">4</span>
+                      <h4 className="text-sm font-bold text-gray-900">메모 / 특이사항</h4>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-[12.5px] font-semibold text-gray-900 mb-1.5">메모</label>
+                        <Textarea
+                          value={form.notes}
+                          onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                          minRows={2}
+                          placeholder="타회원권 교환 희망 / 매수 의향 등"
+                          disabled={!!editingMemo}
+                        />
+                        {editingMemo && <p className="mt-1 text-[11px] text-gray-400">수정 모드에서는 메모를 직접 편집할 수 없습니다.</p>}
+                      </div>
+                      <div>
+                        <label className="block text-[12.5px] font-semibold text-gray-900 mb-1.5">특이사항</label>
+                        <Textarea
+                          value={form.remarks}
+                          onChange={(e) => setForm((f) => ({ ...f, remarks: e.target.value }))}
+                          minRows={2}
+                          placeholder="계약금 입금 완료 / 특별 요청사항 등"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section 5: 일정 */}
+                  <div>
+                    <div className="inline-flex items-center gap-2 mb-3.5">
+                      <span className="inline-grid place-items-center w-[22px] h-[22px] bg-gray-900 text-white rounded-[5px] text-[11.5px] font-bold font-mono">5</span>
+                      <h4 className="text-sm font-bold text-gray-900">일정</h4>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[12.5px] font-semibold text-gray-900 mb-1.5">등록일</label>
+                        <Input type="date" value={form.registrationDate} onChange={(e) => setForm((f) => ({ ...f, registrationDate: e.target.value }))} />
+                      </div>
+                      <div>
+                        <label className="block text-[12.5px] font-semibold text-gray-900 mb-1.5">거래일</label>
+                        <Input type="date" value={form.tradeDate} onChange={(e) => setForm((f) => ({ ...f, tradeDate: e.target.value }))} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 저장/취소 */}
+                  <div className="flex justify-between items-center gap-3 pt-4 border-t border-gray-100">
+                    <span className="text-[12px] text-gray-400"><span className="text-red-500 font-bold">*</span> 필수 입력</span>
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={() => { setShowAddDrawer(false); setEditingMemo(null); resetForm(); }}>취소</Button>
+                      <Button onClick={editingMemo ? handleUpdate : handleAdd} disabled={isSaving}>
+                        {isSaving ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" />저장 중...</> : editingMemo ? "수정" : "저장"}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
           </div>
-        )}
-      </Drawer>
+        </div>
+      )}
 
       <ConfirmModal
         isOpen={!!deleteTarget}

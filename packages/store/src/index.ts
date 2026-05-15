@@ -265,6 +265,27 @@ export {
   isInTradeStage,
 } from "./domain/consultation-progress";
 
+// Trade record display helpers
+export {
+  getTradeWorkflowMeta,
+  canAdvanceTradeToTaxFiling,
+  canAdvanceTradeToCompleted,
+  canRejectTradeRecord,
+  formatTradeRecordPrice,
+  getTradeRecordGroupLabel,
+  groupTradeRecordsByContractMonth,
+  getTradeRecordCounts,
+} from "./domain/trade-records";
+export type {
+  TradeRecordWorkflowTone,
+  TradeRecordWorkflowMeta,
+  TradeRecordWorkflowLike,
+  TradeRecordCountLike,
+  TradeRecordDateLike,
+  GroupedTradeRecords,
+  TradeRecordCounts,
+} from "./domain/trade-records";
+
 // 고객 update 입력 타입 — 뷰의 인라인 편집(`InlineField`) 콜백에서 사용
 export type { CustomerUpdateInput } from "@heritage-dx/types";
 

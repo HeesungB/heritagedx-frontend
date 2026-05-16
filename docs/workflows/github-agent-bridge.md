@@ -1,5 +1,8 @@
 # GitHub × Claude/Codex 협업 워크플로우 (gh-agent-bridge)
 
+> 👤 **사용자 가이드**(이슈 만드는 법·슬래시 명령·plan 댓글 읽기): [`agent-issue-guide.md`](./agent-issue-guide.md)
+> 🛠 **이 문서**: 운영자용 — Cloudflare 위임, GitHub App 생성, cloudflared 터널, launchd 등록, 트러블슈팅
+
 GitHub 이슈를 시작점으로 **Claude CLI 와 Codex CLI 가 협업**하여 플랜·토론·구현·상호 리뷰까지 진행하는 로컬 데몬형 자동화. 무거운 LLM 호출은 사용자 PC 에서 돌고, GitHub Actions 는 가벼운 라벨링·트리거만 담당한다.
 
 ## 사용자 워크플로우

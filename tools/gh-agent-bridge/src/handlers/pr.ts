@@ -30,12 +30,16 @@ export async function handlePrOpened(prNumber: number): Promise<void> {
     author_agent: authorAgent,
   });
 
-  // diff 추출 (gh CLI 사용)
-  const diff = spawnSync(config.GH_CLI, ['pr', 'diff', String(prNumber)], {
-    cwd: config.REPO_DIR,
-    encoding: 'utf8',
-    maxBuffer: 10 * 1024 * 1024,
-  }).stdout ?? '';
+  // diff 추출 — cwd 의 origin remote 가 데몬이 향하는 repo 와 다를 수 있으므로 --repo 명시.
+  const diff = spawnSync(
+    config.GH_CLI,
+    ['pr', 'diff', String(prNumber), '--repo', `${config.GITHUB_OWNER}/${config.GITHUB_REPO}`],
+    {
+      cwd: config.REPO_DIR,
+      encoding: 'utf8',
+      maxBuffer: 10 * 1024 * 1024,
+    },
+  ).stdout ?? '';
 
   const reviewPrompt = buildReviewPrompt(
     reviewer,

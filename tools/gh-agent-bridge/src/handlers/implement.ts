@@ -119,7 +119,10 @@ export async function handleImplement(issueNumber: number, agent: AgentName): Pr
     '-m',
     commitMessage(agent, issue.title, issueNumber),
   ]);
-  const push = await gitInWorktree(worktree, ['push', '-u', 'origin', branch]);
+  // worktree 가 공유하는 git remote `origin` 은 본 working tree 사용자가 선택한 값이라
+  // 데몬이 향해야 할 .env 의 OWNER/REPO 와 다를 수 있다. URL 을 직접 지정해 의도된 repo 로 push.
+  const repoUrl = `git@github.com:${config.GITHUB_OWNER}/${config.GITHUB_REPO}.git`;
+  const push = await gitInWorktree(worktree, ['push', '-u', repoUrl, branch]);
   if (push.code !== 0) {
     await postIssueComment(issueNumber, `❌ push 실패\n\n\`\`\`\n${push.stderr}\n\`\`\``);
     return;
@@ -129,6 +132,8 @@ export async function handleImplement(issueNumber: number, agent: AgentName): Pr
   const prCreate = await shellInWorktree(worktree, config.GH_CLI, [
     'pr',
     'create',
+    '--repo',
+    `${config.GITHUB_OWNER}/${config.GITHUB_REPO}`,
     '--title',
     prTitle(agent, issue.title, issueNumber),
     '--body',

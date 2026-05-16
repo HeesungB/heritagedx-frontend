@@ -8,6 +8,22 @@ export async function createServer() {
   const app = Fastify({ logger: false, bodyLimit: 25 * 1024 * 1024 });
   const webhooks = new Webhooks({ secret: config.GITHUB_WEBHOOK_SECRET });
 
+  // GitHub 서명은 원본 byte 로 계산되므로 raw body 를 보존해야 한다.
+  app.addContentTypeParser(
+    'application/json',
+    { parseAs: 'string' },
+    (req, body, done) => {
+      try {
+        const text = body as string;
+        const json = text ? JSON.parse(text) : {};
+        (req as unknown as { rawBody: string }).rawBody = text;
+        done(null, json);
+      } catch (err) {
+        done(err as Error, undefined);
+      }
+    },
+  );
+
   app.get('/health', async () => ({ ok: true, ts: Date.now() }));
 
   app.post('/webhook', async (req, reply) => {
@@ -18,7 +34,7 @@ export async function createServer() {
       logger.warn({ id, name, hasSig: Boolean(sig) }, '필수 헤더 누락');
       return reply.code(400).send({ error: 'bad request' });
     }
-    const rawBody = JSON.stringify(req.body);
+    const rawBody = (req as unknown as { rawBody?: string }).rawBody ?? '';
     const valid = await webhooks.verify(rawBody, sig);
     if (!valid) {
       logger.warn({ id }, '서명 검증 실패');

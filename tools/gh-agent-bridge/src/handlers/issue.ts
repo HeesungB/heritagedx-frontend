@@ -18,6 +18,19 @@ import { ensureWorktree } from '../worktree.ts';
 
 export async function handleIssueOpened(issueNumber: number): Promise<void> {
   logger.info({ issueNumber }, 'handleIssueOpened');
+
+  // 이미 plan 단계를 지난 이슈는 재진입하지 않는다 (봇 자체 라벨링이 다시 trigger 되는 경우 대비).
+  const existing = stmts.getIssueState.get(issueNumber) as
+    | { last_label?: string | null }
+    | undefined;
+  if (existing?.last_label && existing.last_label !== STATE_LABELS.new) {
+    logger.info(
+      { issueNumber, last_label: existing.last_label },
+      '이미 처리됨 — handleIssueOpened skip',
+    );
+    return;
+  }
+
   const issue = await getIssue(issueNumber);
   const { path, branch } = await ensureWorktree(issueNumber);
   stmts.upsertIssueState.run({

@@ -25,6 +25,7 @@ interface ParsedPayload {
   pull_request?: { number: number };
   comment?: { body: string; user: { login: string } };
   sender?: { login: string };
+  label?: { name: string };
 }
 
 async function dispatch(event: EventRow): Promise<void> {
@@ -33,7 +34,11 @@ async function dispatch(event: EventRow): Promise<void> {
     case 'issues': {
       const n = payload.issue?.number;
       if (!n) return;
-      if (payload.action === 'opened' || payload.action === 'labeled') {
+      if (payload.action === 'opened') {
+        await issueLock(n).add(() => handleIssueOpened(n));
+      } else if (payload.action === 'labeled' && payload.label?.name === 'state:new') {
+        // state:new 라벨이 새로 부여될 때만 plan 단계를 시작한다.
+        // 봇이 부여하는 state:planning / state:plan-ready 등은 cascade 를 일으키므로 여기서 무시.
         await issueLock(n).add(() => handleIssueOpened(n));
       }
       return;

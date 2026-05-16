@@ -22,7 +22,9 @@ function runCli(
 ): Promise<AgentResult> {
   return new Promise((resolve) => {
     logger.info({ cli, label: input.label, cwd: input.cwd }, 'agent invoke');
-    const child = spawn(cli, args, { cwd: input.cwd });
+    // stdin 은 의도적으로 ignore. codex CLI 는 stdin 이 piped 면 추가 prompt 로 인식해 EOF 까지 대기하므로
+    // 우리 spawn 의 기본 'pipe' 가 그대로면 6분 timeout 까지 hang 한다.
+    const child = spawn(cli, args, { cwd: input.cwd, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
     const timer = setTimeout(() => {

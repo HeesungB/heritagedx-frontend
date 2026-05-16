@@ -1,0 +1,10 @@
+# Copy to ~/.cloudflared/config.yml after `cloudflared tunnel create gh-bridge`.
+# Replace <TUNNEL_UUID> with the UUID printed by the create command.
+
+tunnel: gh-bridge
+credentials-file: /Users/heesungbae/.cloudflared/<TUNNEL_UUID>.json
+
+ingress:
+  - hostname: gh-bridge.blackmarket.kr
+    service: http://127.0.0.1:7878
+  - service: http_status:404

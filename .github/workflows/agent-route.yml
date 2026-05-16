@@ -1,0 +1,47 @@
+name: agent-route
+
+# 무거운 일은 로컬 데몬 (gh-agent-bridge) 에 위임한다.
+# Actions 는 가벼운 라벨링만 수행해 데몬이 라벨로 단계를 파악할 수 있게 한다.
+# 데몬도 직접 webhook 으로 같은 이벤트를 받지만, Actions 라벨링은 GitHub UI 에서
+# 상태가 즉시 보이도록 하기 위한 보조 역할이다.
+
+on:
+  issues:
+    types: [opened, reopened]
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  tag-new-issue:
+    if: github.event_name == 'issues' && (github.event.action == 'opened' || github.event.action == 'reopened')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add state:new label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['state:new'],
+            });
+
+  tag-pr-awaiting-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add state:awaiting-review label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['state:awaiting-review'],
+            });

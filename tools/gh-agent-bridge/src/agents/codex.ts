@@ -20,6 +20,11 @@ async function invokeCodex(input: AgentInvocation): Promise<AgentResult> {
     '--skip-git-repo-check',
     '--color',
     'never',
+    // implement 단계에서 codex 가 worktree 안 파일을 직접 써야 하므로
+    // default `read-only` 가 아닌 workspace-write 로 sandbox 를 풀어준다.
+    // plan 단계는 코드 변경을 하지 않으므로 영향 없다.
+    '--sandbox',
+    'workspace-write',
     '-o',
     outFile,
     input.prompt,

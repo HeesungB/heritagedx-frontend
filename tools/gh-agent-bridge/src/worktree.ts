@@ -51,6 +51,21 @@ export async function ensureWorktree(issueNumber: number): Promise<WorktreeInfo>
     }
   }
   logger.info({ issueNumber, path, branch }, 'worktree 생성');
+
+  // 의존성 설치 — worktree 는 root 의 node_modules 를 공유하지 않으므로
+  // lint / type-check 가 binary·config 를 찾도록 lockfile 기반으로 한 번 install 한다.
+  // pnpm-workspace.yaml 이 root 에 있어 worktree 안에서도 정상 동작.
+  logger.info({ issueNumber, path }, 'worktree 의존성 설치 시작 (pnpm install)');
+  const install = await run('pnpm', ['install', '--frozen-lockfile'], path);
+  if (install.code !== 0) {
+    logger.warn(
+      { issueNumber, code: install.code, stderr: install.stderr.slice(0, 1000) },
+      'worktree pnpm install 경고 (계속 진행)',
+    );
+  } else {
+    logger.info({ issueNumber }, 'worktree 의존성 설치 완료');
+  }
+
   return { path, branch };
 }
 
